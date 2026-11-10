@@ -1,0 +1,177 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+/// Frame layout: `[type: u8][payloadLength: u32 BE][payload]`.
+///
+/// Data frames carry raw bytes; every other frame carries UTF-8 JSON. TCP is
+/// already reliable and ordered, so the protocol deliberately has no
+/// per-chunk acknowledgement — only per-file ones, which keeps the pipe full.
+abstract final class FrameType {
+  static const hello = 1;
+  static const session = 2;
+  static const accept = 3;
+  static const fileHeader = 4;
+  static const data = 5;
+  static const fileEnd = 6;
+  static const transferEnd = 7;
+  static const ackFile = 8;
+  static const ackAll = 9;
+  static const error = 10;
+  static const cancel = 11;
+}
+
+class Frame {
+  const Frame(this.type, this.payload);
+  final int type;
+  final Uint8List payload;
+
+  Map<String, Object?> json() {
+    if (payload.isEmpty) return const {};
+    final decoded = jsonDecode(utf8.decode(payload));
+    return decoded is Map<String, Object?> ? decoded : const {};
+  }
+}
+
+class ProtocolException implements Exception {
+  ProtocolException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+/// Encodes control frames. Data frames bypass this and write the 5-byte header
+/// plus the payload directly, so large chunks are never copied twice.
+abstract final class FrameCodec {
+  static Uint8List header(int type, int length) {
+    final header = Uint8List(5);
+    header[0] = type;
+    ByteData.view(header.buffer).setUint32(1, length, Endian.big);
+    return header;
+  }
+
+  static Uint8List json(int type, Map<String, Object?> payload) {
+    final body = utf8.encode(jsonEncode(payload));
+    final frame = Uint8List(5 + body.length);
+    frame[0] = type;
+    ByteData.view(frame.buffer).setUint32(1, body.length, Endian.big);
+    frame.setRange(5, frame.length, body);
+    return frame;
+  }
+}
+
+/// Reassembles frames from arbitrary TCP chunk boundaries.
+class FrameReader {
+  FrameReader(this._onFrame, {this.onError});
+
+  final void Function(Frame frame) _onFrame;
+  final void Function(Object error)? onError;
+
+  Uint8List _buffer = Uint8List(64 * 1024);
+  int _start = 0;
+  int _end = 0;
+
+  void add(Uint8List chunk) {
+    try {
+      _append(chunk);
+      while (_end - _start >= 5) {
+        final available = _end - _start;
+        final length = ByteData.sublistView(
+          _buffer,
+          _start + 1,
+          _start + 5,
+        ).getUint32(0, Endian.big);
+        if (length > 8 * 1024 * 1024) {
+          throw ProtocolException('Frame too large ($length bytes)');
+        }
+        if (available < 5 + length) break;
+        final type = _buffer[_start];
+        final payload = Uint8List.fromList(
+          Uint8List.sublistView(_buffer, _start + 5, _start + 5 + length),
+        );
+        _start += 5 + length;
+        _onFrame(Frame(type, payload));
+      }
+      _compact();
+    } on Object catch (error) {
+      onError?.call(error);
+    }
+  }
+
+  void _append(Uint8List chunk) {
+    final needed = _end + chunk.length;
+    if (needed <= _buffer.length) {
+      _buffer.setRange(_end, needed, chunk);
+      _end = needed;
+      return;
+    }
+    var grown = _buffer.length * 2;
+    while (grown < needed) {
+      grown *= 2;
+    }
+    final next = Uint8List(grown);
+    next.setRange(0, _end - _start, Uint8List.sublistView(_buffer, _start, _end));
+    _end -= _start;
+    _start = 0;
+    next.setRange(_end, _end + chunk.length, chunk);
+    _end += chunk.length;
+    _buffer = next;
+  }
+
+  void _compact() {
+    if (_start == 0) return;
+    if (_start == _end) {
+      _start = 0;
+      _end = 0;
+      return;
+    }
+    // Reclaim the consumed prefix once it dominates the buffer.
+    if (_start > 256 * 1024 && _start * 2 > _buffer.length) {
+      final remaining = _end - _start;
+      _buffer.setRange(0, remaining, Uint8List.sublistView(_buffer, _start, _end));
+      _start = 0;
+      _end = remaining;
+    }
+  }
+}
+
+/// Buffered writer that never awaits a syscall per chunk.
+class FrameWriter {
+  FrameWriter(this._socket);
+
+  final Socket _socket;
+  int _pending = 0;
+  static const _flushThreshold = 4 * 1024 * 1024;
+
+  void json(int type, Map<String, Object?> payload) {
+    _socket.add(FrameCodec.json(type, payload));
+  }
+
+  void beginDataFrame(int length) {
+    _socket.add(FrameCodec.header(FrameType.data, length));
+  }
+
+  void data(Uint8List chunk) {
+    _socket.add(chunk);
+    _pending += chunk.length;
+  }
+
+  /// Only drains the socket buffer once it has grown to a few megabytes, which
+  /// keeps the network pipe saturated without unbounded memory growth.
+  Future<void> maybeFlush({bool force = false}) async {
+    if (!force && _pending < _flushThreshold) return;
+    _pending = 0;
+    await _socket.flush();
+  }
+
+  Future<void> flush() async {
+    _pending = 0;
+    await _socket.flush();
+  }
+
+  void error(String message) {
+    json(FrameType.error, {'message': message});
+  }
+}
+
+const u8Empty = <int>[];

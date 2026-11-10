@@ -1,0 +1,117 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:free_send/services/transfer/protocol.dart';
+
+/// Turns a socket into an await-able sequence of frames plus a buffered writer.
+///
+/// Reading is pull-based (`next()`), which serialises file writes on the
+/// receiving side and gives natural backpressure through TCP.
+class FrameChannel {
+  FrameChannel(this.socket) {
+    try {
+      socket.setOption(SocketOption.tcpNoDelay, true);
+    } on Object {
+      // Not fatal: some desktop stacks ignore this option.
+    }
+    writer = FrameWriter(socket);
+    // A write to a reset socket surfaces on `done`; with no listener that error
+    // escapes as an unhandled async error in the app's zone.
+    unawaited(socket.done.then<void>((_) {}, onError: (Object _) {}));
+    _reader = FrameReader(_onFrame, onError: _fail);
+    // Keep the subscription alive after an error: a reset connection often
+    // reports a second error, and with `cancelOnError` that one would reach the
+    // zone's uncaught handler instead of being folded into `_fail`.
+    _subscription = socket.listen(
+      _reader.add,
+      onError: _fail,
+      onDone: _markClosed,
+      cancelOnError: false,
+    );
+  }
+
+  final Socket socket;
+  late final FrameWriter writer;
+  late final FrameReader _reader;
+  late final StreamSubscription<Uint8List> _subscription;
+
+  final _pending = <Frame>[];
+  Completer<Frame>? _waiter;
+  Object? _error;
+  bool _closed = false;
+
+  bool get isClosed => _closed || _error != null;
+
+  Future<Frame> next({Duration timeout = const Duration(minutes: 5)}) {
+    if (_pending.isNotEmpty) {
+      return Future.value(_pending.removeAt(0));
+    }
+    if (_error != null) return Future.error(_error!);
+    if (_closed) {
+      return Future.error(ProtocolException('The other device closed the connection'));
+    }
+    final completer = Completer<Frame>();
+    _waiter = completer;
+    return completer.future.timeout(timeout, onTimeout: () {
+      if (identical(_waiter, completer)) _waiter = null;
+      throw TimeoutException('Timed out waiting for the other device', timeout);
+    });
+  }
+
+  void _onFrame(Frame frame) {
+    final waiter = _waiter;
+    if (waiter != null && !waiter.isCompleted) {
+      _waiter = null;
+      waiter.complete(frame);
+      return;
+    }
+    _pending.add(frame);
+  }
+
+  void _fail(Object error) {
+    if (_error != null) return;
+    _error = error is ProtocolException
+        ? error
+        : ProtocolException(error.toString());
+    final waiter = _waiter;
+    _waiter = null;
+    if (waiter != null && !waiter.isCompleted) {
+      waiter.completeError(_error!);
+    }
+  }
+
+  void _markClosed() {
+    _closed = true;
+    final waiter = _waiter;
+    _waiter = null;
+    if (waiter != null && !waiter.isCompleted) {
+      waiter.completeError(
+        ProtocolException('The other device closed the connection'),
+      );
+    }
+  }
+
+  /// Returns the next frame, or null when the peer closes cleanly.
+  Future<Frame?> nextOrNull({Duration timeout = const Duration(seconds: 30)}) async {
+    try {
+      return await next(timeout: timeout);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> close() async {
+    try {
+      await socket.flush();
+    } on Object {
+      // Ignore: the socket may already be gone.
+    }
+    try {
+      await _subscription.cancel();
+    } on Object {
+      // Ignore.
+    }
+    socket.destroy();
+    _closed = true;
+  }
+}

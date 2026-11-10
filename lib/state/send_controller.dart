@@ -1,0 +1,306 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
+import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/models/transfer_item.dart';
+import 'package:free_send/models/transfer_record.dart';
+import 'package:free_send/services/discovery_service.dart';
+import 'package:free_send/services/hotspot/hotspot_permissions.dart';
+import 'package:free_send/services/hotspot/hotspot_service.dart';
+import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/transfer_host.dart';
+import 'package:free_send/state/app_state.dart';
+
+enum SendPhase {
+  idle,
+  preparing,
+  waitingForPeer,
+  transferring,
+  completed,
+  failed,
+  cancelled,
+}
+
+/// Drives the sending side: hotspot up, listener up, beacons out, files pushed.
+class SendController extends ChangeNotifier {
+  SendController({required this.appState, HotspotService? hotspotService})
+      : _hotspotService = hotspotService ?? createHotspotService();
+
+  final AppState appState;
+  final HotspotService _hotspotService;
+  final SessionBroadcaster _broadcaster = SessionBroadcaster();
+
+  final List<TransferItem> items = [];
+
+  SendPhase phase = SendPhase.idle;
+  HotspotInfo? hotspot;
+  String? errorMessage;
+  String? peerName;
+  String? peerPlatform;
+  int port = AppConstants.transferPort;
+
+  int totalBytes = 0;
+  int sentBytes = 0;
+  double speedBytesPerSecond = 0;
+  String? currentFileName;
+
+  TransferHost? _host;
+  Stopwatch? _stopwatch;
+  DateTime? _lastSampleAt;
+  int _lastSampleBytes = 0;
+  int _id = 0;
+  TransferRecord? lastRecord;
+
+  bool get canCreateHotspot => _hotspotService.canCreate;
+
+  /// The invitation the other device can scan. It only exists once the
+  /// listener is up, and only carries a hotspot when this app created one:
+  /// on Windows and macOS the session runs over a network the user picked, so
+  /// the code just points at the address.
+  PairingCode? get pairingCode {
+    final info = hotspot;
+    if (info == null || port <= 0) return null;
+    if (phase != SendPhase.waitingForPeer && phase != SendPhase.transferring) {
+      return null;
+    }
+    final code = PairingCode(
+      ssid: info.created ? info.ssid : null,
+      password: info.created ? info.password : null,
+      host: info.ip,
+      port: port,
+      senderName: appState.deviceName,
+      senderPlatform: PlatformEnv.label,
+    );
+    return code.isUsable ? code : null;
+  }
+  bool get isBusy =>
+      phase == SendPhase.preparing ||
+      phase == SendPhase.waitingForPeer ||
+      phase == SendPhase.transferring;
+  bool get hasPeer => _host?.hasPeer ?? false;
+
+  int get remainingBytes => (totalBytes - sentBytes).clamp(0, totalBytes);
+
+  double get overallProgress {
+    if (phase == SendPhase.completed) return 1;
+    if (totalBytes <= 0) return 0;
+    return (sentBytes / totalBytes).clamp(0, 1);
+  }
+
+  /// Picks up files chosen by the user. Duplicates of the same path are skipped.
+  void addFiles(List<File> files, {String? relativePath}) {
+    final existing = {for (final item in items) item.path};
+    for (final file in files) {
+      if (existing.contains(file.path)) continue;
+      final item = TransferItem.fromFile(file, relativePath: relativePath);
+      if (item == null) continue;
+      item.id = 'f${_id++}';
+      items.add(item);
+      existing.add(file.path);
+    }
+    _recalculateTotal();
+    notifyListeners();
+  }
+
+  void removeItem(TransferItem item) {
+    items.remove(item);
+    _recalculateTotal();
+    notifyListeners();
+  }
+
+  void clearFiles() {
+    items.clear();
+    _recalculateTotal();
+    notifyListeners();
+  }
+
+  void _recalculateTotal() {
+    totalBytes = items.fold<int>(0, (sum, item) => sum + item.size);
+  }
+
+  Future<void> startSession() async {
+    if (items.isEmpty || isBusy) return;
+    phase = SendPhase.preparing;
+    errorMessage = null;
+    peerName = null;
+    sentBytes = 0;
+    speedBytesPerSecond = 0;
+    notifyListeners();
+
+    try {
+      await ensureHotspotPermissions();
+
+      hotspot = await _hotspotService.start(deviceName: appState.deviceName);
+      if (hotspot!.note != null) {
+        // Surfaced in the connection panel, not as an error.
+        debugPrint('Free Send: ${hotspot!.note}');
+      }
+
+      final bindAddress = hotspot?.ip ?? await localIpv4();
+      final host = TransferHost(
+        items: items,
+        deviceName: appState.deviceName,
+        instanceId: appState.instanceId,
+        events: HostEvents(
+          onPeerConnected: _onPeerConnected,
+          onProgress: _onProgress,
+          onFinished: _onFinished,
+          onError: _onHostError,
+        ),
+      );
+      port = await host.start();
+      _host = host;
+
+      await _broadcaster.start(
+        instanceId: appState.instanceId,
+        deviceName: appState.deviceName,
+        platform: PlatformEnv.label,
+        port: port,
+        fileCount: items.length,
+        totalBytes: totalBytes,
+        bindAddress: bindAddress,
+      );
+
+      phase = SendPhase.waitingForPeer;
+      notifyListeners();
+    } on HotspotException catch (error) {
+      _fail(error.message);
+    } on SocketException catch (error) {
+      _fail('Could not open the transfer listener: ${error.message}');
+    } on Object catch (error) {
+      _fail('Could not start sharing: $error');
+    }
+  }
+
+  void _onPeerConnected(String name, String? platform) {
+    peerName = name;
+    peerPlatform = platform;
+    notifyListeners();
+  }
+
+  void _onProgress(TransferItem item, int _) {
+    currentFileName = item.name;
+    sentBytes = items.fold<int>(0, (sum, entry) => sum + entry.transferred);
+    _sampleSpeed();
+    if (phase != SendPhase.transferring) {
+      phase = SendPhase.transferring;
+      _stopwatch = Stopwatch()..start();
+    }
+    notifyListeners();
+  }
+
+  void _sampleSpeed() {
+    final now = DateTime.now();
+    final last = _lastSampleAt;
+    if (last == null) {
+      _lastSampleAt = now;
+      _lastSampleBytes = sentBytes;
+      return;
+    }
+    final elapsed = now.difference(last).inMilliseconds;
+    if (elapsed < AppConstants.progressInterval.inMilliseconds) return;
+    final delta = sentBytes - _lastSampleBytes;
+    final instant = delta / (elapsed / 1000);
+    // Exponential smoothing keeps the number readable while it fluctuates.
+    speedBytesPerSecond =
+        speedBytesPerSecond == 0 ? instant : speedBytesPerSecond * 0.7 + instant * 0.3;
+    _lastSampleAt = now;
+    _lastSampleBytes = sentBytes;
+  }
+
+  void _onFinished(int fileCount, int bytes, Duration elapsed) {
+    _stopwatch?.stop();
+    sentBytes = bytes;
+    totalBytes = totalBytes == 0 ? bytes : totalBytes;
+    phase = SendPhase.completed;
+    _finishSession(files: fileCount, bytes: bytes, duration: elapsed, ok: true);
+    notifyListeners();
+  }
+
+  void _onHostError(String message) {
+    if (phase == SendPhase.completed || phase == SendPhase.cancelled) return;
+    _fail(message);
+  }
+
+  void _fail(String message) {
+    errorMessage = message;
+    phase = SendPhase.failed;
+    unawaited(_teardown());
+    notifyListeners();
+  }
+
+  Future<void> cancelSession() async {
+    if (phase == SendPhase.idle) return;
+    final bytes = sentBytes;
+    final files = items.where((item) => item.transferred > 0).length;
+    phase = SendPhase.cancelled;
+    notifyListeners();
+    await _teardown();
+    if (bytes > 0) {
+      await _finishSession(
+        files: files,
+        bytes: bytes,
+        duration: _stopwatch?.elapsed ?? Duration.zero,
+        ok: false,
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> _finishSession({
+    required int files,
+    required int bytes,
+    required Duration duration,
+    required bool ok,
+  }) async {
+    final record = TransferRecord(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      direction: TransferDirection.send,
+      peerName: peerName ?? 'Nearby device',
+      peerPlatform: peerPlatform,
+      fileCount: files,
+      bytes: bytes,
+      timestamp: DateTime.now(),
+      durationMs: duration.inMilliseconds,
+      succeeded: ok,
+    );
+    lastRecord = record;
+    await appState.recordTransfer(record);
+  }
+
+  Future<void> _teardown() async {
+    await _broadcaster.stop();
+    await _host?.dispose();
+    _host = null;
+    await _hotspotService.stop();
+  }
+
+  /// Leaves the session view but keeps picked files, ready for another round.
+  Future<void> reset() async {
+    await _teardown();
+    hotspot = null;
+    peerName = null;
+    peerPlatform = null;
+    errorMessage = null;
+    sentBytes = 0;
+    speedBytesPerSecond = 0;
+    currentFileName = null;
+    _lastSampleAt = null;
+    _lastSampleBytes = 0;
+    for (final item in items) {
+      item.transferred = 0;
+      item.done = false;
+    }
+    phase = SendPhase.idle;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_teardown());
+    super.dispose();
+  }
+}

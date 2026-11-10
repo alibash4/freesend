@@ -1,0 +1,362 @@
+import 'package:flutter/material.dart';
+
+/// Pure page backgrounds, one accent, and a neutral grey ramp with no colour
+/// cast. Content sits directly on the page; where a section needs grouping it
+/// gets a soft neutral fill instead of a border or a shadow.
+abstract final class AppColors {
+  /// The single accent. Used for primary fills, selection and focus.
+  static const accent = Color(0xFF1E90FF);
+
+  /// The accent darkened for small text on light surfaces, where #1E90FF is
+  /// too light to read comfortably.
+  static const accentDeep = Color(0xFF0B63C5);
+
+  static const accentWash = Color(0xFFEAF4FF);
+  static const accentInk = Color(0xFF08365C);
+  static const accentWashDark = Color(0xFF102F4C);
+  static const accentInkDark = Color(0xFFA9D4FF);
+
+  /// Page backgrounds: pure white, and near-black for dark mode.
+  static const page = Color(0xFFFFFFFF);
+  static const ink = Color(0xFF1C1C1C);
+
+  static const neutral0 = Color(0xFFFFFFFF);
+  static const neutral50 = Color(0xFFFAFAFA);
+  static const neutral100 = Color(0xFFF5F5F5);
+  static const neutral200 = Color(0xFFE5E5E5);
+  static const neutral300 = Color(0xFFD4D4D4);
+  static const neutral400 = Color(0xFFA3A3A3);
+  static const neutral500 = Color(0xFF737373);
+  static const neutral600 = Color(0xFF525252);
+  static const neutral700 = Color(0xFF404040);
+  static const neutral800 = Color(0xFF262626);
+  static const neutral900 = Color(0xFF171717);
+
+  // One value each, used everywhere: no pale or dark variants.
+  static const success = Color(0xFF16A34A);
+  static const danger = Color(0xFFDC2626);
+}
+
+abstract final class AppRadii {
+  static const card = 18.0;
+  static const field = 12.0;
+  static const pill = 999.0;
+}
+
+abstract final class AppSpacing {
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 16.0;
+  static const lg = 24.0;
+  static const xl = 32.0;
+}
+
+extension AppSchemeColors on ColorScheme {
+  bool get isLight => brightness == Brightness.light;
+
+  /// Accent colour that stays readable as text on this brightness.
+  Color get accentText => isLight ? AppColors.accentDeep : AppColors.accent;
+
+  /// Fill for grouped content that needs to stand slightly off the page.
+  Color get softFill => surfaceContainerLow;
+
+  /// Hairline between rows.
+  Color get hairline => outlineVariant;
+}
+
+abstract final class AppTheme {
+  static ThemeData light() {
+    const scheme = ColorScheme(
+      brightness: Brightness.light,
+      primary: AppColors.accent,
+      onPrimary: AppColors.neutral0,
+      primaryContainer: AppColors.accentWash,
+      onPrimaryContainer: AppColors.accentInk,
+      secondary: AppColors.neutral700,
+      onSecondary: AppColors.neutral0,
+      secondaryContainer: AppColors.neutral100,
+      onSecondaryContainer: AppColors.neutral900,
+      tertiary: AppColors.accent,
+      onTertiary: AppColors.neutral0,
+      error: AppColors.danger,
+      onError: AppColors.neutral0,
+      surface: AppColors.page,
+      onSurface: AppColors.ink,
+      surfaceContainerLowest: AppColors.neutral0,
+      surfaceContainerLow: AppColors.neutral50,
+      surfaceContainer: AppColors.neutral50,
+      surfaceContainerHigh: AppColors.neutral100,
+      surfaceContainerHighest: AppColors.neutral200,
+      onSurfaceVariant: AppColors.neutral600,
+      outline: AppColors.neutral200,
+      outlineVariant: Color(0xFFEDEDED),
+      shadow: Color(0x0F000000),
+      scrim: Color(0x66000000),
+      inverseSurface: AppColors.neutral900,
+      onInverseSurface: AppColors.neutral50,
+    );
+    return _base(scheme, AppColors.page);
+  }
+
+  static ThemeData dark() {
+    const scheme = ColorScheme(
+      brightness: Brightness.dark,
+      primary: AppColors.accent,
+      onPrimary: AppColors.neutral0,
+      primaryContainer: AppColors.accentWashDark,
+      onPrimaryContainer: AppColors.accentInkDark,
+      secondary: AppColors.neutral300,
+      onSecondary: AppColors.neutral900,
+      secondaryContainer: AppColors.neutral800,
+      onSecondaryContainer: AppColors.neutral100,
+      tertiary: AppColors.accent,
+      onTertiary: AppColors.neutral0,
+      error: AppColors.danger,
+      onError: AppColors.neutral0,
+      surface: AppColors.ink,
+      onSurface: AppColors.neutral100,
+      surfaceContainerLowest: Color(0xFF181818),
+      surfaceContainerLow: Color(0xFF212121),
+      surfaceContainer: Color(0xFF232323),
+      surfaceContainerHigh: Color(0xFF292929),
+      surfaceContainerHighest: Color(0xFF303030),
+      onSurfaceVariant: AppColors.neutral400,
+      outline: Color(0xFF3A3A3A),
+      outlineVariant: Color(0xFF2C2C2C),
+      shadow: Color(0x66000000),
+      scrim: Color(0x99000000),
+      inverseSurface: AppColors.neutral100,
+      onInverseSurface: AppColors.neutral900,
+    );
+    return _base(scheme, AppColors.ink);
+  }
+
+  static ThemeData _base(ColorScheme scheme, Color page) {
+    final textTheme = _textTheme(scheme);
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: page,
+      canvasColor: page,
+      textTheme: textTheme,
+      splashFactory: InkSparkle.splashFactory,
+      dividerColor: scheme.outlineVariant,
+      dividerTheme: DividerThemeData(
+        color: scheme.outlineVariant,
+        thickness: 1,
+        space: 1,
+      ),
+      iconTheme: IconThemeData(color: scheme.onSurface, size: 20),
+      appBarTheme: AppBarTheme(
+        backgroundColor: page,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: textTheme.titleLarge,
+        iconTheme: IconThemeData(color: scheme.onSurface, size: 20),
+        actionsIconTheme: IconThemeData(color: scheme.onSurface, size: 20),
+      ),
+      // Cards carry a soft fill and nothing else: no border, no shadow.
+      cardTheme: CardThemeData(
+        color: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          textStyle: textTheme.labelLarge,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.field),
+          ),
+        ),
+      ),
+      // The secondary button is a soft neutral fill rather than an outline.
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          ),
+          textStyle: WidgetStatePropertyAll(textTheme.labelLarge),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? scheme.surfaceContainerLow
+                : scheme.surfaceContainerHigh,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? scheme.onSurfaceVariant.withValues(alpha: 0.5)
+                : scheme.onSurface,
+          ),
+          side: const WidgetStatePropertyAll(BorderSide.none),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.field),
+            ),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          textStyle: textTheme.labelLarge,
+          foregroundColor: scheme.accentText,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surfaceContainerHigh,
+        contentPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          20,
+          AppSpacing.md,
+          14,
+        ),
+        hintStyle: textTheme.bodyMedium?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+        floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+          (states) => textTheme.labelMedium!.copyWith(
+            color: states.contains(WidgetState.focused)
+                ? scheme.accentText
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderSide: BorderSide(color: scheme.error, width: 1.5),
+        ),
+      ),
+      // The bar shares the page colour, so navigation sits on the page too.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: page,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primaryContainer,
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+        ),
+        height: 66,
+        elevation: 0,
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => textTheme.labelSmall!.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? scheme.accentText
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 20,
+            color: states.contains(WidgetState.selected)
+                ? scheme.accentText
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: scheme.onInverseSurface,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.field),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+        modalBarrierColor: scheme.scrim,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(5),
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: scheme.primary,
+        linearTrackColor: scheme.surfaceContainerHigh,
+        circularTrackColor: scheme.surfaceContainerHigh,
+      ),
+    );
+  }
+
+  static TextTheme _textTheme(ColorScheme scheme) {
+    final base = ThemeData(
+      brightness: scheme.brightness,
+      colorScheme: scheme,
+    ).textTheme;
+    return base.copyWith(
+      displaySmall: base.displaySmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.8,
+        color: scheme.onSurface,
+      ),
+      headlineMedium: base.headlineMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.5,
+        color: scheme.onSurface,
+      ),
+      headlineSmall: base.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.3,
+        color: scheme.onSurface,
+      ),
+      titleLarge: base.titleLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
+        fontSize: 19,
+        color: scheme.onSurface,
+      ),
+      titleMedium: base.titleMedium?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
+      ),
+      bodyMedium: base.bodyMedium?.copyWith(
+        height: 1.45,
+        color: scheme.onSurface,
+      ),
+      bodySmall: base.bodySmall?.copyWith(
+        height: 1.45,
+        color: scheme.onSurfaceVariant,
+      ),
+      labelLarge: base.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+      ),
+      labelSmall: base.labelSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+      ),
+    );
+  }
+}
