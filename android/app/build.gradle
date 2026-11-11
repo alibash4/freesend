@@ -14,15 +14,13 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-def hasReleaseKey() {
-    if (keystorePropertiesFile.exists()) {
-        return keystoreProperties['STORE_FILE'] != null &&
-               keystoreProperties['STORE_PASSWORD'] != null &&
-               keystoreProperties['KEY_ALIAS'] != null &&
-               keystoreProperties['KEY_PASSWORD'] != null
-    }
-    return false
-}
+// A plain value, not a method: closures inside the android block capture
+// surrounding locals, but a method cannot see them.
+def hasReleaseKey = keystorePropertiesFile.exists() &&
+    keystoreProperties['STORE_FILE'] != null &&
+    keystoreProperties['STORE_PASSWORD'] != null &&
+    keystoreProperties['KEY_ALIAS'] != null &&
+    keystoreProperties['KEY_PASSWORD'] != null
 
 android {
     namespace = "com.freesend.free_send"
@@ -30,12 +28,12 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8
+        jvmTarget = "17"
     }
 
     defaultConfig {
@@ -49,7 +47,7 @@ android {
 
     signingConfigs {
         release {
-            if (hasReleaseKey()) {
+            if (hasReleaseKey) {
                 storeFile file(keystoreProperties['STORE_FILE'])
                 storePassword keystoreProperties['STORE_PASSWORD']
                 keyAlias keystoreProperties['KEY_ALIAS']
@@ -60,7 +58,7 @@ android {
 
     buildTypes {
         release {
-            if (hasReleaseKey()) {
+            if (hasReleaseKey) {
                 signingConfig signingConfigs.release
             } else {
                 // TODO: Replace with a real keystore for published builds.

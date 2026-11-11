@@ -129,7 +129,9 @@ class HotspotBridge(
     private fun ssidOf(res: WifiManager.LocalOnlyHotspotReservation): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val ap = res.softApConfiguration
-            if (!ap?.ssid.isNullOrEmpty()) return ap!!.ssid
+            // isNullOrEmpty lets Kotlin smart-cast the platform type to String.
+            val ssid = ap?.ssid
+            if (!ssid.isNullOrEmpty()) return ssid
         }
         @Suppress("DEPRECATION")
         val legacy = res.wifiConfiguration?.SSID ?: ""
@@ -139,7 +141,8 @@ class HotspotBridge(
     private fun passwordOf(res: WifiManager.LocalOnlyHotspotReservation): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val ap = res.softApConfiguration
-            if (!ap?.passphrase.isNullOrEmpty()) return ap!!.passphrase
+            val passphrase = ap?.passphrase
+            if (!passphrase.isNullOrEmpty()) return passphrase
         }
         @Suppress("DEPRECATION")
         val legacy = res.wifiConfiguration?.preSharedKey ?: ""
