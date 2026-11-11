@@ -141,8 +141,8 @@ Create the release first, then let the pipeline attach the binary to it.
 3. If a tag has no release at all, the job creates one for you, using the commit
    log since the previous tag as the notes.
 
-The build job builds only the ABI splits on `main` to keep a push cheap, and
-adds the universal APK on tags.
+The build job runs the same set on `main` and on tags: analyze, test, the two
+ABI splits and the universal APK.
 
 Two things must be configured once:
 
