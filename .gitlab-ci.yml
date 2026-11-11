@@ -9,9 +9,9 @@ stages:
   - build
   - release
 
-variables:
-  # Keep in step with the Flutter version installed on the dev machine.
-  FLUTTER_VERSION: "3.47.5"
+# The versioned tags in this image stop at 3.38.x, so track `stable` (currently
+# Flutter 3.44.0) — it ships the Android SDK too. The build runs on every push
+# to main, so a Flutter bump that breaks the app shows up immediately.
 
 default:
   before_script:
@@ -19,7 +19,7 @@ default:
 
 build:apk:
   stage: build
-  image: "ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION}"
+  image: "ghcr.io/cirruslabs/flutter:stable"
   before_script:
     # Job-level before_script replaces the default one, so both run here.
     - sh scripts/setup_signing.sh
