@@ -20,6 +20,10 @@ default:
 build:apk:
   stage: build
   image: "ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION}"
+  before_script:
+    # Job-level before_script replaces the default one, so both run here.
+    - sh scripts/setup_signing.sh
+    - export PATH="$PATH:$HOME/.pub-cache/bin"
   script:
     - flutter --version
     - flutter pub get

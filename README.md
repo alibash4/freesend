@@ -135,8 +135,16 @@ Two things must be configured once:
    CI/CD variable (Settings → CI/CD → Variables). Creating a release in the UI
    does not remove the need for this: the job still has to upload the APK and
    attach it, and `CI_JOB_TOKEN` cannot do that. Mark the variable **masked**.
-2. **A signing keystore** — create `android/key.properties` locally and keep the
-   same key for every release:
+
+   Also check **Protect variable**. A protected variable only reaches pipelines
+   on protected branches or tags. If you leave it off, every pipeline can see
+   it. If you turn it on, you must also protect your release tags
+   (Settings → Repository → Protected tags, rule `v*`) or the tag pipeline
+   will not receive the token and the job will fail with a 401.
+
+2. **A signing keystore** — one stable key, or Android refuses to install an
+   update over an existing copy. Locally, create `android/key.properties`
+   (gitignored):
 
    ```
    STORE_FILE=/absolute/path/to/freesend.keystore
@@ -145,8 +153,26 @@ Two things must be configured once:
    KEY_PASSWORD=...
    ```
 
-   Without it the build falls back to debug signing, and an update installed
-   over a differently signed copy is rejected.
+   Generate the keystore once and keep it somewhere safe; losing it means no
+   further updates to installed copies:
+
+   ```bash
+   keytool -genkeypair -v -keystore ~/freesend.keystore \
+     -alias freesend -keyalg RSA -keysize 4096 -validity 10000
+   ```
+
+   For CI, add the same key as four CI/CD variables and the pipeline writes
+   `key.properties` itself:
+
+   | Variable | Value |
+   | --- | --- |
+   | `SIGNING_KEYSTORE_BASE64` | `base64 -w0 ~/freesend.keystore` |
+   | `SIGNING_STORE_PASSWORD` | keystore password |
+   | `SIGNING_KEY_ALIAS` | `freesend` |
+   | `SIGNING_KEY_PASSWORD` | key password |
+
+   Without these the build falls back to debug signing, which is fine for
+   testing but will not update a properly signed release.
 
 ## Tests
 
