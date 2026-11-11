@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/services/update/package_format.dart';
 import 'package:free_send/services/update/update_info.dart';
 import 'package:free_send/services/update/update_service.dart';
 
@@ -281,6 +282,126 @@ void main() {
       final info = await service.fetchLatest(abi: 'arm64-v8a');
       expect(info, isNotNull);
       expect(info!.downloadUrl, 'https://gitlab.com/a/freesend.apk');
+    });
+  });
+
+  group('UpdateService linux and windows packages', () {
+    final release = {
+      'tag_name': 'v1.4.0',
+      'description': 'Packages.',
+      'assets': {
+        'links': [
+          {
+            'name': 'Free Send for Linux (AppImage)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend.AppImage',
+          },
+          {
+            'name': 'Free Send for Linux (deb)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend.deb',
+          },
+          {
+            'name': 'Free Send for Linux (rpm)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend.rpm',
+          },
+          {
+            'name': 'Free Send for Linux (bundle)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend.tar.gz',
+          },
+          {
+            'name': 'Free Send for Windows (exe)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-windows.zip',
+          },
+          {
+            'name': 'Free Send for Android (64-bit)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-64.apk',
+          },
+        ],
+      },
+    };
+
+    Future<UpdateInfo?> fetch(PlatformKind platform, PackageFormat format) {
+      final service = UpdateService(
+        platform: platform,
+        packageFormat: format,
+        client: MockClient(
+          (_) async => http.Response(jsonEncode([release]), 200),
+        ),
+      );
+      addTearDown(service.dispose);
+      return service.fetchLatest();
+    }
+
+    test('an AppImage install downloads the AppImage', () async {
+      final info = await fetch(PlatformKind.linux, PackageFormat.appImage);
+      expect(info!.downloadUrl, contains('AppImage'));
+    });
+
+    test('a deb install downloads the deb', () async {
+      final info = await fetch(PlatformKind.linux, PackageFormat.deb);
+      expect(info!.downloadUrl, endsWith('.deb'));
+    });
+
+    test('an rpm install downloads the rpm', () async {
+      final info = await fetch(PlatformKind.linux, PackageFormat.rpm);
+      expect(info!.downloadUrl, endsWith('.rpm'));
+    });
+
+    test('a raw bundle downloads the tar.gz', () async {
+      final info = await fetch(PlatformKind.linux, PackageFormat.bundle);
+      expect(info!.downloadUrl, endsWith('.tar.gz'));
+    });
+
+    test('Windows downloads the exe zip', () async {
+      final info = await fetch(PlatformKind.windows, PackageFormat.windows);
+      expect(info!.downloadUrl, contains('windows.zip'));
+    });
+
+    test('a deb install falls back to the bundle when no deb was published',
+        () async {
+      final service = UpdateService(
+        platform: PlatformKind.linux,
+        packageFormat: PackageFormat.deb,
+        client: MockClient((_) async => http.Response(jsonEncode([
+          {
+            'tag_name': 'v1.4.0',
+            'description': '',
+            'assets': {
+              'links': [
+                {
+                  'name': 'Free Send for Linux (bundle)',
+                  'direct_asset_url': 'https://gitlab.com/a/freesend.tar.gz',
+                },
+              ],
+            },
+          },
+        ]), 200)),
+      );
+      addTearDown(service.dispose);
+      final info = await service.fetchLatest();
+      expect(info!.downloadUrl, endsWith('.tar.gz'));
+    });
+  });
+
+  group('package format marker', () {
+    test('APPIMAGE wins over a bundle marker', () {
+      expect(
+        detectPackageFormat(
+          environment: {'APPIMAGE': '/tmp/FreeSend.AppImage'},
+          markerText: 'bundle',
+        ),
+        PackageFormat.appImage,
+      );
+    });
+
+    test('package-kind selects deb and rpm', () {
+      expect(
+        detectPackageFormat(environment: {}, markerText: 'deb'),
+        PackageFormat.deb,
+      );
+      expect(
+        detectPackageFormat(environment: {}, markerText: 'rpm'),
+        PackageFormat.rpm,
+      );
     });
   });
 

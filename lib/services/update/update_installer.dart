@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/services/update/update_apply.dart';
 
 /// How an update is handed to the operating system.
 enum InstallMethod {
@@ -22,7 +23,10 @@ enum InstallMethod {
 /// native installer UI; this class only decides which path to take and owns
 /// the channel name.
 class UpdateInstaller {
-  UpdateInstaller({this.channel = _defaultChannel});
+  UpdateInstaller({this.channel = _defaultChannel, UpdateApply? apply})
+      : _apply = apply ?? const UpdateApply();
+
+  final UpdateApply _apply;
 
   static const _defaultChannel =
       MethodChannel('com.freesend.free_send/updates');
@@ -62,10 +66,16 @@ class UpdateInstaller {
           'version': version,
         });
       case InstallMethod.replaceAndRelaunch:
-        await channel.invokeMethod<void>('installPackage', {
-          'path': file.path,
-          'version': version,
-        });
+        try {
+          await channel.invokeMethod<void>('installPackage', {
+            'path': file.path,
+            'version': version,
+          });
+        } on MissingPluginException {
+          // Desktop runners have no native updater channel. Apply the package
+          // the pipeline published (AppImage, deb, rpm, bundle, or Windows zip).
+          await _apply.apply(file);
+        }
       case InstallMethod.unsupported:
         throw UnsupportedError(
           'Automatic updates are not available on ${PlatformEnv.label}.',

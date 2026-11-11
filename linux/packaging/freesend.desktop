@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Free Send
+Comment=Direct transfer. No cloud.
+Exec=freesend
+Icon=freesend
+Categories=Network;FileTransfer;
+Terminal=false

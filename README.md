@@ -107,21 +107,28 @@ The app can check GitLab Releases for a newer build and install it.
   size. **Download update** pulls the asset, then **Install and restart** hands
   it to the OS installer and exits the app.
 
-Releases are matched to the platform by a name suffix on the release asset
-(`android`, `linux`, `windows`, `macos`), so one release can carry all four
-builds.
+Releases are matched to the platform by a word in the asset name
+(`android`, `linux`, `windows`, `macos`). Linux and Windows also carry a
+format marker, and the app downloads the package that matches how it was
+installed:
 
-Android releases carry three assets, and the app picks the one for its own ABI:
+| Asset name | File | Who gets it |
+| --- | --- | --- |
+| `Free Send for Android (32-bit)` | armeabi-v7a APK | 32-bit phones |
+| `Free Send for Android (64-bit)` | arm64-v8a APK | 64-bit phones |
+| `Free Send for Android (universal)` | all ABIs, including emulators | x86_64, or when no split matches |
+| `Free Send for Linux (AppImage)` | `.AppImage` | running from an AppImage (`APPIMAGE` is set) |
+| `Free Send for Linux (deb)` | `.deb` | Debian/Ubuntu package (`package-kind` is `deb`) |
+| `Free Send for Linux (rpm)` | `.rpm` | Fedora/RHEL package (`package-kind` is `rpm`) |
+| `Free Send for Linux (bundle)` | `.tar.gz` of the raw build | an unpacked `free_send` bundle |
+| `Free Send for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
 
-| Asset | Contents |
-| --- | --- |
-| `Free Send for Android (32-bit)` | armeabi-v7a |
-| `Free Send for Android (64-bit)` | arm64-v8a |
-| `Free Send for Android` | universal: armeabi-v7a, arm64-v8a and x86_64 |
-
-The ABI is read from the device, so a 64-bit phone downloads the 26 MB build
-instead of the 69 MB universal one. x86_64 (emulators) has no split and falls
-back to the universal APK.
+The Android ABI is read from the device, so a 64-bit phone downloads the
+smaller split instead of the universal APK. A Linux install that cannot find
+its own format falls back to the raw bundle, then the AppImage. Installing a
+deb or rpm asks the system for permission (`pkexec`). An AppImage, the raw
+bundle, and the Windows zip replace themselves after the app exits and then
+relaunch.
 
 Android requires the user to grant *install unknown apps* to Free Send; the
 install bridge checks for it and points at the system page when it is missing.
@@ -135,14 +142,19 @@ Create the release first, then let the pipeline attach the binary to it.
 1. **Make the release** in GitLab: Deploy → Releases → New release, pick a tag
    (or type `v1.2.3` to create it), write the release notes, and save. Creating
    the tag is what triggers the pipeline.
-2. The `release:publish` job builds the APKs, uploads them, and **attaches
-   them to that release** as "Free Send for Android (32-bit)",
-   "(64-bit)" and the universal build. Your release notes are left alone.
+2. The `release:publish` job uploads every package the build jobs produced
+   and **attaches them to that release** under the names in the table above.
+   Your release notes are left alone. A missing file (for example the Windows
+   zip, when no Windows runner is available) is skipped; the rest are still
+   attached.
 3. If a tag has no release at all, the job creates one for you, using the commit
    log since the previous tag as the notes.
 
-The build job runs the same set on `main` and on tags: analyze, test, the two
-ABI splits and the universal APK.
+`build:apk` runs on `main` and on tags: analyze, test, the two ABI splits and
+the universal APK. `build:linux` produces the AppImage, deb, rpm and the raw
+tar.gz. `build:windows` runs on a GitLab Windows runner and zips `free_send.exe`
+with its DLLs; that job is allowed to fail so a missing runner does not block
+the release.
 
 Two things must be configured once:
 

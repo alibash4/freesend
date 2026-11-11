@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/services/update/package_format.dart';
 import 'package:free_send/services/update/update_info.dart';
 
 /// Thrown when a release exists but this platform has no matching asset.
@@ -16,18 +17,21 @@ class UpdateNotAvailableException implements Exception {
   String toString() => message;
 }
 
-/// Reads GitLab Releases and pulls the asset for this platform.
+/// Reads GitLab Releases and pulls the asset for this install.
 ///
-/// Releases are expected to carry one asset link per platform, named with a
-/// stable suffix (`android`, `linux`, `windows`, `macos`) so the picker does
-/// not have to guess from a file extension.
+/// Asset link names carry a platform word (`android`, `linux`, `windows`,
+/// `macos`) and, where a platform ships more than one package, a format
+/// marker: `(32-bit)`, `(64-bit)`, `(universal)`, `(AppImage)`, `(deb)`,
+/// `(rpm)`, `(bundle)`, `(exe)`.
 class UpdateService {
   UpdateService({
     http.Client? client,
     this.projectId = '88767048',
     PlatformKind? platform,
+    PackageFormat? packageFormat,
   })  : _client = client ?? http.Client(),
-        _platform = platform ?? PlatformEnv.kind;
+        _platform = platform ?? PlatformEnv.kind,
+        _packageFormat = packageFormat;
 
   final http.Client _client;
 
@@ -37,6 +41,12 @@ class UpdateService {
   /// Platform whose assets to look for; injectable so tests can exercise the
   /// Android bitness rules from any host.
   final PlatformKind _platform;
+
+  /// Package this copy was installed from. Null means detect at call time.
+  final PackageFormat? _packageFormat;
+
+  PackageFormat get _format =>
+      _packageFormat ?? detectPackageFormat();
 
   static const _apiBase = 'https://gitlab.com/api/v4/projects';
 
@@ -112,7 +122,9 @@ class UpdateService {
     }
     if (candidates.isEmpty) return null;
 
-    final match = _pickForAbi(candidates, abi);
+    final match = _platform == PlatformKind.android
+        ? _pickForAbi(candidates, abi)
+        : _pickForFormat(candidates);
     final url = (match['direct_asset_url'] ?? match['url'])! as String;
     final size = match['size'];
     final releasedAt = release['released_at'] ?? release['created_at'];
@@ -160,6 +172,19 @@ class UpdateService {
     if (lower.contains('arm64')) return '64-bit';
     if (lower.contains('armeabi') || lower.contains('v7a')) return '32-bit';
     return null;
+  }
+
+  /// Prefers the package this install can apply, then the fallbacks in
+  /// [formatMarkers].
+  Map<String, Object?> _pickForFormat(List<Map<String, Object?>> candidates) {
+    if (candidates.length == 1) return candidates.first;
+    for (final marker in formatMarkers(_format)) {
+      for (final candidate in candidates) {
+        final name = (candidate['name']! as String).toLowerCase();
+        if (name.contains(marker)) return candidate;
+      }
+    }
+    return candidates.first;
   }
 
   bool _matchesPlatform(String name) {

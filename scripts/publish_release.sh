@@ -1,13 +1,14 @@
 #!/bin/sh
-# Attaches the built Android APKs to the release for this tag.
+# Attaches the built packages to the release for this tag.
 #
 # The release is expected to already exist: you create it in GitLab (or with
 # glab) so the notes and timing are yours. This script only uploads the binaries
 # and links them to the release, and creates the release itself as a fallback
 # for when a tag has no release yet.
 #
-# Asset link names carry the platform and bitness the in-app updater matches
-# on, so keep "android" and the bitness markers in LINK_NAME.
+# Asset link names are what the in-app updater matches. Keep the platform word
+# and the format marker: (32-bit), (64-bit), (universal), (AppImage), (deb),
+# (rpm), (bundle), (exe).
 #
 # Required CI/CD variables:
 #   RELEASE_TOKEN  project access token with the `api` scope
@@ -22,13 +23,19 @@ set -eu
 
 PROJECT_NAME="${PROJECT_NAME:-${CI_PROJECT_NAME:-freesend}}"
 APK_DIR="$CI_PROJECT_DIR/build/app/outputs/flutter-apk"
+DIST_DIR="$CI_PROJECT_DIR/dist"
 VERSION="${CI_COMMIT_TAG#v}"
 
-# link name|file name|built artifact. Order matters only for readability.
+# link name|uploaded file name|directory|built artifact
 ASSETS="
-Free Send for Android (32-bit)|${PROJECT_NAME}-${VERSION}-android-32bit.apk|app-armeabi-v7a-release.apk
-Free Send for Android (64-bit)|${PROJECT_NAME}-${VERSION}-android-64bit.apk|app-arm64-v8a-release.apk
-Free Send for Android|${PROJECT_NAME}-${VERSION}-android-universal.apk|app-release.apk
+Free Send for Android (32-bit)|${PROJECT_NAME}-${VERSION}-android-32bit.apk|${APK_DIR}|app-armeabi-v7a-release.apk
+Free Send for Android (64-bit)|${PROJECT_NAME}-${VERSION}-android-64bit.apk|${APK_DIR}|app-arm64-v8a-release.apk
+Free Send for Android (universal)|${PROJECT_NAME}-${VERSION}-android-universal.apk|${APK_DIR}|app-release.apk
+Free Send for Linux (AppImage)|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage
+Free Send for Linux (deb)|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb
+Free Send for Linux (rpm)|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm
+Free Send for Linux (bundle)|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz
+Free Send for Windows (exe)|${PROJECT_NAME}-${VERSION}-windows-x64.zip|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-windows-x64.zip
 "
 
 # Changelog: every commit since the previous tag, newest first. Only used when
@@ -46,11 +53,11 @@ fi
 LINK_FILE="$(mktemp)"
 trap 'rm -f "$LINK_FILE"' EXIT
 
-# Upload each built APK and record "link name<TAB>url" for the release call.
-while IFS='|' read -r LINK_NAME FILE_NAME ARTIFACT; do
+# Upload each built package and record "link name<TAB>url" for the release call.
+while IFS='|' read -r LINK_NAME FILE_NAME ARTIFACT_DIR ARTIFACT; do
   [ -n "$LINK_NAME" ] || continue
-  PATH_TO_APK="$APK_DIR/$ARTIFACT"
-  if [ ! -f "$PATH_TO_APK" ]; then
+  PATH_TO_FILE="$ARTIFACT_DIR/$ARTIFACT"
+  if [ ! -f "$PATH_TO_FILE" ]; then
     echo "Skipping $ARTIFACT (not built)."
     continue
   fi
@@ -60,7 +67,7 @@ while IFS='|' read -r LINK_NAME FILE_NAME ARTIFACT; do
     curl --silent --show-error --fail \
       --request POST \
       --header "PRIVATE-TOKEN: ${RELEASE_TOKEN}" \
-      --form "file=@${PATH_TO_APK}" \
+      --form "file=@${PATH_TO_FILE}" \
       "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/uploads"
   )"
 
@@ -78,7 +85,7 @@ ${ASSETS}
 ENTRIES
 
 if [ ! -s "$LINK_FILE" ]; then
-  echo "No APKs were uploaded; nothing to attach." >&2
+  echo "No packages were uploaded; nothing to attach." >&2
   exit 1
 fi
 
