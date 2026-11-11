@@ -111,6 +111,18 @@ Releases are matched to the platform by a name suffix on the release asset
 (`android`, `linux`, `windows`, `macos`), so one release can carry all four
 builds.
 
+Android releases carry three assets, and the app picks the one for its own ABI:
+
+| Asset | Contents |
+| --- | --- |
+| `Free Send for Android (32-bit)` | armeabi-v7a |
+| `Free Send for Android (64-bit)` | arm64-v8a |
+| `Free Send for Android` | universal: armeabi-v7a, arm64-v8a and x86_64 |
+
+The ABI is read from the device, so a 64-bit phone downloads the 26 MB build
+instead of the 69 MB universal one. x86_64 (emulators) has no split and falls
+back to the universal APK.
+
 Android requires the user to grant *install unknown apps* to Free Send; the
 install bridge checks for it and points at the system page when it is missing.
 Every platform must be signed with the same key as the installed copy or the
@@ -123,11 +135,14 @@ Create the release first, then let the pipeline attach the binary to it.
 1. **Make the release** in GitLab: Deploy → Releases → New release, pick a tag
    (or type `v1.2.3` to create it), write the release notes, and save. Creating
    the tag is what triggers the pipeline.
-2. The `release:publish` job builds the APK, uploads it, and **attaches it to
-   that release** as the asset "Free Send for Android". Your release notes are
-   left alone.
+2. The `release:publish` job builds the APKs, uploads them, and **attaches
+   them to that release** as "Free Send for Android (32-bit)",
+   "(64-bit)" and the universal build. Your release notes are left alone.
 3. If a tag has no release at all, the job creates one for you, using the commit
    log since the previous tag as the notes.
+
+The build job builds only the ABI splits on `main` to keep a push cheap, and
+adds the universal APK on tags.
 
 Two things must be configured once:
 
