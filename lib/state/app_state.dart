@@ -18,6 +18,9 @@ class AppState extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   List<TransferRecord> history = const [];
 
+  /// Whether to look for a newer release on launch.
+  bool autoUpdate = false;
+
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
 
@@ -40,8 +43,15 @@ class AppState extends ChangeNotifier {
       _ => ThemeMode.system,
     };
     history = store.history;
+    autoUpdate = store.autoUpdate;
     _ready = true;
     notifyListeners();
+  }
+
+  Future<void> setAutoUpdate(bool value) async {
+    autoUpdate = value;
+    notifyListeners();
+    await store.setAutoUpdate(value);
   }
 
   Future<void> setDeviceName(String value) async {

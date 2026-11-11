@@ -39,6 +39,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Release signing key — never commit.
+/android/key.properties
 
 # Test artefacts (screenshots produced by test/ui_render_test.dart)
 /artifacts/

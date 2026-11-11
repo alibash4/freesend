@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/state/app_state.dart';
+import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/update_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -67,6 +69,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _checkNow() async {
+    final updates = context.read<UpdateController>();
+    await updates.checkManually();
+    if (!mounted) return;
+    if (updates.phase == UpdatePhase.available) {
+      await UpdateSheet.show(context);
+    }
+  }
+
   Future<void> _clearHistory(AppState appState) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -92,6 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final appState = context.watch<AppState>();
+    final updateState = context.watch<UpdateController>();
 
     return ListView(
       padding: const EdgeInsets.only(bottom: AppSpacing.xl),
@@ -202,10 +214,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
+              const SectionHeader(title: 'Updates'),
+              _UpdateRow(
+                label: 'Check automatically',
+                subtitle:
+                    'Look for a newer release every time Free Send starts.',
+                value: appState.autoUpdate,
+                onChanged: (value) async {
+                  await appState.setAutoUpdate(value);
+                  if (!context.mounted) return;
+                  context.read<UpdateController>().setAutoCheck(value);
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _checkNow,
+                  icon: const Icon(AppIcons.refresh, size: 17),
+                  label: const Text('Check for updates'),
+                ),
+              ),
+              if (updateState.message != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  updateState.message!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: updateState.phase == UpdatePhase.failed
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
               const SectionHeader(title: 'About'),
               _AboutRow(
                 label: 'App',
-                value: '${AppConstants.appName} 1.0.0',
+                value: '${AppConstants.appName} ${updateState.currentVersion}',
               ),
               Divider(height: AppSpacing.lg, color: theme.colorScheme.hairline),
               _AboutRow(
@@ -269,6 +314,43 @@ class _ThemeChoice extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _UpdateRow extends StatelessWidget {
+  const _UpdateRow({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 2),
+                Text(subtitle, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
       ),
     );
   }

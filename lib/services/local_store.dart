@@ -15,6 +15,7 @@ class LocalStore {
   static const _kThemeMode = 'theme_mode';
   static const _kDownloadDir = 'download_dir';
   static const _kHistory = 'history';
+  static const _kAutoUpdate = 'auto_update';
 
   late SharedPreferences _prefs;
 
@@ -46,6 +47,13 @@ class LocalStore {
 
   Future<void> setDownloadDir(String path) async {
     await _prefs.setString(_kDownloadDir, path);
+  }
+
+  /// Whether the app asks GitLab for a newer release on every launch.
+  bool get autoUpdate => _prefs.getBool(_kAutoUpdate) ?? false;
+
+  Future<void> setAutoUpdate(bool value) async {
+    await _prefs.setBool(_kAutoUpdate, value);
   }
 
   /// Where received files land. Android keeps them inside app-owned storage so

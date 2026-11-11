@@ -96,6 +96,58 @@ the system Wi-Fi menu, or use *Connect by address*.
 Received files go to `Downloads/Free Send` on desktop and to the app's external
 files directory on Android (changeable in Settings).
 
+## Updating
+
+The app can check GitLab Releases for a newer build and install it.
+
+- **Settings → Updates → Check automatically** turns on a silent check each
+  launch. A failure or an up-to-date app stays quiet.
+- **Check for updates** always reports the outcome.
+- When a release is found, a sheet shows the release notes and the download
+  size. **Download update** pulls the asset, then **Install and restart** hands
+  it to the OS installer and exits the app.
+
+Releases are matched to the platform by a name suffix on the release asset
+(`android`, `linux`, `windows`, `macos`), so one release can carry all four
+builds.
+
+Android requires the user to grant *install unknown apps* to Free Send; the
+install bridge checks for it and points at the system page when it is missing.
+Every platform must be signed with the same key as the installed copy or the
+installer refuses the update.
+
+## Releasing
+
+Create the release first, then let the pipeline attach the binary to it.
+
+1. **Make the release** in GitLab: Deploy → Releases → New release, pick a tag
+   (or type `v1.2.3` to create it), write the release notes, and save. Creating
+   the tag is what triggers the pipeline.
+2. The `release:publish` job builds the APK, uploads it, and **attaches it to
+   that release** as the asset "Free Send for Android". Your release notes are
+   left alone.
+3. If a tag has no release at all, the job creates one for you, using the commit
+   log since the previous tag as the notes.
+
+Two things must be configured once:
+
+1. **`RELEASE_TOKEN`** — a project access token with the `api` scope, set as a
+   CI/CD variable (Settings → CI/CD → Variables). Creating a release in the UI
+   does not remove the need for this: the job still has to upload the APK and
+   attach it, and `CI_JOB_TOKEN` cannot do that. Mark the variable **masked**.
+2. **A signing keystore** — create `android/key.properties` locally and keep the
+   same key for every release:
+
+   ```
+   STORE_FILE=/absolute/path/to/freesend.keystore
+   STORE_PASSWORD=...
+   KEY_ALIAS=freesend
+   KEY_PASSWORD=...
+   ```
+
+   Without it the build falls back to debug signing, and an update installed
+   over a differently signed copy is rejected.
+
 ## Tests
 
 ```bash
@@ -111,7 +163,10 @@ flutter test
   range ports and hostnames are refused.
 - `test/ui_render_test.dart` renders the actual screens at phone size and fails
   on layout overflow or missing widgets; it also writes PNGs to `artifacts/`
-  for visual review.
+  for visual review. It covers the update sheet end to end against a stubbed
+  release API.
+- `test/update_test.dart` checks release parsing, platform asset selection,
+  version comparison, download progress and partial-file cleanup.
 
 ## Known limitations
 

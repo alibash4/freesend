@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/state/send_controller.dart';
+import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/widgets/update_sheet.dart';
 
 class FreeSendApp extends StatelessWidget {
   const FreeSendApp({super.key, required this.appState});
@@ -23,18 +27,64 @@ class FreeSendApp extends StatelessWidget {
         ChangeNotifierProvider<ReceiveController>(
           create: (_) => ReceiveController(appState: appState),
         ),
+        ChangeNotifierProvider<UpdateController>(
+          create: (_) => UpdateController(),
+        ),
       ],
-      child: Consumer<AppState>(
-        builder: (context, state, _) {
-          return MaterialApp(
-            title: 'Free Send',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: state.themeMode,
-            home: const AppShell(),
-          );
-        },
+      child: _UpdateBootstrap(appState: appState),
+    );
+  }
+}
+
+/// Runs the startup update check.
+///
+/// It has to sit below the providers to read [UpdateController], and above
+/// [MaterialApp] so it can reach the navigator when a release is found.
+class _UpdateBootstrap extends StatefulWidget {
+  const _UpdateBootstrap({required this.appState});
+
+  final AppState appState;
+
+  @override
+  State<_UpdateBootstrap> createState() => _UpdateBootstrapState();
+}
+
+class _UpdateBootstrapState extends State<_UpdateBootstrap> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    if (!mounted) return;
+    final updates = context.read<UpdateController>();
+    updates.setAutoCheck(widget.appState.autoUpdate);
+    final found = await updates.checkSilently();
+    if (found) _showUpdates();
+  }
+
+  /// Resolves the navigator context itself, so the async check above never
+  /// touches a context after an await.
+  void _showUpdates() {
+    final navigatorContext = _navigatorKey.currentContext;
+    if (navigatorContext == null) return;
+    unawaited(UpdateSheet.show(navigatorContext));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AppState>(
+      builder: (context, state, _) => MaterialApp(
+        title: 'Free Send',
+        debugShowCheckedModeBanner: false,
+        navigatorKey: _navigatorKey,
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
+        themeMode: state.themeMode,
+        home: const AppShell(),
       ),
     );
   }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Downloaded updates live in the app's cache; the installer reads them
+         through this provider. -->
+    <cache-path name="updates" path="." />
+    <external-cache-path name="external_updates" path="." />
+</paths>

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -6,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,13 +16,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/update/update_service.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/state/send_controller.dart';
+import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
+import 'package:free_send/ui/widgets/update_sheet.dart';
 
 /// Renders the real screens at phone size so layout overflow and missing
 /// widgets fail loudly, and writes PNGs to `artifacts/` for visual review.
@@ -51,7 +58,11 @@ void main() {
     await appState.init();
   });
 
-  Widget harness({required Widget home, SendController? sendController}) {
+  Widget harness({
+    required Widget home,
+    SendController? sendController,
+    UpdateController? updateController,
+  }) {
     final light = AppTheme.light();
     final dark = AppTheme.dark();
     return RepaintBoundary(
@@ -68,6 +79,14 @@ void main() {
           ChangeNotifierProvider<ReceiveController>(
             create: (_) => ReceiveController(appState: appState),
           ),
+          if (updateController == null)
+            ChangeNotifierProvider<UpdateController>(
+              create: (_) => UpdateController(),
+            )
+          else
+            ChangeNotifierProvider<UpdateController>.value(
+              value: updateController,
+            ),
         ],
         child: Consumer<AppState>(
           builder: (context, state, _) => MaterialApp(
@@ -114,7 +133,8 @@ void main() {
     await pumpApp(tester);
 
     expect(find.text('Free Send'), findsOneWidget);
-    expect(find.text('Move files over the link, not the internet.'), findsOneWidget);
+    expect(find.text('Move files over the link, not the internet.'),
+        findsOneWidget);
     expect(find.text('Send'), findsWidgets);
     expect(find.text('Receive'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -170,7 +190,8 @@ void main() {
     await capture(tester, '12-receive-dark');
   });
 
-  testWidgets('pairing card renders a code and its instructions', (tester) async {
+  testWidgets('pairing card renders a code and its instructions',
+      (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
@@ -284,6 +305,109 @@ void main() {
     expect(find.text('Send'), findsOneWidget);
     expect(find.text('Receive'), findsOneWidget);
     await capture(tester, '14-home-wide');
+  });
+
+  testWidgets('settings shows the updates section', (tester) async {
+    await pumpApp(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Updates'), findsOneWidget);
+    expect(find.text('Check automatically'), findsOneWidget);
+    expect(find.text('Check for updates'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '17-settings-updates');
+
+    // The toggle persists through the app state. It sits below the fold, so
+    // scroll it into view before tapping.
+    final toggle = find.byType(Switch);
+    expect(tester.widget<Switch>(toggle).value, isFalse);
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(toggle).value, isTrue);
+    expect(appState.autoUpdate, isTrue);
+    expect(
+      tester
+          .element(find.byType(SettingsScreen))
+          .read<UpdateController>()
+          .autoCheck,
+      isTrue,
+    );
+  });
+
+  testWidgets('the update sheet shows notes and downloads', (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    final updates = UpdateController(
+      // Seeded so the test never touches PackageInfo, whose platform channel
+      // cannot resolve inside a widget test.
+      initialVersion: '1.0.0',
+      service: UpdateService(
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/releases')) {
+            return http.Response(
+                jsonEncode([
+                  {
+                    'tag_name': 'v9.9.9',
+                    'description': 'Faster handshakes and a new icon.',
+                    'assets': {
+                      'links': [
+                        {
+                          'name': 'Free Send for Linux',
+                          'direct_asset_url':
+                              'https://gitlab.com/a/freesend.AppImage',
+                        },
+                      ],
+                    },
+                  },
+                ]),
+                200);
+          }
+          return http.Response('apk-bytes', 200);
+        }),
+      ),
+    );
+    addTearDown(updates.dispose);
+
+    await tester.pumpWidget(
+      harness(home: const AppShell(), updateController: updates),
+    );
+    await tester.pumpAndSettle();
+
+    // Real file I/O and sockets cannot complete inside the fake-async zone a
+    // widget test runs in, so the network-bound steps go through runAsync.
+    await tester.runAsync(() => updates.checkManually());
+    await tester.pumpAndSettle();
+    expect(updates.phase, UpdatePhase.available);
+
+    // showModalBottomSheet's future completes on dismissal, so it is not
+    // awaited here.
+    unawaited(UpdateSheet.show(tester.element(find.byType(AppShell))));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Free Send 9.9.9 is available'), findsOneWidget);
+    expect(find.text('Faster handshakes and a new icon.'), findsOneWidget);
+    expect(find.text('Download update'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '15-update-sheet');
+
+    await tester.tap(find.text('Download update'));
+    await tester.runAsync(() => updates.download());
+    await tester.pumpAndSettle();
+
+    expect(updates.phase, UpdatePhase.readyToInstall);
+    expect(updates.downloadedFile, isNotNull);
+    // Reading the file back is real I/O, so it goes through runAsync too.
+    final downloaded = await tester.runAsync(
+      () => updates.downloadedFile!.readAsString(),
+    );
+    expect(downloaded, 'apk-bytes');
+    await capture(tester, '16-update-ready');
   });
 }
 
