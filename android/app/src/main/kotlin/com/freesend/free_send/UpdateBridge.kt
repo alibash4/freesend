@@ -38,6 +38,7 @@ class UpdateBridge(
                 }
                 installApk(File(path), result)
             }
+            "getAbi" -> result.success(Build.SUPPORTED_ABIS.firstOrNull())
             "canInstall" -> result.success(canInstall())
             "openInstallSettings" -> {
                 openInstallSettings()

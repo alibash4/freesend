@@ -22,13 +22,21 @@ class UpdateNotAvailableException implements Exception {
 /// stable suffix (`android`, `linux`, `windows`, `macos`) so the picker does
 /// not have to guess from a file extension.
 class UpdateService {
-  UpdateService({http.Client? client, this.projectId = '88767048'})
-      : _client = client ?? http.Client();
+  UpdateService({
+    http.Client? client,
+    this.projectId = '88767048',
+    PlatformKind? platform,
+  })  : _client = client ?? http.Client(),
+        _platform = platform ?? PlatformEnv.kind;
 
   final http.Client _client;
 
   /// GitLab project id for `kaon2004a/freesend`.
   final String projectId;
+
+  /// Platform whose assets to look for; injectable so tests can exercise the
+  /// Android bitness rules from any host.
+  final PlatformKind _platform;
 
   static const _apiBase = 'https://gitlab.com/api/v4/projects';
 
@@ -43,11 +51,14 @@ class UpdateService {
     PlatformKind.macOS: 'macos',
   };
 
-  String get _platformSuffix => _assetSuffixes[PlatformEnv.kind] ?? 'other';
+  String get _platformSuffix => _assetSuffixes[_platform] ?? 'other';
 
   /// Returns the newest release that has an asset for this platform, or null
   /// when there are no releases at all.
-  Future<UpdateInfo?> fetchLatest() async {
+  ///
+  /// When [abi] is given, an asset built for that ABI is preferred over the
+  /// universal one, so a 64-bit device does not download a universal build.
+  Future<UpdateInfo?> fetchLatest({String? abi}) async {
     final uri = Uri.parse('$_apiBase/$projectId/releases');
     final response = await _client.get(uri,
         headers: {'Accept': 'application/json'}).timeout(_metadataTimeout);
@@ -64,7 +75,7 @@ class UpdateService {
 
     for (final entry in decoded) {
       if (entry is! Map<String, Object?>) continue;
-      final info = _parseRelease(entry);
+      final info = _parseRelease(entry, abi);
       if (info != null) return info;
     }
     return null;
@@ -72,14 +83,17 @@ class UpdateService {
 
   /// Returns the newest release that is newer than [currentVersion], or null
   /// when the app is already up to date.
-  Future<UpdateInfo?> checkForUpdate(String currentVersion) async {
-    final latest = await fetchLatest();
+  Future<UpdateInfo?> checkForUpdate(
+    String currentVersion, {
+    String? abi,
+  }) async {
+    final latest = await fetchLatest(abi: abi);
     if (latest == null) return null;
     if (!latest.isNewerThan(currentVersion)) return null;
     return latest;
   }
 
-  UpdateInfo? _parseRelease(Map<String, Object?> release) {
+  UpdateInfo? _parseRelease(Map<String, Object?> release, String? abi) {
     final tag = release['tag_name'];
     if (tag is! String || tag.isEmpty) return null;
 
@@ -87,19 +101,18 @@ class UpdateService {
     final links = assets is Map<String, Object?> ? assets['links'] : null;
     if (links is! List || links.isEmpty) return null;
 
-    Map<String, Object?>? match;
+    final candidates = <Map<String, Object?>>[];
     for (final link in links) {
       if (link is! Map<String, Object?>) continue;
       final name = link['name'];
       final url = link['direct_asset_url'] ?? link['url'];
       if (name is! String || url is! String) continue;
-      if (_matchesPlatform(name)) {
-        match = link;
-        break;
-      }
+      if (!_matchesPlatform(name)) continue;
+      candidates.add(link);
     }
-    if (match == null) return null;
+    if (candidates.isEmpty) return null;
 
+    final match = _pickForAbi(candidates, abi);
     final url = (match['direct_asset_url'] ?? match['url'])! as String;
     final size = match['size'];
     final releasedAt = release['released_at'] ?? release['created_at'];
@@ -115,6 +128,38 @@ class UpdateService {
       ),
       sizeBytes: size is num ? size.toInt() : 0,
     );
+  }
+
+  /// Picks the asset for this device: an ABI-specific build when one matches,
+  /// otherwise the universal build, which is the asset with no bitness marker.
+  Map<String, Object?> _pickForAbi(
+    List<Map<String, Object?>> candidates,
+    String? abi,
+  ) {
+    if (candidates.length == 1) return candidates.first;
+
+    final marker = _abiMarker(abi);
+    if (marker != null) {
+      for (final candidate in candidates) {
+        if ((candidate['name']! as String).contains(marker)) return candidate;
+      }
+    }
+    for (final candidate in candidates) {
+      final name = candidate['name']! as String;
+      if (!name.contains('32-bit') && !name.contains('64-bit')) {
+        return candidate;
+      }
+    }
+    return candidates.first;
+  }
+
+  /// x86_64 has no split build, so it falls back to the universal APK.
+  String? _abiMarker(String? abi) {
+    if (abi == null) return null;
+    final lower = abi.toLowerCase();
+    if (lower.contains('arm64')) return '64-bit';
+    if (lower.contains('armeabi') || lower.contains('v7a')) return '32-bit';
+    return null;
   }
 
   bool _matchesPlatform(String name) {

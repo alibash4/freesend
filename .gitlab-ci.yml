@@ -1,9 +1,14 @@
 # Builds the Android release and attaches it to the GitLab release for the tag.
 #
 # Make the release in GitLab first; creating its tag runs this pipeline. The
-# job uploads the APK and links it to that release, and only creates a release
-# itself when the tag has none. It needs the RELEASE_TOKEN CI/CD variable (a
-# project access token with the `api` scope).
+# job uploads the APKs and links them to that release, and only creates a
+# release itself when the tag has none. It needs the RELEASE_TOKEN CI/CD
+# variable (a project access token with the `api` scope).
+#
+# Three Android artifacts are produced:
+#   app-armeabi-v7a-release.apk   32-bit
+#   app-arm64-v8a-release.apk     64-bit
+#   app-release.apk               universal, every ABI including emulators
 
 stages:
   - build
@@ -29,16 +34,32 @@ build:apk:
     - flutter pub get
     - flutter analyze
     - flutter test
-    - flutter build apk --release
+    # A tag builds everything; main builds only the ABI splits so a push stays
+    # cheap while still exercising the Android toolchain.
+    - |
+      if [ "${BUILD_SPLITS}" = "1" ]; then
+        flutter build apk --release --split-per-abi \
+          --target-platform android-arm,android-arm64
+      fi
+    - |
+      if [ "${BUILD_UNIVERSAL}" = "1" ]; then
+        flutter build apk --release
+      fi
   artifacts:
     name: "freesend-apk"
     paths:
-      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/flutter-apk/*.apk
     expire_in: 2 weeks
   rules:
-    # Build on tags and on main so a broken pipeline is caught before release.
     - if: $CI_COMMIT_TAG
+      variables:
+        BUILD_UNIVERSAL: "1"
+        BUILD_SPLITS: "1"
+    # Build on main too, so a broken pipeline is caught before release.
     - if: $CI_COMMIT_BRANCH == "main"
+      variables:
+        BUILD_UNIVERSAL: "0"
+        BUILD_SPLITS: "1"
 
 release:publish:
   stage: release

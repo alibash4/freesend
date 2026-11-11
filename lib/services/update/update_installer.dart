@@ -39,6 +39,19 @@ class UpdateInstaller {
 
   bool get isSupported => method != InstallMethod.unsupported;
 
+  /// The device's preferred ABI, e.g. `arm64-v8a`. Null on platforms that do
+  /// not ship per-ABI builds.
+  Future<String?> currentAbi() async {
+    if (method != InstallMethod.androidPackageInstaller) return null;
+    try {
+      return await channel.invokeMethod<String>('getAbi');
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
   /// Opens the native installer for [file]. On Android this shows the system
   /// "Do you want to install this app?" dialog.
   Future<void> install(File file, {String? version}) async {

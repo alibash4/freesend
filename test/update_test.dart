@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/services/update/update_info.dart';
 import 'package:free_send/services/update/update_service.dart';
 
@@ -191,6 +192,95 @@ void main() {
       addTearDown(service.dispose);
 
       expect(await service.checkForUpdate('1.0.0'), isNull);
+    });
+  });
+
+  group('UpdateService asset selection by ABI', () {
+    final release = {
+      'tag_name': 'v1.2.0',
+      'description': 'Notes.',
+      'assets': {
+        'links': [
+          {
+            'name': 'Free Send for Android (32-bit)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-32.apk',
+            'size': 22,
+          },
+          {
+            'name': 'Free Send for Android (64-bit)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-64.apk',
+            'size': 26,
+          },
+          {
+            'name': 'Free Send for Android',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-universal.apk',
+            'size': 69,
+          },
+          {
+            // Another platform's asset must never be considered.
+            'name': 'Free Send for Linux',
+            'direct_asset_url': 'https://gitlab.com/a/freesend.AppImage',
+          },
+        ],
+      },
+    };
+
+    Future<UpdateInfo?> fetchWith(String? abi) async {
+      final service = UpdateService(
+        // Android asset names, so the test does not depend on the host OS.
+        platform: PlatformKind.android,
+        client: MockClient(
+          (_) async => http.Response(jsonEncode([release]), 200),
+        ),
+      );
+      addTearDown(service.dispose);
+      return service.fetchLatest(abi: abi);
+    }
+
+    test('a 64-bit device gets the 64-bit build', () async {
+      final info = await fetchWith('arm64-v8a');
+      expect(info!.downloadUrl, contains('freesend-64.apk'));
+      expect(info.sizeBytes, 26);
+    });
+
+    test('a 32-bit device gets the 32-bit build', () async {
+      final info = await fetchWith('armeabi-v7a');
+      expect(info!.downloadUrl, contains('freesend-32.apk'));
+    });
+
+    test('an ABI with no split falls back to the universal build', () async {
+      final info = await fetchWith('x86_64');
+      expect(info!.downloadUrl, contains('freesend-universal.apk'));
+    });
+
+    test('an unknown ABI still gets the universal build', () async {
+      final info = await fetchWith(null);
+      expect(info!.downloadUrl, contains('freesend-universal.apk'));
+    });
+
+    test('a release with only a universal build works', () async {
+      final service = UpdateService(
+        platform: PlatformKind.android,
+        client: MockClient((_) async => http.Response(jsonEncode([
+          {
+            'tag_name': 'v1.2.0',
+            'description': '',
+            'assets': {
+              'links': [
+                {
+                  'name': 'Free Send for Android',
+                  'direct_asset_url': 'https://gitlab.com/a/freesend.apk',
+                },
+              ],
+            },
+          },
+        ]), 200)),
+      );
+      addTearDown(service.dispose);
+
+      final info = await service.fetchLatest(abi: 'arm64-v8a');
+      expect(info, isNotNull);
+      expect(info!.downloadUrl, 'https://gitlab.com/a/freesend.apk');
     });
   });
 
