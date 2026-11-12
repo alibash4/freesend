@@ -321,7 +321,13 @@ void main() {
 
     // The toggle persists through the app state. It sits below the fold, so
     // scroll it into view before tapping.
-    final toggle = find.byType(Switch);
+    final toggle = find.descendant(
+      of: find.ancestor(
+        of: find.text('Check automatically'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byType(Switch),
+    );
     expect(tester.widget<Switch>(toggle).value, isFalse);
     await tester.ensureVisible(toggle);
     await tester.pumpAndSettle();
@@ -336,6 +342,29 @@ void main() {
           .autoCheck,
       isTrue,
     );
+  });
+
+  testWidgets('settings can turn on minimize to tray on close', (tester) async {
+    await pumpApp(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('System tray'), findsOneWidget);
+    final toggle = find.descendant(
+      of: find.ancestor(
+        of: find.text('Minimize to tray on close'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byType(Switch),
+    );
+    expect(tester.widget<Switch>(toggle).value, isFalse);
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(appState.minimizeToTray, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the update sheet shows notes and downloads', (tester) async {

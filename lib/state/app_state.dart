@@ -21,6 +21,9 @@ class AppState extends ChangeNotifier {
   /// Whether to look for a newer release on launch.
   bool autoUpdate = false;
 
+  /// Whether closing the window hides it to the tray instead of quitting.
+  bool minimizeToTray = false;
+
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
 
@@ -44,6 +47,7 @@ class AppState extends ChangeNotifier {
     };
     history = store.history;
     autoUpdate = store.autoUpdate;
+    minimizeToTray = store.minimizeToTray;
     _ready = true;
     notifyListeners();
   }
@@ -52,6 +56,12 @@ class AppState extends ChangeNotifier {
     autoUpdate = value;
     notifyListeners();
     await store.setAutoUpdate(value);
+  }
+
+  Future<void> setMinimizeToTray(bool value) async {
+    minimizeToTray = value;
+    notifyListeners();
+    await store.setMinimizeToTray(value);
   }
 
   Future<void> setDeviceName(String value) async {

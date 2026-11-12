@@ -16,6 +16,7 @@ class LocalStore {
   static const _kDownloadDir = 'download_dir';
   static const _kHistory = 'history';
   static const _kAutoUpdate = 'auto_update';
+  static const _kMinimizeToTray = 'minimize_to_tray';
 
   late SharedPreferences _prefs;
 
@@ -54,6 +55,13 @@ class LocalStore {
 
   Future<void> setAutoUpdate(bool value) async {
     await _prefs.setBool(_kAutoUpdate, value);
+  }
+
+  /// Whether closing the window keeps the app running in the tray.
+  bool get minimizeToTray => _prefs.getBool(_kMinimizeToTray) ?? false;
+
+  Future<void> setMinimizeToTray(bool value) async {
+    await _prefs.setBool(_kMinimizeToTray, value);
   }
 
   /// Where received files land. Android keeps them inside app-owned storage so

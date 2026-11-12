@@ -24,6 +24,15 @@ abstract final class PlatformEnv {
   static bool get canCreateHotspot =>
       kind == PlatformKind.android || kind == PlatformKind.linux;
 
+  /// Whether the OS exposes a system tray the app can sit in.
+  ///
+  /// GNOME needs the AppIndicator extension, but the tray itself is the normal
+  /// desktop mechanism on Windows, KDE and GNOME alike.
+  static bool get supportsTray =>
+      kind == PlatformKind.windows ||
+      kind == PlatformKind.linux ||
+      kind == PlatformKind.macOS;
+
   /// Whether the app can join a hotspot non-interactively.
   static bool get canJoinHotspot =>
       kind == PlatformKind.android ||

@@ -28,12 +28,25 @@ streams frames of file bytes  ──── Wi-Fi ────▶    writes strai
 | Join a hotspot from inside the app      | ✅      | ✅    | manual (Wi-Fi settings) | ✅ (`networksetup`) |
 | Receive files                           | ✅      | ✅    | ✅      | ✅    |
 | Scan a pairing QR code with the camera  | ✅      | —     | —       | ✅    |
+| System tray icon with Open / Quit menu  | —       | ✅    | ✅      | ✅    |
 
 Minimum Android is 8.0 (API 26) because `WifiManager.startLocalOnlyHotspot` is
 needed to create a hotspot without user interaction. On Windows and macOS the
 OS does not expose hotspot creation to applications, so the app shares over the
 network the device is already on and tells you where to enable a system hotspot
 if you want the fastest link.
+
+The tray icon appears while Free Send is running. Right-click it for the native
+menu (**Open Free Send**, **Quit Free Send**); on Windows and macOS a left click
+restores the window. Desktop builds have a **Minimize to tray on close** toggle
+in Settings. GNOME needs the AppIndicator extension installed to show the icon.
+
+Linux builds need the tray library at build time and run time:
+
+```bash
+sudo apt install libayatana-appindicator3-dev      # Debian/Ubuntu build
+sudo dnf install libayatana-appindicator-gtk3      # Fedora runtime
+```
 
 iOS is intentionally not targeted: Apple does not allow an app to create a
 hotspot.

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:free_send/services/tray_controller.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/state/send_controller.dart';
@@ -13,9 +14,12 @@ import 'package:free_send/ui/widgets/update_sheet.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 class FreeSendApp extends StatelessWidget {
-  const FreeSendApp({super.key, required this.appState});
+  const FreeSendApp({super.key, required this.appState, required this.tray});
 
   final AppState appState;
+
+  /// Kept alive with the widget tree; it owns the native tray listeners.
+  final TrayController tray;
 
   @override
   Widget build(BuildContext context) {

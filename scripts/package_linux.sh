@@ -65,7 +65,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: Free Send <freesend@localhost>
 Installed-Size: ${INSTALLED_SIZE}
-Depends: libgtk-3-0
+Depends: libgtk-3-0, libayatana-appindicator3-1 | libappindicator3-1
 Description: Direct, hotspot-only file transfer.
  No cloud, no accounts.
 EOF

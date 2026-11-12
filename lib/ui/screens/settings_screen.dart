@@ -195,6 +195,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
+              if (PlatformEnv.supportsTray) ...[
+                const SectionHeader(title: 'System tray'),
+                _UpdateRow(
+                  label: 'Minimize to tray on close',
+                  subtitle:
+                      'Keep Free Send running in the tray when the window is '
+                      'closed.',
+                  value: appState.minimizeToTray,
+                  onChanged: (value) => appState.setMinimizeToTray(value),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+              ],
               const SectionHeader(title: 'Data'),
               Text(
                 'Free Send keeps a local list of past transfers and nothing '
