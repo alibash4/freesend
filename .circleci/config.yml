@@ -1,0 +1,41 @@
+# CircleCI builds macOS, which GitLab CI here cannot reach. That needs a
+# macOS executor, so it runs on Apple silicon.
+#
+# Release publishing stays in GitLab CI, which owns the tags and the release
+# token. This pipeline only builds and stores artifacts.
+version: 2.1
+
+orbs:
+  flutter: circleci/flutter@3.0.0
+
+executors:
+  apple-silicon:
+    macos:
+      xcode: 16.4.0
+      resource_class: m4pro.medium
+
+jobs:
+  build-macos:
+    executor: apple-silicon
+    steps:
+      - checkout
+      - flutter/install_sdk_and_pub:
+          channel: stable
+          version: 3.47.5
+      - run:
+          name: Build macOS
+          command: flutter build macos --release
+      - run:
+          name: Package the app
+          command: |
+            mkdir -p dist
+            APP=$(find "build/macos/Build/Products/Release" -maxdepth 1 -name '*.app' -print -quit)
+            if [ -z "$APP" ]; then echo "No built .app found" >&2; exit 1; fi
+            ditto -c -k --keepParent "$APP" "dist/freesend-macos.zip"
+      - store_artifacts:
+          path: dist
+
+workflows:
+  macos:
+    jobs:
+      - build-macos
