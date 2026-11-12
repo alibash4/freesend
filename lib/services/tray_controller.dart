@@ -96,7 +96,7 @@ class TrayController with TrayListener, WindowListener {
   void onTrayIconRightMouseDown() {
     // The Linux AppIndicator host shows the menu itself; asking for a popup
     // there would throw because the plugin does not implement it.
-    if (Platform.isWindows || Platform.isMacOS) {
+    if (Platform.isWindows) {
       unawaited(trayManager.popUpContextMenu());
     }
   }

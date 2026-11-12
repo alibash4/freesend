@@ -29,12 +29,11 @@ abstract final class PlatformEnv {
 
   /// Whether the OS exposes a system tray the app can sit in.
   ///
-  /// GNOME needs the AppIndicator extension, but the tray itself is the normal
-  /// desktop mechanism on Windows, KDE and GNOME alike.
+  /// Windows, KDE and GNOME use a tray; GNOME needs the AppIndicator
+  /// extension. macOS uses the Dock instead, so close-to-tray is not a macOS
+  /// pattern and the app does not pretend it is one.
   static bool get supportsTray =>
-      kind == PlatformKind.windows ||
-      kind == PlatformKind.linux ||
-      kind == PlatformKind.macOS;
+      kind == PlatformKind.windows || kind == PlatformKind.linux;
 
   /// Whether the app can join a hotspot non-interactively.
   static bool get canJoinHotspot =>
