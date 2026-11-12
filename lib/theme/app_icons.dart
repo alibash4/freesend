@@ -32,6 +32,10 @@ abstract final class AppIcons {
   static const IconData download = LucideIcons400.download;
   static const IconData inbox = LucideIcons400.inbox;
   static const IconData trash = LucideIcons400.trash2;
+  static const IconData image = LucideIcons400.image;
+  static const IconData video = LucideIcons400.video;
+  static const IconData music = LucideIcons400.music;
+  static const IconData fileText = LucideIcons400.fileText;
 
   // Navigation and chrome.
   static const IconData home = LucideIcons400.house;
@@ -50,6 +54,7 @@ abstract final class AppIcons {
   static const IconData alert = LucideIcons400.triangleAlert;
   static const IconData info = LucideIcons400.info;
   static const IconData radar = LucideIcons400.radar;
+  static const IconData search = LucideIcons400.search;
   static const IconData cameraOff = LucideIcons400.cameraOff;
 
   // Appearance.

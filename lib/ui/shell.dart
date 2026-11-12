@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:free_send/ui/screens/history_screen.dart';
 import 'package:free_send/ui/screens/home_screen.dart';
+import 'package:free_send/ui/screens/transfers_screen.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -27,6 +28,7 @@ class _AppShellState extends State<AppShell> {
           index: _index,
           children: const [
             HomeScreen(),
+            TransfersScreen(),
             HistoryScreen(),
             SettingsScreen(),
           ],
@@ -40,6 +42,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(AppIcons.home),
             selectedIcon: Icon(AppIcons.home),
             label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(AppIcons.zap),
+            selectedIcon: Icon(AppIcons.zap),
+            label: 'Transfers',
           ),
           NavigationDestination(
             icon: Icon(AppIcons.history),

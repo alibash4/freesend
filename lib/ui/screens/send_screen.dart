@@ -21,8 +21,11 @@ class SendScreen extends StatefulWidget {
   State<SendScreen> createState() => _SendScreenState();
 }
 
+enum _SourceKind { any, photos, videos, audio, docs, folder }
+
 class _SendScreenState extends State<SendScreen> {
   bool _picking = false;
+  String _query = '';
 
   late final ScrollController _scrollController = AnimatedScrollController(
     animationFactory: const ChromiumEaseInOut(),
@@ -34,13 +37,45 @@ class _SendScreenState extends State<SendScreen> {
     super.dispose();
   }
 
-  Future<void> _pickFiles(SendController controller) async {
+  Future<void> _openSourcePicker(SendController controller) async {
+    final kind = await showModalBottomSheet<_SourceKind>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => const _SourceSheet(),
+    );
+    if (kind == null || !mounted) return;
+    if (kind == _SourceKind.folder) {
+      setState(() => _picking = true);
+      try {
+        await _pickFolder(controller);
+      } finally {
+        if (mounted) setState(() => _picking = false);
+      }
+      return;
+    }
+    await _pick(controller, kind);
+  }
+
+  Future<void> _pick(SendController controller, _SourceKind kind) async {
     if (_picking) return;
     setState(() => _picking = true);
     try {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         withData: false,
+        type: switch (kind) {
+          _SourceKind.any => FileType.any,
+          _SourceKind.photos => FileType.image,
+          _SourceKind.videos => FileType.video,
+          _SourceKind.audio => FileType.audio,
+          _SourceKind.docs || _SourceKind.folder => FileType.custom,
+        },
+        allowedExtensions: kind == _SourceKind.docs
+            ? const [
+                'pdf', 'doc', 'docx', 'txt', 'md', 'rtf',
+                'xls', 'xlsx', 'csv', 'ppt', 'pptx',
+              ]
+            : null,
       );
       if (result == null) return;
       final files = <File>[];
@@ -54,6 +89,22 @@ class _SendScreenState extends State<SendScreen> {
       _toast('Could not open the file picker: $error');
     } finally {
       if (mounted) setState(() => _picking = false);
+    }
+  }
+
+  Future<void> _pickFolder(SendController controller) async {
+    final path = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose a folder to send',
+    );
+    if (path == null || path.isEmpty || !mounted) return;
+    final folder = Directory(path);
+    if (!await folder.exists()) {
+      if (mounted) _toast('That folder is not readable.');
+      return;
+    }
+    await controller.addDirectory(folder);
+    if (mounted && controller.items.isEmpty) {
+      _toast('That folder has no readable files.');
     }
   }
 
@@ -134,7 +185,10 @@ class _SendScreenState extends State<SendScreen> {
                         key: const ValueKey('pick'),
                         controller: controller,
                         picking: _picking,
-                        onPick: () => _pickFiles(controller),
+                        query: _query,
+                        onQueryChanged: (value) =>
+                            setState(() => _query = value),
+                        onPick: () => _openSourcePicker(controller),
                         onStart: controller.startSession,
                       ),
                     SendPhase.preparing => const _BusyView(
@@ -189,23 +243,31 @@ class _PickView extends StatelessWidget {
     super.key,
     required this.controller,
     required this.picking,
+    required this.query,
+    required this.onQueryChanged,
     required this.onPick,
     required this.onStart,
   });
 
   final SendController controller;
   final bool picking;
+  final String query;
+  final ValueChanged<String> onQueryChanged;
   final VoidCallback onPick;
   final Future<void> Function() onStart;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final needle = query.trim().toLowerCase();
+    final visible = controller.items
+        .where((item) => needle.isEmpty || item.name.toLowerCase().contains(needle))
+        .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Pick the files to send',
+          'Pick what to send',
           style: theme.textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -214,6 +276,17 @@ class _PickView extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.lg),
+        if (controller.items.isNotEmpty) ...[
+          TextField(
+            onChanged: onQueryChanged,
+            decoration: const InputDecoration(
+              hintText: 'Search selected files',
+              prefixIcon: Icon(AppIcons.search, size: 18),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (controller.items.isEmpty)
           EmptyState(
             icon: AppIcons.addCircle,
@@ -221,34 +294,51 @@ class _PickView extends StatelessWidget {
             message:
                 'Choose files from this device. Folders keep their names when '
                 'they arrive.',
-            action: FilledButton.icon(
-              onPressed: picking ? null : onPick,
-              icon: picking
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(AppIcons.folderOpen, size: 17),
-              label: Text(picking ? 'Opening…' : 'Choose files'),
+            action: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: picking ? null : onPick,
+                    icon: picking
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(AppIcons.folderOpen, size: 17),
+                    label: Text(picking ? 'Opening…' : 'Choose files or folder'),
+                  ),
+                ),
+              ],
             ),
           )
         else
           Column(
             children: [
-              for (var i = 0; i < controller.items.length; i++) ...[
+              if (visible.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: Text(
+                    'No selected file matches “$query”.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              for (var i = 0; i < visible.length; i++) ...[
                 if (i > 0)
                   Divider(
                     height: 1,
                     color: theme.colorScheme.hairline,
                   ),
                 FileTile(
-                  name: controller.items[i].name,
-                  size: controller.items[i].size,
+                  name: visible[i].name,
+                  size: visible[i].size,
+                  subtitle: visible[i].relativePath,
                   trailing: IconButton(
                     tooltip: 'Remove',
                     visualDensity: VisualDensity.compact,
-                    onPressed: () => controller.removeItem(controller.items[i]),
+                    onPressed: () => controller.removeItem(visible[i]),
                     icon: Icon(
                       AppIcons.close,
                       size: 17,
@@ -348,6 +438,7 @@ class _SessionView extends StatelessWidget {
     final theme = Theme.of(context);
     final hotspot = controller.hotspot;
     final transferring = controller.phase == SendPhase.transferring;
+    final paused = controller.paused;
     final address = hotspot?.ip != null
         ? '${hotspot!.ip}:${controller.port}'
         : 'Port ${controller.port}';
@@ -358,15 +449,19 @@ class _SessionView extends StatelessWidget {
         Row(
           children: [
             StatusPill(
-              label: transferring
-                  ? 'Transferring'
-                  : controller.hasPeer
-                      ? '${controller.peerName ?? 'Device'} connected'
-                      : 'Waiting for a device',
-              icon: transferring ? AppIcons.zap : null,
+              label: paused
+                  ? 'Paused'
+                  : transferring
+                      ? 'Transferring'
+                      : controller.hasPeer
+                          ? '${controller.peerName ?? 'Device'} connected'
+                          : 'Waiting for a device',
+              icon: paused ? AppIcons.stop : (transferring ? AppIcons.zap : null),
               color: transferring ? theme.colorScheme.primary : null,
             ),
             const Spacer(),
+            if (transferring && controller.peerCount > 1)
+              StatusPill(label: '${controller.peerCount} devices'),
             if (!transferring) const PulsingDots(),
           ],
         ),
@@ -503,6 +598,24 @@ class _SessionView extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
+            if (transferring) ...[
+              Expanded(
+                child: paused
+                    ? FilledButton.icon(
+                        onPressed: controller.resumeTransfer,
+                        icon: const Icon(AppIcons.forward, size: 17),
+                        label: const Text('Resume'),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: controller.canPause
+                            ? controller.pauseTransfer
+                            : null,
+                        icon: const Icon(AppIcons.stop, size: 17),
+                        label: const Text('Pause'),
+                      ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+            ],
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: controller.cancelSession,
@@ -677,6 +790,66 @@ class _FailedView extends StatelessWidget {
           child: const Text('Back to files'),
         ),
       ],
+    );
+  }
+}
+
+class _SourceSheet extends StatelessWidget {
+  const _SourceSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
+            child: Text('Add to this transfer', style: theme.textTheme.titleLarge),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.folderOpen),
+            title: const Text('Files'),
+            subtitle: const Text('Any file type'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.any),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.image),
+            title: const Text('Photos'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.photos),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.video),
+            title: const Text('Videos'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.videos),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.music),
+            title: const Text('Audio'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.audio),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.fileText),
+            title: const Text('Documents'),
+            subtitle: const Text('PDF, Office, text, CSV'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.docs),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.folder),
+            title: const Text('Folder'),
+            subtitle: const Text('Send a whole folder tree'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.folder),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+      ),
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/state/receive_controller.dart';
@@ -556,6 +557,14 @@ class _ProgressView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (controller.isPaused) ...[
+          StatusPill(
+            label: 'Paused by sender',
+            icon: AppIcons.stop,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         Center(
           child: ProgressRing(
             progress: controller.overallProgress,
@@ -603,10 +612,18 @@ class _ProgressView extends StatelessWidget {
                 name: controller.receivedItems[i].name,
                 size: controller.receivedItems[i].size,
                 progress: controller.receivedItems[i].progress,
-                subtitle: controller.receivedItems[i].done
-                    ? '${formatBytes(controller.receivedItems[i].size)} · saved'
-                    : '${formatBytes(controller.receivedItems[i].transferred)} of '
+                subtitle: switch (controller.receivedItems[i].status) {
+                  TransferStatus.done =>
+                    '${formatBytes(controller.receivedItems[i].size)} · saved',
+                  TransferStatus.paused =>
+                    '${formatBytes(controller.receivedItems[i].transferred)} of '
+                        '${formatBytes(controller.receivedItems[i].size)} · paused',
+                  TransferStatus.failed => 'Failed',
+                  TransferStatus.active ||
+                  TransferStatus.pending =>
+                    '${formatBytes(controller.receivedItems[i].transferred)} of '
                         '${formatBytes(controller.receivedItems[i].size)}',
+                },
                 trailing: controller.receivedItems[i].done
                     ? Icon(
                         AppIcons.check,

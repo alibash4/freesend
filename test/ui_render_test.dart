@@ -140,7 +140,7 @@ void main() {
         .map((list) => list.controller)
         .toSet();
 
-    expect(controllers.length, 3);
+    expect(controllers.length, 4);
   });
 
   testWidgets('home renders and both flows open', (tester) async {
@@ -156,7 +156,7 @@ void main() {
 
     await tester.tap(find.text('Send').first);
     await tester.pumpAndSettle();
-    expect(find.text('Pick the files to send'), findsOneWidget);
+    expect(find.text('Pick what to send'), findsOneWidget);
     expect(find.text('Nothing selected'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '02-send-empty');
