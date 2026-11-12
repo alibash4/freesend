@@ -84,7 +84,25 @@ build:windows:
   tags:
     - saas-windows-medium-amd64
   allow_failure: true
+  before_script:
+    # The hosted Windows runner has no Flutter SDK and its shell is PowerShell,
+    # so the project's bash before_script does not even parse here. Fetch the
+    # current stable SDK and put it on PATH for the script below.
+    - |
+      $ErrorActionPreference = "Stop"
+      $flutterRoot = "C:\flutter"
+      if (-not (Test-Path (Join-Path $flutterRoot "bin\flutter.bat"))) {
+        $index = Invoke-RestMethod "https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json"
+        $stable = $index.current_release.stable
+        $release = $index.releases | Where-Object { $_.hash -eq $stable -and $_.channel -eq "stable" } | Select-Object -First 1
+        $zip = Join-Path $env:TEMP "flutter-windows.zip"
+        curl.exe --location --silent --show-error --fail --output $zip "https://storage.googleapis.com/flutter_infra_release/releases/$($release.archive)"
+        Expand-Archive -LiteralPath $zip -DestinationPath "C:\" -Force
+        Remove-Item -LiteralPath $zip
+      }
+      $env:PATH = "$flutterRoot\bin;$env:PATH"
   script:
+    - flutter --version
     - flutter pub get
     - flutter build windows --release
     - powershell -File scripts/package_windows.ps1

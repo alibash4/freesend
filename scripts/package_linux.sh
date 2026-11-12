@@ -77,7 +77,9 @@ copy_bundle "$STAGE/rpmroot/opt/freesend" "rpm"
 mkdir -p "$STAGE/rpmroot/usr/bin" "$STAGE/rpmroot/usr/share/applications"
 cp "$STAGE/deb/usr/bin/freesend" "$STAGE/rpmroot/usr/bin/freesend"
 cp "$ROOT/linux/packaging/freesend.desktop" "$STAGE/rpmroot/usr/share/applications/freesend.desktop"
-mkdir -p "$STAGE/rpmbuild"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+# No brace expansion here: /bin/sh on the CI image is dash, which would create
+# one directory literally named "{BUILD,RPMS,SOURCES,SPECS,SRPMS}".
+mkdir -p "$STAGE/rpmbuild/BUILD" "$STAGE/rpmbuild/RPMS" "$STAGE/rpmbuild/SOURCES" "$STAGE/rpmbuild/SPECS" "$STAGE/rpmbuild/SRPMS"
 cat > "$STAGE/rpmbuild/SPECS/freesend.spec" <<EOF
 Name: freesend
 Version: ${VERSION}
