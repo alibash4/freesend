@@ -15,6 +15,7 @@
 #   freesend-<version>-linux-x86_64.deb
 #   freesend-<version>-linux-x86_64.rpm
 #   freesend-<version>-linux-x86_64.tar.gz    raw bundle
+# The same four for aarch64, built on a hosted Arm runner.
 #
 # Windows (a hosted Windows runner, when one is available):
 #   freesend-<version>-windows-x64.zip        contains free_send.exe
@@ -77,6 +78,31 @@ build:linux:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
 
+# Arm64 Linux on a hosted Arm runner. The cirruslabs Flutter image is
+# multi-arch, so the same tag pulls the arm64 build here.
+build:linux:arm64:
+  stage: build
+  tags:
+    - saas-linux-small-arm64
+  image: "ghcr.io/cirruslabs/flutter:stable"
+  before_script:
+    - export PATH="$PATH:$HOME/.pub-cache/bin"
+    - apt-get update
+    - apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libblkid-dev liblzma-dev rpm curl ca-certificates file
+  script:
+    - flutter --version
+    - flutter pub get
+    - flutter build linux --release
+    - ARCH=aarch64 sh scripts/package_linux.sh
+  artifacts:
+    name: "freesend-linux-arm64"
+    paths:
+      - dist/*
+    expire_in: 2 weeks
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+
 # GitLab.com shared Windows runners are not on every plan. The job is allowed
 # to fail so a missing runner does not block the Android and Linux release.
 build:windows:
@@ -122,6 +148,8 @@ release:publish:
     - job: build:apk
       artifacts: true
     - job: build:linux
+      artifacts: true
+    - job: build:linux:arm64
       artifacts: true
     - job: build:windows
       artifacts: true

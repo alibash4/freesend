@@ -102,9 +102,10 @@ class UpdateController extends ChangeNotifier {
     message = null;
     notifyListeners();
     try {
-      // Ask the OS which ABI to fetch; Android ships per-ABI builds.
-      final abi = await _installer.currentAbi();
-      final latest = await _service.checkForUpdate(_currentVersion, abi: abi);
+      // Ask the OS which architecture to fetch: Android ships per-ABI builds,
+      // Linux per-architecture ones.
+      final arch = await _installer.currentArch();
+      final latest = await _service.checkForUpdate(_currentVersion, arch: arch);
       update = latest;
       if (latest == null) {
         phase = notifyWhenCurrent ? UpdatePhase.upToDate : UpdatePhase.idle;

@@ -6,9 +6,10 @@
 # and links them to the release, and creates the release itself as a fallback
 # for when a tag has no release yet.
 #
-# Asset link names are what the in-app updater matches. Keep the platform word
-# and the format marker: (32-bit), (64-bit), (universal), (AppImage), (deb),
-# (rpm), (bundle), (exe).
+# Asset link names are what the in-app updater matches. Keep the platform word,
+# the format marker ((32-bit), (64-bit), (universal), (AppImage), (deb), (rpm),
+# (bundle), (exe)) and, where a platform ships per-architecture builds, the
+# architecture word (x86_64, aarch64).
 #
 # Required CI/CD variables:
 #   RELEASE_TOKEN  project access token with the `api` scope
@@ -31,10 +32,14 @@ ASSETS="
 Free Send for Android (32-bit)|${PROJECT_NAME}-${VERSION}-android-32bit.apk|${APK_DIR}|app-armeabi-v7a-release.apk
 Free Send for Android (64-bit)|${PROJECT_NAME}-${VERSION}-android-64bit.apk|${APK_DIR}|app-arm64-v8a-release.apk
 Free Send for Android (universal)|${PROJECT_NAME}-${VERSION}-android-universal.apk|${APK_DIR}|app-release.apk
-Free Send for Linux (AppImage)|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage
-Free Send for Linux (deb)|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb
-Free Send for Linux (rpm)|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm
-Free Send for Linux (bundle)|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz
+Free Send for Linux x86_64 (AppImage)|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage
+Free Send for Linux x86_64 (deb)|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb
+Free Send for Linux x86_64 (rpm)|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm
+Free Send for Linux x86_64 (bundle)|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz
+Free Send for Linux aarch64 (AppImage)|${PROJECT_NAME}-${VERSION}-linux-aarch64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.AppImage
+Free Send for Linux aarch64 (deb)|${PROJECT_NAME}-${VERSION}-linux-aarch64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.deb
+Free Send for Linux aarch64 (rpm)|${PROJECT_NAME}-${VERSION}-linux-aarch64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.rpm
+Free Send for Linux aarch64 (bundle)|${PROJECT_NAME}-${VERSION}-linux-aarch64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.tar.gz
 Free Send for Windows (exe)|${PROJECT_NAME}-${VERSION}-windows-x64.zip|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-windows-x64.zip
 "
 

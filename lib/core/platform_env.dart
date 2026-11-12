@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:io';
 
 enum PlatformKind { android, windows, linux, macOS, other }
@@ -38,6 +39,21 @@ abstract final class PlatformEnv {
       kind == PlatformKind.android ||
       kind == PlatformKind.linux ||
       kind == PlatformKind.macOS;
+
+  /// The architecture word release assets are named with: `x86_64` or
+  /// `aarch64`.
+  ///
+  /// Only Linux ships per-architecture builds, so every other platform
+  /// returns null and the updater takes the single asset on offer.
+  static String? get assetArch {
+    if (kind != PlatformKind.linux) return null;
+    return switch (Abi.current()) {
+      Abi.linuxX64 => 'x86_64',
+      Abi.linuxArm64 => 'aarch64',
+      Abi.linuxArm => 'armhf',
+      _ => null,
+    };
+  }
 }
 
 /// Best-effort primary IPv4 address of a non-loopback interface.

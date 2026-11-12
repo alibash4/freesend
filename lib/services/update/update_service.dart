@@ -20,9 +20,10 @@ class UpdateNotAvailableException implements Exception {
 /// Reads GitLab Releases and pulls the asset for this install.
 ///
 /// Asset link names carry a platform word (`android`, `linux`, `windows`,
-/// `macos`) and, where a platform ships more than one package, a format
-/// marker: `(32-bit)`, `(64-bit)`, `(universal)`, `(AppImage)`, `(deb)`,
-/// `(rpm)`, `(bundle)`, `(exe)`.
+/// `macos`), a format marker (`(32-bit)`, `(64-bit)`, `(universal)`,
+/// `(AppImage)`, `(deb)`, `(rpm)`, `(bundle)`, `(exe)`) and, where a platform
+/// ships more than one architecture, the architecture word (`x86_64`,
+/// `aarch64`).
 class UpdateService {
   UpdateService({
     http.Client? client,
@@ -66,9 +67,10 @@ class UpdateService {
   /// Returns the newest release that has an asset for this platform, or null
   /// when there are no releases at all.
   ///
-  /// When [abi] is given, an asset built for that ABI is preferred over the
-  /// universal one, so a 64-bit device does not download a universal build.
-  Future<UpdateInfo?> fetchLatest({String? abi}) async {
+  /// When [arch] is given, an asset built for that architecture is preferred,
+  /// so an arm64 machine does not download the x86_64 build and a 64-bit
+  /// Android device does not download the universal APK.
+  Future<UpdateInfo?> fetchLatest({String? arch}) async {
     final uri = Uri.parse('$_apiBase/$projectId/releases');
     final response = await _client.get(uri,
         headers: {'Accept': 'application/json'}).timeout(_metadataTimeout);
@@ -85,7 +87,7 @@ class UpdateService {
 
     for (final entry in decoded) {
       if (entry is! Map<String, Object?>) continue;
-      final info = _parseRelease(entry, abi);
+      final info = _parseRelease(entry, arch);
       if (info != null) return info;
     }
     return null;
@@ -95,15 +97,15 @@ class UpdateService {
   /// when the app is already up to date.
   Future<UpdateInfo?> checkForUpdate(
     String currentVersion, {
-    String? abi,
+    String? arch,
   }) async {
-    final latest = await fetchLatest(abi: abi);
+    final latest = await fetchLatest(arch: arch);
     if (latest == null) return null;
     if (!latest.isNewerThan(currentVersion)) return null;
     return latest;
   }
 
-  UpdateInfo? _parseRelease(Map<String, Object?> release, String? abi) {
+  UpdateInfo? _parseRelease(Map<String, Object?> release, String? arch) {
     final tag = release['tag_name'];
     if (tag is! String || tag.isEmpty) return null;
 
@@ -122,9 +124,14 @@ class UpdateService {
     }
     if (candidates.isEmpty) return null;
 
+    final scoped = _platform == PlatformKind.linux
+        ? _forArch(candidates, arch)
+        : candidates;
+    if (scoped.isEmpty) return null;
+
     final match = _platform == PlatformKind.android
-        ? _pickForAbi(candidates, abi)
-        : _pickForFormat(candidates);
+        ? _pickForAbi(scoped, arch)
+        : _pickForFormat(scoped);
     final url = (match['direct_asset_url'] ?? match['url'])! as String;
     final size = match['size'];
     final releasedAt = release['released_at'] ?? release['created_at'];
@@ -140,6 +147,24 @@ class UpdateService {
       ),
       sizeBytes: size is num ? size.toInt() : 0,
     );
+  }
+
+  /// Keeps the assets built for [arch].
+  ///
+  /// Assets published before the architectures were split carry no marker and
+  /// are x86_64 builds, so they still match an x86_64 machine. An arm64
+  /// machine never falls back to them: the packages would not run.
+  List<Map<String, Object?>> _forArch(
+    List<Map<String, Object?>> candidates,
+    String? arch,
+  ) {
+    if (arch == null) return candidates;
+    const markers = ['x86_64', 'aarch64', 'armhf'];
+    return candidates.where((candidate) {
+      final name = candidate['name']! as String;
+      final marked = markers.any(name.contains);
+      return marked ? name.contains(arch) : arch == 'x86_64';
+    }).toList();
   }
 
   /// Picks the asset for this device: an ABI-specific build when one matches,

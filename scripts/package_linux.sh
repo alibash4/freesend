@@ -10,14 +10,24 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
-BUNDLE="$ROOT/build/linux/x64/release/bundle"
 DIST="$ROOT/dist"
 VERSION="${VERSION:-${CI_COMMIT_TAG:-}}"
 VERSION="${VERSION#v}"
 if [ -z "$VERSION" ]; then
   VERSION="$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' "$ROOT/pubspec.yaml")"
 fi
-ARCH="x86_64"
+# Architecture word used in the file names: x86_64 or aarch64. Flutter spells
+# its build directory differently, and Debian calls the same CPU amd64.
+ARCH="${ARCH:-x86_64}"
+case "$ARCH" in
+  x86_64) FLUTTER_ARCH=x64; DEB_ARCH=amd64 ;;
+  aarch64) FLUTTER_ARCH=arm64; DEB_ARCH=arm64 ;;
+  *)
+    echo "Unsupported ARCH: $ARCH (expected x86_64 or aarch64)" >&2
+    exit 1
+    ;;
+esac
+BUNDLE="$ROOT/build/linux/$FLUTTER_ARCH/release/bundle"
 PROJECT_NAME="${PROJECT_NAME:-freesend}"
 NAME="${PROJECT_NAME}-${VERSION}-linux-${ARCH}"
 
@@ -62,7 +72,7 @@ Package: freesend
 Version: ${VERSION}
 Section: net
 Priority: optional
-Architecture: amd64
+Architecture: ${DEB_ARCH}
 Maintainer: Free Send <freesend@localhost>
 Installed-Size: ${INSTALLED_SIZE}
 Depends: libgtk-3-0, libayatana-appindicator3-1 | libappindicator3-1
@@ -87,7 +97,7 @@ Version: ${VERSION}
 Release: 1
 Summary: Direct, hotspot-only file transfer
 License: LicenseRef-FreeSend
-BuildArch: x86_64
+BuildArch: ${ARCH}
 
 %description
 No cloud, no accounts.
@@ -104,7 +114,7 @@ cp -a %{_sourcedir}/root/. %{buildroot}/
 EOF
 cp -a "$STAGE/rpmroot" "$STAGE/rpmbuild/SOURCES/root"
 rpmbuild --define "_topdir $STAGE/rpmbuild" -bb "$STAGE/rpmbuild/SPECS/freesend.spec"
-cp "$STAGE/rpmbuild/RPMS/x86_64/"*.rpm "$DIST/${NAME}.rpm"
+cp "$STAGE/rpmbuild/RPMS/$ARCH/"*.rpm "$DIST/${NAME}.rpm"
 echo "Wrote $DIST/${NAME}.rpm"
 
 # AppImage: the bundle is the AppDir. APPIMAGE is set by the runtime, which
@@ -124,8 +134,8 @@ TOOL="$STAGE/appimagetool"
 if [ ! -x "$TOOL" ]; then
   curl --silent --show-error --location --fail \
     -o "$TOOL" \
-    https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+    "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${ARCH}.AppImage"
   chmod 755 "$TOOL"
 fi
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$STAGE/AppDir" "$DIST/${NAME}.AppImage"
+ARCH="$ARCH" APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" "$STAGE/AppDir" "$DIST/${NAME}.AppImage"
 echo "Wrote $DIST/${NAME}.AppImage"

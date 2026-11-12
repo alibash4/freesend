@@ -43,17 +43,20 @@ class UpdateInstaller {
 
   bool get isSupported => method != InstallMethod.unsupported;
 
-  /// The device's preferred ABI, e.g. `arm64-v8a`. Null on platforms that do
-  /// not ship per-ABI builds.
-  Future<String?> currentAbi() async {
-    if (method != InstallMethod.androidPackageInstaller) return null;
-    try {
-      return await channel.invokeMethod<String>('getAbi');
-    } on MissingPluginException {
-      return null;
-    } on PlatformException {
-      return null;
+  /// The architecture identifier release assets are named with: the Android
+  /// ABI (`arm64-v8a`) on Android, the architecture word (`x86_64`, `aarch64`)
+  /// on Linux. Null on platforms that ship a single build.
+  Future<String?> currentArch() async {
+    if (method == InstallMethod.androidPackageInstaller) {
+      try {
+        return await channel.invokeMethod<String>('getAbi');
+      } on MissingPluginException {
+        return null;
+      } on PlatformException {
+        return null;
+      }
     }
+    return PlatformEnv.assetArch;
   }
 
   /// Opens the native installer for [file]. On Android this shows the system

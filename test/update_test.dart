@@ -196,7 +196,7 @@ void main() {
     });
   });
 
-  group('UpdateService asset selection by ABI', () {
+  group('UpdateService asset selection by architecture', () {
     final release = {
       'tag_name': 'v1.2.0',
       'description': 'Notes.',
@@ -226,7 +226,7 @@ void main() {
       },
     };
 
-    Future<UpdateInfo?> fetchWith(String? abi) async {
+    Future<UpdateInfo?> fetchWith(String? arch) async {
       final service = UpdateService(
         // Android asset names, so the test does not depend on the host OS.
         platform: PlatformKind.android,
@@ -235,7 +235,7 @@ void main() {
         ),
       );
       addTearDown(service.dispose);
-      return service.fetchLatest(abi: abi);
+      return service.fetchLatest(arch: arch);
     }
 
     test('a 64-bit device gets the 64-bit build', () async {
@@ -279,7 +279,7 @@ void main() {
       );
       addTearDown(service.dispose);
 
-      final info = await service.fetchLatest(abi: 'arm64-v8a');
+      final info = await service.fetchLatest(arch: 'arm64-v8a');
       expect(info, isNotNull);
       expect(info!.downloadUrl, 'https://gitlab.com/a/freesend.apk');
     });
@@ -379,6 +379,115 @@ void main() {
       addTearDown(service.dispose);
       final info = await service.fetchLatest();
       expect(info!.downloadUrl, endsWith('.tar.gz'));
+    });
+  });
+
+  group('UpdateService linux architecture', () {
+    final release = {
+      'tag_name': 'v1.5.0',
+      'description': 'Both architectures.',
+      'assets': {
+        'links': [
+          {
+            'name': 'Free Send for Linux x86_64 (AppImage)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-x86_64.AppImage',
+          },
+          {
+            'name': 'Free Send for Linux aarch64 (AppImage)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-aarch64.AppImage',
+          },
+          {
+            'name': 'Free Send for Linux x86_64 (deb)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-x86_64.deb',
+          },
+          {
+            'name': 'Free Send for Linux aarch64 (deb)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-aarch64.deb',
+          },
+        ],
+      },
+    };
+
+    Future<UpdateInfo?> fetch(String? arch, PackageFormat format) {
+      final service = UpdateService(
+        platform: PlatformKind.linux,
+        packageFormat: format,
+        client: MockClient(
+          (_) async => http.Response(jsonEncode([release]), 200),
+        ),
+      );
+      addTearDown(service.dispose);
+      return service.fetchLatest(arch: arch);
+    }
+
+    test('an arm64 machine downloads the arm64 build', () async {
+      final info = await fetch('aarch64', PackageFormat.appImage);
+      expect(info!.downloadUrl, contains('aarch64'));
+    });
+
+    test('an x86_64 machine downloads the x86_64 build', () async {
+      final info = await fetch('x86_64', PackageFormat.appImage);
+      expect(info!.downloadUrl, contains('x86_64'));
+    });
+
+    test('the architecture does not change the package format', () async {
+      final info = await fetch('aarch64', PackageFormat.deb);
+      expect(info!.downloadUrl, endsWith('.deb'));
+      expect(info.downloadUrl, contains('aarch64'));
+    });
+
+    test('the format fallbacks still apply within the architecture', () async {
+      final info = await fetch('aarch64', PackageFormat.bundle);
+      expect(info!.downloadUrl, endsWith('.AppImage'));
+    });
+
+    test('a release published before the split still updates x86_64', () async {
+      final service = UpdateService(
+        platform: PlatformKind.linux,
+        packageFormat: PackageFormat.appImage,
+        client: MockClient((_) async => http.Response(jsonEncode([
+          {
+            'tag_name': 'v1.4.0',
+            'description': '',
+            'assets': {
+              'links': [
+                {
+                  'name': 'Free Send for Linux (AppImage)',
+                  'direct_asset_url':
+                      'https://gitlab.com/a/freesend.AppImage',
+                },
+              ],
+            },
+          },
+        ]), 200)),
+      );
+      addTearDown(service.dispose);
+      final info = await service.fetchLatest(arch: 'x86_64');
+      expect(info!.downloadUrl, endsWith('.AppImage'));
+    });
+
+    test('an arm64 machine skips a release without arm64 assets', () async {
+      final service = UpdateService(
+        platform: PlatformKind.linux,
+        packageFormat: PackageFormat.appImage,
+        client: MockClient((_) async => http.Response(jsonEncode([
+          {
+            'tag_name': 'v1.4.0',
+            'description': '',
+            'assets': {
+              'links': [
+                {
+                  'name': 'Free Send for Linux x86_64 (AppImage)',
+                  'direct_asset_url':
+                      'https://gitlab.com/a/freesend-x86_64.AppImage',
+                },
+              ],
+            },
+          },
+        ]), 200)),
+      );
+      addTearDown(service.dispose);
+      expect(await service.fetchLatest(arch: 'aarch64'), isNull);
     });
   });
 

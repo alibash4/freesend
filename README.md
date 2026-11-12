@@ -122,26 +122,31 @@ The app can check GitLab Releases for a newer build and install it.
 
 Releases are matched to the platform by a word in the asset name
 (`android`, `linux`, `windows`, `macos`). Linux and Windows also carry a
-format marker, and the app downloads the package that matches how it was
-installed:
+format marker, Linux carries the architecture word (`x86_64`, `aarch64`), and
+the app downloads the package that matches how it was installed:
 
 | Asset name | File | Who gets it |
 | --- | --- | --- |
 | `Free Send for Android (32-bit)` | armeabi-v7a APK | 32-bit phones |
 | `Free Send for Android (64-bit)` | arm64-v8a APK | 64-bit phones |
 | `Free Send for Android (universal)` | all ABIs, including emulators | x86_64, or when no split matches |
-| `Free Send for Linux (AppImage)` | `.AppImage` | running from an AppImage (`APPIMAGE` is set) |
-| `Free Send for Linux (deb)` | `.deb` | Debian/Ubuntu package (`package-kind` is `deb`) |
-| `Free Send for Linux (rpm)` | `.rpm` | Fedora/RHEL package (`package-kind` is `rpm`) |
-| `Free Send for Linux (bundle)` | `.tar.gz` of the raw build | an unpacked `free_send` bundle |
+| `Free Send for Linux x86_64 (AppImage)` | `.AppImage` for x86_64 | x86_64 AppImage (`APPIMAGE` is set) |
+| `Free Send for Linux x86_64 (deb)` | `.deb` for amd64 | Debian/Ubuntu package (`package-kind` is `deb`) |
+| `Free Send for Linux x86_64 (rpm)` | `.rpm` for x86_64 | Fedora/RHEL package (`package-kind` is `rpm`) |
+| `Free Send for Linux x86_64 (bundle)` | `.tar.gz` of the raw x86_64 build | an unpacked `free_send` bundle |
+| `Free Send for Linux aarch64 (AppImage)` | `.AppImage` for aarch64 | arm64 AppImage (`APPIMAGE` is set) |
+| `Free Send for Linux aarch64 (deb)` | `.deb` for arm64 | Debian/Ubuntu package on arm64 |
+| `Free Send for Linux aarch64 (rpm)` | `.rpm` for aarch64 | Fedora/RHEL package on arm64 |
+| `Free Send for Linux aarch64 (bundle)` | `.tar.gz` of the raw aarch64 build | an unpacked `free_send` bundle on arm64 |
 | `Free Send for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
 
 The Android ABI is read from the device, so a 64-bit phone downloads the
-smaller split instead of the universal APK. A Linux install that cannot find
-its own format falls back to the raw bundle, then the AppImage. Installing a
-deb or rpm asks the system for permission (`pkexec`). An AppImage, the raw
-bundle, and the Windows zip replace themselves after the app exits and then
-relaunch.
+smaller split instead of the universal APK. On Linux the architecture is read
+from the running process, so an arm64 machine downloads the aarch64 build and
+never the x86_64 one. A Linux install that cannot find its own format falls
+back to the raw bundle, then the AppImage. Installing a deb or rpm asks the
+system for permission (`pkexec`). An AppImage, the raw bundle, and the Windows
+zip replace themselves after the app exits and then relaunch.
 
 Android requires the user to grant *install unknown apps* to Free Send; the
 install bridge checks for it and points at the system page when it is missing.
@@ -165,9 +170,10 @@ Create the release first, then let the pipeline attach the binary to it.
 
 `build:apk` runs on `main` and on tags: analyze, test, the two ABI splits and
 the universal APK. `build:linux` produces the AppImage, deb, rpm and the raw
-tar.gz. `build:windows` runs on a GitLab Windows runner and zips `free_send.exe`
-with its DLLs; that job is allowed to fail so a missing runner does not block
-the release.
+tar.gz, and `build:linux:arm64` produces the same four for aarch64 on a hosted
+Arm runner. `build:windows` runs on a GitLab Windows runner and zips
+`free_send.exe` with its DLLs; that job is allowed to fail so a missing runner
+does not block the release.
 
 Two things must be configured once:
 
