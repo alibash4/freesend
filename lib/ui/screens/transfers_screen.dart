@@ -12,6 +12,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/peer_list.dart';
 
 /// The transfer center: whatever is live right now, plus the local record.
 /// It is deliberately a state view, not a second copy of the send/receive
@@ -194,6 +195,10 @@ class _SendTransferCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
+          if (controller.peers.isNotEmpty) ...[
+            PeerList(peers: controller.peers),
+            const SizedBox(height: AppSpacing.lg),
+          ],
           for (final item in controller.items) ...[
             if (item != controller.items.first)
               Divider(height: 1, color: theme.colorScheme.hairline),

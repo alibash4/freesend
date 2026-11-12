@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
@@ -48,6 +49,7 @@ class SendController extends ChangeNotifier {
   String? currentFileName;
   int peerCount = 0;
   List<String> connectedPeerNames = const [];
+  List<PeerInfo> peers = const [];
   bool paused = false;
 
   TransferHost? _host;
@@ -171,6 +173,7 @@ class SendController extends ChangeNotifier {
     peerPlatform = null;
     peerCount = 0;
     connectedPeerNames = const [];
+    peers = const [];
     paused = false;
     sentBytes = 0;
     speedBytesPerSecond = 0;
@@ -196,9 +199,9 @@ class SendController extends ChangeNotifier {
         deviceName: appState.deviceName,
         instanceId: appState.instanceId,
         events: HostEvents(
-          onPeerConnected: _onPeerConnected,
-          onPeerDisconnected: _onPeerDisconnected,
-          onPeerCountChanged: _onPeerCountChanged,
+          onPeersChanged: _onPeersChanged,
+          onPeerFinished: _onPeerFinished,
+          onPeerError: _onPeerError,
           onProgress: _onProgress,
           onFinished: _onFinished,
           onError: _onHostError,
@@ -229,26 +232,53 @@ class SendController extends ChangeNotifier {
     }
   }
 
-  void _onPeerConnected(String name, String? platform) {
-    peerName ??= name;
-    peerPlatform ??= platform;
-    notifyListeners();
-  }
-
-  void _onPeerDisconnected(String name, String? platform) {
-    // A group can lose one receiver without ending the session.
-    if ((_host?.peerCount ?? 0) > 0) return;
-    if (peerName == name) peerName = null;
-    peerPlatform = null;
-    notifyListeners();
-  }
-
-  void _onPeerCountChanged(int count) {
-    peerCount = count;
-    connectedPeerNames = _host?.connectedPeerNames ?? const [];
-    if (count == 0) {
+  void _onPeersChanged(List<PeerInfo> value) {
+    peers = value;
+    peerCount = value.length;
+    connectedPeerNames = value.map((peer) => peer.name).toList(growable: false);
+    if (value.isEmpty) {
       peerName = null;
       peerPlatform = null;
+    } else {
+      peerName ??= value.first.name;
+      peerPlatform ??= value.first.platform;
+    }
+    notifyListeners();
+  }
+
+  void _onPeerFinished(
+    String peerId,
+    int fileCount,
+    int bytes,
+    Duration elapsed,
+  ) {
+    peers = [
+      for (final peer in peers)
+        if (peer.id == peerId)
+          peer.copyWith(
+            selectedIds: peer.selectedIds,
+            transferred: bytes,
+            completedFiles: fileCount,
+            clearCurrentFile: true,
+            status: TransferStatus.done,
+          )
+        else
+          peer,
+    ];
+    notifyListeners();
+  }
+
+  void _onPeerError(String peerId, String message) {
+    peers = [
+      for (final peer in peers)
+        if (peer.id == peerId)
+          peer.copyWith(clearCurrentFile: true, status: TransferStatus.failed)
+        else
+          peer,
+    ];
+    if (peers.isNotEmpty &&
+        peers.every((peer) => peer.status == TransferStatus.failed)) {
+      errorMessage = message;
     }
     notifyListeners();
   }
@@ -303,8 +333,13 @@ class SendController extends ChangeNotifier {
   void _onFinished(int fileCount, int bytes, Duration elapsed) {
     // The host reports completion once per receiver. In a group session the
     // first receiver finishing must not end the UI while others are still
-    // streaming; only the last peer closes the transfer.
-    if ((_host?.peerCount ?? 0) > 1) {
+    // streaming; the transfer ends when every receiver is done or failed.
+    final allSettled = peers.every(
+      (peer) =>
+          peer.status == TransferStatus.done ||
+          peer.status == TransferStatus.failed,
+    );
+    if (!allSettled) {
       notifyListeners();
       return;
     }
@@ -390,6 +425,7 @@ class SendController extends ChangeNotifier {
     peerPlatform = null;
     peerCount = 0;
     connectedPeerNames = const [];
+    peers = const [];
     paused = false;
     errorMessage = null;
     sentBytes = 0;

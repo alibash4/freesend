@@ -12,6 +12,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 
 class SendScreen extends StatefulWidget {
@@ -594,6 +595,10 @@ class _SessionView extends StatelessWidget {
             '${formatBytes(controller.totalBytes)}',
             style: theme.textTheme.bodySmall,
           ),
+        ],
+        if (controller.peers.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          PeerList(peers: controller.peers),
         ],
         const SizedBox(height: AppSpacing.lg),
         Row(

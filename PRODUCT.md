@@ -42,8 +42,9 @@ Confirmed product facts:
 
 - Android, iOS, Windows, Linux, and macOS. iOS cannot create a hotspot, so it
   joins the network the sender selects.
-- Current baseline is one sender to one receiver, files only, over a TCP
-  session found by UDP beacons or a pairing code.
+- Current baseline is one sender to multiple receivers, files and folders, over a
+  TCP session found by UDP beacons or a pairing code. Protocol v2 adds folder
+  paths, SHA-256 verification, sender-side pause/resume, and a v1 fallback.
 - Hotspot creation is native on Android and Linux; Windows, macOS, and iOS use
   the network the user selects, with system guidance.
 - History is local-only and capped.
@@ -83,7 +84,9 @@ first, so this pass does not replace the visual world.
 
 Working Flutter app in this repository with send/receive controllers, hotspot
 services, UDP discovery, a framed TCP protocol, local history, settings, and
-tests. The transfer protocol is currently version 1 and single-peer.
+tests. Protocol v2 supports multi-receiver sessions, folder-shaped writes,
+SHA-256 checks, and sender-side pause/resume. Encryption/trusted devices and
+Android app/APK sharing are not implemented.
 
 ## Product Principles
 

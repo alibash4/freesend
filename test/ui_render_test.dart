@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/pairing_code.dart';
@@ -26,6 +27,7 @@ import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
+import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
 /// Renders the real screens at phone size so layout overflow and missing
@@ -321,6 +323,44 @@ void main() {
     await capture(tester, '14-home-wide');
   });
 
+  testWidgets('peer list shows independent receiver progress', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: PeerList(
+              peers: [
+                PeerInfo(
+                  id: 'p1',
+                  name: 'Pixel',
+                  selectedIds: ['f0'],
+                  totalBytes: 200,
+                  transferred: 100,
+                  completedFiles: 1,
+                ),
+                PeerInfo(
+                  id: 'p2',
+                  name: 'Desktop',
+                  selectedIds: ['f0'],
+                  totalBytes: 200,
+                  transferred: 20,
+                  completedFiles: 0,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Receivers'), findsOneWidget);
+    expect(find.text('Pixel'), findsOneWidget);
+    expect(find.text('Desktop'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+    expect(find.text('10%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('settings shows the updates section', (tester) async {
     await pumpApp(tester);
 
@@ -468,9 +508,10 @@ Future<void> _loadPackageFont({
   // the project's own package config.
   final config = File('.dart_tool/package_config.json');
   if (!config.existsSync()) return;
-  final decoded = jsonDecode(await config.readAsString()) as Map<String, Object?>;
-  final packages = (decoded['packages'] as List<Object?>)
-      .cast<Map<String, Object?>>();
+  final decoded =
+      jsonDecode(await config.readAsString()) as Map<String, Object?>;
+  final packages =
+      (decoded['packages'] as List<Object?>).cast<Map<String, Object?>>();
   final match = packages.where((entry) => entry['name'] == package);
   if (match.isEmpty) return;
   final root = config.uri.resolve(match.first['rootUri']! as String);

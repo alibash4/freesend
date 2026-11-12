@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
@@ -278,11 +279,22 @@ void main() {
     final file = await writeRandomFile('group.bin', 512 * 1024 + 31);
     final items = [TransferItem.fromFile(file)!..id = 'f0'];
 
+    final selected = Completer<void>();
     final host = TransferHost(
       items: items,
       deviceName: 'Sender',
       instanceId: 'host-group',
-      events: const HostEvents(),
+      events: HostEvents(
+        onPeersChanged: (peers) {
+          if (peers.length == 2 &&
+              peers.every(
+                (peer) =>
+                    peer.selectedIds.contains('f0') && peer.totalBytes > 0,
+              )) {
+            if (!selected.isCompleted) selected.complete();
+          }
+        },
+      ),
     );
     final port = await host.start();
     addTearDown(host.dispose);
@@ -311,11 +323,17 @@ void main() {
     final manifestA = await clientA.connect('127.0.0.1', port);
     final manifestB = await clientB.connect('127.0.0.1', port);
     expect(host.peerCount, 2);
+    expect(
+      host.peers.map((peer) => peer.name),
+      containsAll(['Receiver A', 'Receiver B']),
+    );
 
-    await Future.wait([
-      clientA.receive(ids: ['f0'], downloadRoot: dirA.path),
-      clientB.receive(ids: ['f0'], downloadRoot: dirB.path),
-    ]);
+    final receiveA = clientA.receive(ids: ['f0'], downloadRoot: dirA.path);
+    final receiveB = clientB.receive(ids: ['f0'], downloadRoot: dirB.path);
+    await selected.future.timeout(const Duration(seconds: 5));
+    expect(host.peers.length, 2);
+    expect(host.peers.every((peer) => peer.totalBytes > 0), isTrue);
+    await Future.wait([receiveA, receiveB]);
 
     for (final dir in [dirA, dirB]) {
       final received = File('${dir.path}/group.bin');
@@ -373,6 +391,21 @@ void main() {
     final received = File('${dir.path}/pausable.bin');
     expect(await received.exists(), isTrue);
     expect(await received.readAsBytes(), await file.readAsBytes());
+  });
+
+  test('peer progress is per receiver', () {
+    const peer = PeerInfo(
+      id: 'p0',
+      name: 'Receiver',
+      totalBytes: 200,
+      transferred: 50,
+      completedFiles: 1,
+    );
+    expect(peer.progress, 0.25);
+    expect(
+      peer.copyWith(status: TransferStatus.done).progress,
+      1.0,
+    );
   });
 }
 
