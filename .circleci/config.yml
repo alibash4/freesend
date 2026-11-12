@@ -37,5 +37,9 @@ jobs:
 
 workflows:
   macos:
+    # CircleCI only builds releases. GitLab CI handles every push to main, and
+    # the trigger filter on the CircleCI side does the same job; this is a
+    # second layer in case another trigger is ever added.
+    when: pipeline.git.tag != ""
     jobs:
       - build-macos
