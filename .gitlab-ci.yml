@@ -24,19 +24,29 @@ stages:
   - build
   - release
 
-# The versioned tags in this image stop at 3.38.x, so track `stable` (currently
-# Flutter 3.44.0) — it ships the Android SDK too. The build runs on every push
-# to main, so a Flutter bump that breaks the app shows up immediately.
+# The cirruslabs image is only a base for the Android SDK and system packages;
+# its newest tag is 3.44.0. install_flutter.sh pins the SDK the project builds
+# with (3.50.0) on every job, including the arm64 runner.
+
+variables:
+  FREESEND_FLUTTER_VERSION: "3.50.0"
+  FREESEND_FLUTTER_ROOT: "/opt/flutter-3.50.0"
 
 default:
   before_script:
+    - sh scripts/install_flutter.sh
+    - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
     - export PATH="$PATH:$HOME/.pub-cache/bin"
 
 build:apk:
   stage: build
-  image: "ghcr.io/cirruslabs/flutter:stable"
+  image: "ghcr.io/cirruslabs/flutter:3.44.0"
   before_script:
     # Job-level before_script replaces the default one, so both run here.
+    - apt-get update
+    - apt-get install -y --no-install-recommends curl ca-certificates xz-utils unzip git
+    - sh scripts/install_flutter.sh
+    - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
     - sh scripts/setup_signing.sh
     - export PATH="$PATH:$HOME/.pub-cache/bin"
   script:
@@ -59,11 +69,13 @@ build:apk:
 
 build:linux:
   stage: build
-  image: "ghcr.io/cirruslabs/flutter:stable"
+  image: "ghcr.io/cirruslabs/flutter:3.44.0"
   before_script:
     - export PATH="$PATH:$HOME/.pub-cache/bin"
     - apt-get update
-    - apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libblkid-dev liblzma-dev rpm curl ca-certificates file
+    - apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libblkid-dev liblzma-dev rpm curl ca-certificates xz-utils unzip git file
+    - sh scripts/install_flutter.sh
+    - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
   script:
     - flutter --version
     - flutter pub get
@@ -78,17 +90,19 @@ build:linux:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH == "main"
 
-# Arm64 Linux on a hosted Arm runner. The cirruslabs Flutter image is
-# multi-arch, so the same tag pulls the arm64 build here.
+# Arm64 Linux on a hosted Arm runner. The cirruslabs image provides the arm64
+# system base; install_flutter.sh clones Flutter 3.50.0 for this architecture.
 build:linux:arm64:
   stage: build
   tags:
     - saas-linux-small-arm64
-  image: "ghcr.io/cirruslabs/flutter:stable"
+  image: "ghcr.io/cirruslabs/flutter:3.44.0"
   before_script:
     - export PATH="$PATH:$HOME/.pub-cache/bin"
     - apt-get update
-    - apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libblkid-dev liblzma-dev rpm curl ca-certificates file
+    - apt-get install -y --no-install-recommends clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libblkid-dev liblzma-dev rpm curl ca-certificates xz-utils unzip git file
+    - sh scripts/install_flutter.sh
+    - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
   script:
     - flutter --version
     - flutter pub get
