@@ -129,6 +129,20 @@ void main() {
     });
   }
 
+  testWidgets('every tab scrolls with its own controller', (tester) async {
+    await pumpApp(tester);
+
+    // The shell keeps all three tabs alive in an IndexedStack, so one shared
+    // ScrollController gets attached to three ScrollPositions at once, which
+    // is what desktop scrollbars reject.
+    final controllers = tester
+        .widgetList<ListView>(find.byType(ListView, skipOffstage: false))
+        .map((list) => list.controller)
+        .toSet();
+
+    expect(controllers.length, 3);
+  });
+
   testWidgets('home renders and both flows open', (tester) async {
     await pumpApp(tester);
 

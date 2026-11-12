@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -20,6 +21,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  late final ScrollController _scrollController = AnimatedScrollController(
+    animationFactory: const ChromiumEaseInOut(),
+  );
   late final TextEditingController _nameController =
       TextEditingController(text: context.read<AppState>().deviceName);
   final _focusNode = FocusNode();
@@ -34,6 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _focusNode.dispose();
     _nameController.dispose();
     super.dispose();
@@ -106,6 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final updateState = context.watch<UpdateController>();
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.only(bottom: AppSpacing.xl),
       children: [
         Padding(

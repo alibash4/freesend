@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/state/send_controller.dart';
@@ -22,6 +23,16 @@ class SendScreen extends StatefulWidget {
 
 class _SendScreenState extends State<SendScreen> {
   bool _picking = false;
+
+  late final ScrollController _scrollController = AnimatedScrollController(
+    animationFactory: const ChromiumEaseInOut(),
+  );
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFiles(SendController controller) async {
     if (_picking) return;
@@ -111,6 +122,7 @@ class _SendScreenState extends State<SendScreen> {
         ),
         body: SafeArea(
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.only(bottom: AppSpacing.xl),
             children: [
               Padding(

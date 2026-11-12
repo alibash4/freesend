@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -23,6 +24,16 @@ class ReceiveScreen extends StatefulWidget {
 }
 
 class _ReceiveScreenState extends State<ReceiveScreen> {
+  late final ScrollController _scrollController = AnimatedScrollController(
+    animationFactory: const ChromiumEaseInOut(),
+  );
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -123,6 +134,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       ),
       body: SafeArea(
         child: ListView(
+          controller: _scrollController,
           padding: const EdgeInsets.only(bottom: AppSpacing.xl),
           children: [
             Padding(

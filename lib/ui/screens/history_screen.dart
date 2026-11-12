@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/models/transfer_record.dart';
@@ -9,8 +10,23 @@ import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
-class HistoryScreen extends StatelessWidget {
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  late final ScrollController _scrollController = AnimatedScrollController(
+    animationFactory: const ChromiumEaseInOut(),
+  );
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _clear(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -47,6 +63,7 @@ class HistoryScreen extends StatelessWidget {
     final totalBytes = records.fold<int>(0, (sum, record) => sum + record.bytes);
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.only(bottom: AppSpacing.xl),
       children: [
         Padding(

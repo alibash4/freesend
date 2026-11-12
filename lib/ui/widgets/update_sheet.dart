@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/services/update/update_info.dart';
@@ -110,7 +111,9 @@ class UpdateSheet extends StatelessWidget {
             constraints: BoxConstraints(
               maxHeight: MediaQuery.sizeOf(context).height * 0.6,
             ),
-            child: SingleChildScrollView(child: Column(children: body)),
+            child: AnimatedPrimaryScrollController(
+              child: SingleChildScrollView(child: Column(children: body)),
+            ),
           ),
         ],
       ),

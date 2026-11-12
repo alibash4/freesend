@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -13,8 +14,23 @@ import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/brand_mark.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final ScrollController _scrollController = AnimatedScrollController(
+    animationFactory: const ChromiumEaseInOut(),
+  );
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +39,7 @@ class HomeScreen extends StatelessWidget {
     final recent = appState.history.take(3).toList();
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.only(bottom: AppSpacing.xl),
       children: [
         Padding(

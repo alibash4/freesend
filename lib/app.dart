@@ -11,7 +11,6 @@ import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
-import 'package:scroll_animator/scroll_animator.dart';
 
 class FreeSendApp extends StatelessWidget {
   const FreeSendApp({super.key, required this.appState, required this.tray});
@@ -89,9 +88,7 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: state.themeMode,
-        home: const AnimatedPrimaryScrollController(
-          child: AppShell(),
-        ),
+        home: const AppShell(),
       ),
     );
   }
