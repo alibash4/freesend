@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/models/transfer_item.dart';
+import 'package:free_send/services/transfer/checksum.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 
@@ -25,12 +26,14 @@ class TransferManifest {
 class ClientEvents {
   const ClientEvents({
     this.onProgress,
+    this.onStatus,
     this.onFinished,
     this.onError,
     this.onRemoteClosed,
   });
 
   final void Function(TransferItem item, int bytesReceived)? onProgress;
+  final void Function(TransferItem item)? onStatus;
   final void Function(int fileCount, int bytes, Duration elapsed)? onFinished;
   final void Function(String message)? onError;
   final void Function()? onRemoteClosed;
@@ -67,6 +70,7 @@ class TransferClient {
         'v': AppConstants.protocolVersion,
         'name': deviceName,
         'platform': Platform.operatingSystem,
+        'caps': const ['checksums', 'resume'],
       });
       await channel.writer.flush();
 
@@ -109,11 +113,16 @@ class TransferClient {
     var receivedFiles = 0;
     var receivedBytes = 0;
 
-    channel.writer.json(FrameType.accept, {'ids': ids});
+    channel.writer.json(FrameType.accept, {
+      'ids': ids,
+      'caps': const ['checksums', 'resume'],
+    });
     await channel.writer.flush();
 
     RandomAccessFile? handle;
     TransferItem? current;
+    Sha256Stream? hash;
+    String? expectedSha;
     final taken = <String>{};
 
     try {
@@ -126,11 +135,20 @@ class TransferClient {
             final size = (json['size'] as num?)?.toInt() ?? 0;
             final unique = uniqueFileName(name, taken);
             taken.add(unique.toLowerCase());
-            final dir = Directory(downloadRoot);
-            if (!await dir.exists()) {
-              await dir.create(recursive: true);
+            final root = Directory(downloadRoot);
+            if (!await root.exists()) {
+              await root.create(recursive: true);
             }
-            final target = File('${dir.path}${Platform.pathSeparator}$unique');
+            final relative = (json['dir'] as String?)
+                ?.replaceAll('\\', '/')
+                .replaceAll('/', Platform.pathSeparator);
+            final parent = relative == null || relative.isEmpty
+                ? root.path
+                : '${root.path}${Platform.pathSeparator}$relative';
+            if (relative != null && relative.isNotEmpty) {
+              await Directory(parent).create(recursive: true);
+            }
+            final target = File('$parent${Platform.pathSeparator}$unique');
             handle = await target.open(mode: FileMode.write);
             current = TransferItem(
               id: (json['id'] as String?) ?? '',
@@ -138,7 +156,13 @@ class TransferClient {
               size: size,
               path: target.path,
               receivedPath: target.path,
+              relativePath: relative,
+              sha256: json['sha256'] as String?,
+              status: TransferStatus.active,
             );
+            hash = Sha256Stream();
+            expectedSha = json['sha256'] as String?;
+            events.onStatus?.call(current);
             break;
 
           case FrameType.data:
@@ -147,6 +171,7 @@ class TransferClient {
             if (file == null || raf == null) {
               throw ProtocolException('Received data before a file header');
             }
+            hash?.add(frame.payload);
             await raf.writeFrom(frame.payload);
             file.transferred += frame.payload.length;
             receivedBytes += frame.payload.length;
@@ -156,7 +181,11 @@ class TransferClient {
           case FrameType.fileEnd:
             final file = current;
             if (file != null) {
-              file.done = true;
+              final json = frame.json();
+              final digest = hash?.finish();
+              final wanted = (json['sha256'] as String?) ??
+                  expectedSha ??
+                  file.sha256;
               if (file.transferred != file.size) {
                 // A short file is corrupt; surface it rather than silently
                 // leaving a truncated file on disk.
@@ -165,14 +194,41 @@ class TransferClient {
                   '(${formatBytes(file.transferred)} of ${formatBytes(file.size)})',
                 );
               }
+              if (wanted != null && digest != null && wanted != digest) {
+                throw ProtocolException(
+                  '${file.name} failed its checksum; the copy is corrupt.',
+                );
+              }
+              file.done = true;
+              file.status = TransferStatus.done;
+              file.sha256 = digest ?? wanted;
+              events.onStatus?.call(file);
               events.onProgress?.call(file, receivedBytes);
               receivedFiles++;
             }
             await handle?.close();
             handle = null;
             current = null;
+            hash = null;
+            expectedSha = null;
             channel.writer.json(FrameType.ackFile, {'id': file?.id ?? ''});
             await channel.writer.flush();
+            break;
+
+          case FrameType.pause:
+            final file = current;
+            if (file != null) {
+              file.status = TransferStatus.paused;
+              events.onStatus?.call(file);
+            }
+            break;
+
+          case FrameType.resume:
+            final file = current;
+            if (file != null) {
+              file.status = TransferStatus.active;
+              events.onStatus?.call(file);
+            }
             break;
 
           case FrameType.transferEnd:
@@ -208,6 +264,10 @@ class TransferClient {
     } on ProtocolException catch (error) {
       await handle?.close();
       handle = null;
+      if (current != null) {
+        current.status = TransferStatus.failed;
+        events.onStatus?.call(current);
+      }
       if (_cancelled) {
         events.onRemoteClosed?.call();
       } else if (!_finished) {
@@ -217,6 +277,10 @@ class TransferClient {
     } on SocketException catch (error) {
       await handle?.close();
       handle = null;
+      if (current != null) {
+        current.status = TransferStatus.failed;
+        events.onStatus?.call(current);
+      }
       if (!_cancelled && !_finished) {
         events.onError?.call('Connection lost: ${error.message}');
       }

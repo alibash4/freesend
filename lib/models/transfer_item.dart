@@ -1,5 +1,9 @@
 import 'dart:io';
 
+/// Where a single file is in the transfer lifecycle. The UI uses this to show
+/// per-file state without inferring it from byte counts.
+enum TransferStatus { pending, active, paused, done, failed }
+
 /// A single file taking part in a transfer, in either direction.
 class TransferItem {
   TransferItem({
@@ -11,6 +15,8 @@ class TransferItem {
     this.receivedPath,
     this.transferred = 0,
     this.done = false,
+    this.status = TransferStatus.pending,
+    this.sha256,
   });
 
   /// Stable per-session identifier used on the wire. Assigned by the sender
@@ -29,6 +35,8 @@ class TransferItem {
 
   int transferred;
   bool done;
+  TransferStatus status;
+  String? sha256;
 
   double get progress => size <= 0 ? (done ? 1 : 0) : (transferred / size).clamp(0, 1);
 
@@ -55,6 +63,7 @@ class TransferItem {
         'name': name,
         'size': size,
         if (relativePath != null) 'dir': relativePath,
+        if (sha256 != null) 'sha256': sha256,
       };
 
   static TransferItem fromWire(Map<String, Object?> json) {
@@ -63,6 +72,7 @@ class TransferItem {
       name: (json['name'] ?? 'file') as String,
       size: (json['size'] as num?)?.toInt() ?? 0,
       relativePath: json['dir'] as String?,
+      sha256: json['sha256'] as String?,
     );
   }
 }

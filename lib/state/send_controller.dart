@@ -46,6 +46,9 @@ class SendController extends ChangeNotifier {
   int sentBytes = 0;
   double speedBytesPerSecond = 0;
   String? currentFileName;
+  int peerCount = 0;
+  List<String> connectedPeerNames = const [];
+  bool paused = false;
 
   TransferHost? _host;
   Stopwatch? _stopwatch;
@@ -81,6 +84,8 @@ class SendController extends ChangeNotifier {
       phase == SendPhase.waitingForPeer ||
       phase == SendPhase.transferring;
   bool get hasPeer => _host?.hasPeer ?? false;
+  bool get canPause => phase == SendPhase.transferring && !paused;
+  bool get canResume => phase == SendPhase.transferring && paused;
 
   int get remainingBytes => (totalBytes - sentBytes).clamp(0, totalBytes);
 
@@ -101,6 +106,43 @@ class SendController extends ChangeNotifier {
       items.add(item);
       existing.add(file.path);
     }
+    _recalculateTotal();
+    notifyListeners();
+  }
+
+  /// Adds every file below [directory], keeping the selected folder name in
+  /// each item's relative path so the receiver recreates the same shape.
+  Future<void> addDirectory(Directory directory) async {
+    if (!await directory.exists()) return;
+    final base = directory.parent.path;
+    final prefix = base.endsWith(Platform.pathSeparator)
+        ? base
+        : '$base${Platform.pathSeparator}';
+    final files = <File>[];
+    await for (final entity in directory.list(
+      recursive: true,
+      followLinks: false,
+    )) {
+      if (entity is File) files.add(entity);
+    }
+    final existing = {for (final item in items) item.path};
+    final added = <TransferItem>[];
+    for (final file in files) {
+      if (existing.contains(file.path)) continue;
+      final relative = file.path.startsWith(prefix)
+          ? file.path.substring(prefix.length)
+          : file.uri.pathSegments.last;
+      final item = TransferItem.fromFile(
+        file,
+        relativePath: relative.replaceAll(Platform.pathSeparator, '/'),
+      );
+      if (item == null) continue;
+      item.id = 'f${_id++}';
+      added.add(item);
+      existing.add(file.path);
+    }
+    if (added.isEmpty) return;
+    items.addAll(added);
     _recalculateTotal();
     notifyListeners();
   }
@@ -126,8 +168,17 @@ class SendController extends ChangeNotifier {
     phase = SendPhase.preparing;
     errorMessage = null;
     peerName = null;
+    peerPlatform = null;
+    peerCount = 0;
+    connectedPeerNames = const [];
+    paused = false;
     sentBytes = 0;
     speedBytesPerSecond = 0;
+    for (final item in items) {
+      item.transferred = 0;
+      item.done = false;
+      item.status = TransferStatus.pending;
+    }
     notifyListeners();
 
     try {
@@ -146,6 +197,8 @@ class SendController extends ChangeNotifier {
         instanceId: appState.instanceId,
         events: HostEvents(
           onPeerConnected: _onPeerConnected,
+          onPeerDisconnected: _onPeerDisconnected,
+          onPeerCountChanged: _onPeerCountChanged,
           onProgress: _onProgress,
           onFinished: _onFinished,
           onError: _onHostError,
@@ -169,20 +222,56 @@ class SendController extends ChangeNotifier {
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
-      _fail('Could not open the transfer listener: ${error.message}');
+      _fail('Could not open the transfer listener. Allow Free Send through the system '
+          'firewall on private networks, then try again (${error.message}).');
     } on Object catch (error) {
       _fail('Could not start sharing: $error');
     }
   }
 
   void _onPeerConnected(String name, String? platform) {
-    peerName = name;
-    peerPlatform = platform;
+    peerName ??= name;
+    peerPlatform ??= platform;
     notifyListeners();
+  }
+
+  void _onPeerDisconnected(String name, String? platform) {
+    // A group can lose one receiver without ending the session.
+    if ((_host?.peerCount ?? 0) > 0) return;
+    if (peerName == name) peerName = null;
+    peerPlatform = null;
+    notifyListeners();
+  }
+
+  void _onPeerCountChanged(int count) {
+    peerCount = count;
+    connectedPeerNames = _host?.connectedPeerNames ?? const [];
+    if (count == 0) {
+      peerName = null;
+      peerPlatform = null;
+    }
+    notifyListeners();
+  }
+
+  /// Pauses the outgoing stream without dropping the session. The receiver
+  /// keeps the bytes already written and waits for the resume frame.
+  Future<void> pauseTransfer() async {
+    if (phase != SendPhase.transferring || paused) return;
+    paused = true;
+    notifyListeners();
+    await _host?.pauseTransfer();
+  }
+
+  Future<void> resumeTransfer() async {
+    if (!paused) return;
+    paused = false;
+    notifyListeners();
+    await _host?.resumeTransfer();
   }
 
   void _onProgress(TransferItem item, int _) {
     currentFileName = item.name;
+    item.status = TransferStatus.active;
     sentBytes = items.fold<int>(0, (sum, entry) => sum + entry.transferred);
     _sampleSpeed();
     if (phase != SendPhase.transferring) {
@@ -212,9 +301,23 @@ class SendController extends ChangeNotifier {
   }
 
   void _onFinished(int fileCount, int bytes, Duration elapsed) {
+    // The host reports completion once per receiver. In a group session the
+    // first receiver finishing must not end the UI while others are still
+    // streaming; only the last peer closes the transfer.
+    if ((_host?.peerCount ?? 0) > 1) {
+      notifyListeners();
+      return;
+    }
     _stopwatch?.stop();
     sentBytes = bytes;
     totalBytes = totalBytes == 0 ? bytes : totalBytes;
+    paused = false;
+    for (final item in items) {
+      if (item.transferred >= item.size) {
+        item.done = true;
+        item.status = TransferStatus.done;
+      }
+    }
     phase = SendPhase.completed;
     _finishSession(files: fileCount, bytes: bytes, duration: elapsed, ok: true);
     notifyListeners();
@@ -237,6 +340,7 @@ class SendController extends ChangeNotifier {
     final bytes = sentBytes;
     final files = items.where((item) => item.transferred > 0).length;
     phase = SendPhase.cancelled;
+    paused = false;
     notifyListeners();
     await _teardown();
     if (bytes > 0) {
@@ -284,6 +388,9 @@ class SendController extends ChangeNotifier {
     hotspot = null;
     peerName = null;
     peerPlatform = null;
+    peerCount = 0;
+    connectedPeerNames = const [];
+    paused = false;
     errorMessage = null;
     sentBytes = 0;
     speedBytesPerSecond = 0;
@@ -293,6 +400,7 @@ class SendController extends ChangeNotifier {
     for (final item in items) {
       item.transferred = 0;
       item.done = false;
+      item.status = TransferStatus.pending;
     }
     phase = SendPhase.idle;
     notifyListeners();

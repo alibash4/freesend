@@ -19,6 +19,12 @@ abstract final class FrameType {
   static const ackAll = 9;
   static const error = 10;
   static const cancel = 11;
+  /// The sender is stopping the current file but keeping the session alive.
+  static const pause = 12;
+  /// The receiver wants the current file continued from its current offset.
+  static const resume = 13;
+  /// Per-file status for UI that is not the active transfer screen.
+  static const fileStatus = 14;
 }
 
 class Frame {

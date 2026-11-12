@@ -59,6 +59,9 @@ class ReceiveController extends ChangeNotifier {
   TransferRecord? lastRecord;
 
   bool get isJoining => phase == ReceivePhase.joining;
+  bool get isPaused => receivedItems.any(
+        (item) => item.status == TransferStatus.paused && !item.done,
+      );
   bool get canJoinHotspot => _hotspotService.canJoin;
   bool get isScanning => _scanner.isScanning;
 
@@ -179,6 +182,7 @@ class ReceiveController extends ChangeNotifier {
       instanceId: appState.instanceId,
       events: ClientEvents(
         onProgress: _onProgress,
+        onStatus: _onStatus,
         onFinished: _onFinished,
         onError: _onError,
       ),
@@ -237,6 +241,9 @@ class ReceiveController extends ChangeNotifier {
     if (client == null || manifest == null || selectedIds.isEmpty) return;
     totalBytes = selectedBytes;
     receivedBytes = 0;
+    for (final item in receivedItems) {
+      item.status = TransferStatus.pending;
+    }
     speedBytesPerSecond = 0;
     _stopwatch = Stopwatch()..start();
     _lastSampleAt = null;
@@ -264,6 +271,7 @@ class ReceiveController extends ChangeNotifier {
 
   void _onProgress(TransferItem item, int bytes) {
     currentFileName = item.name;
+    item.status = TransferStatus.active;
     receivedBytes = bytes;
     _sampleSpeed();
     notifyListeners();
@@ -288,6 +296,12 @@ class ReceiveController extends ChangeNotifier {
 
   void _onFinished(int fileCount, int bytes, Duration elapsed) {
     _stopwatch?.stop();
+    for (final item in receivedItems) {
+      if (selectedIds.contains(item.id) && item.transferred >= item.size) {
+        item.done = true;
+        item.status = TransferStatus.done;
+      }
+    }
     receivedBytes = bytes;
     totalBytes = totalBytes == 0 ? bytes : totalBytes;
     phase = ReceivePhase.completed;
@@ -295,8 +309,16 @@ class ReceiveController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _onStatus(TransferItem item) {
+    if (item.status == TransferStatus.paused) currentFileName = item.name;
+    notifyListeners();
+  }
+
   void _onError(String message) {
     if (phase == ReceivePhase.completed) return;
+    for (final item in receivedItems) {
+      if (!item.done) item.status = TransferStatus.failed;
+    }
     errorMessage = message;
     phase = ReceivePhase.failed;
     notifyListeners();
@@ -368,6 +390,11 @@ class ReceiveController extends ChangeNotifier {
     totalBytes = 0;
     speedBytesPerSecond = 0;
     hotspotNotice = null;
+    for (final item in receivedItems) {
+      item.transferred = 0;
+      item.done = false;
+      item.status = TransferStatus.pending;
+    }
     phase = ReceivePhase.idle;
     notifyListeners();
   }

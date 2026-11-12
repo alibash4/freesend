@@ -142,7 +142,8 @@ void main() {
     );
   });
 
-  test('frame reader reassembles frames split at arbitrary boundaries', () async {
+  test('frame reader reassembles frames split at arbitrary boundaries',
+      () async {
     final frames = <Frame>[];
     final reader = FrameReader(frames.add);
 
@@ -201,7 +202,9 @@ void main() {
     await channel.writer.flush();
     final session = await channel.next();
     expect(session.type, FrameType.session);
-    channel.writer.json(FrameType.accept, {'ids': ['f0']});
+    channel.writer.json(FrameType.accept, {
+      'ids': ['f0']
+    });
     await channel.writer.flush();
 
     // Vanish while the host is still streaming, so it is writing into a socket
@@ -216,8 +219,160 @@ void main() {
     expect(
       errors,
       isNotEmpty,
-      reason: 'the host must notice the disconnect (finished=${finished.length})',
+      reason:
+          'the host must notice the disconnect (finished=${finished.length})',
     );
+  });
+
+  test('recreates folder paths on the receiver', () async {
+    final folder = Directory('${sourceDir.path}/bundle');
+    await folder.create(recursive: true);
+    await File('${folder.path}/a.txt').writeAsString('alpha');
+    await Directory('${folder.path}/sub').create();
+    await File('${folder.path}/sub/b.bin').writeAsBytes(
+      Uint8List.fromList(List.generate(1000, (i) => i % 256)),
+    );
+    final items = [
+      TransferItem.fromFile(
+        File('${folder.path}/a.txt'),
+        relativePath: 'bundle/a.txt',
+      )!
+        ..id = 'f0',
+      TransferItem.fromFile(
+        File('${folder.path}/sub/b.bin'),
+        relativePath: 'bundle/sub/b.bin',
+      )!
+        ..id = 'f1',
+    ];
+
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-folder',
+      events: const HostEvents(),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final client = TransferClient(
+      deviceName: 'Receiver',
+      instanceId: 'client-folder',
+      events: const ClientEvents(),
+    );
+    addTearDown(client.dispose);
+
+    await client.connect('127.0.0.1', port);
+    await client.receive(
+      ids: ['f0', 'f1'],
+      downloadRoot: targetDir.path,
+    );
+
+    final a = File('${targetDir.path}/bundle/a.txt');
+    final b = File('${targetDir.path}/bundle/sub/b.bin');
+    expect(await a.exists(), isTrue);
+    expect(await b.exists(), isTrue);
+    expect(await a.readAsString(), 'alpha');
+  });
+
+  test('serves two receivers in the same session', () async {
+    final file = await writeRandomFile('group.bin', 512 * 1024 + 31);
+    final items = [TransferItem.fromFile(file)!..id = 'f0'];
+
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-group',
+      events: const HostEvents(),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final dirA = await Directory.systemTemp.createTemp('free_send_grp_a');
+    final dirB = await Directory.systemTemp.createTemp('free_send_grp_b');
+    addTearDown(() async {
+      for (final dir in [dirA, dirB]) {
+        if (await dir.exists()) await dir.delete(recursive: true);
+      }
+    });
+
+    final clientA = TransferClient(
+      deviceName: 'Receiver A',
+      instanceId: 'client-a',
+      events: const ClientEvents(),
+    );
+    final clientB = TransferClient(
+      deviceName: 'Receiver B',
+      instanceId: 'client-b',
+      events: const ClientEvents(),
+    );
+    addTearDown(clientA.dispose);
+    addTearDown(clientB.dispose);
+
+    final manifestA = await clientA.connect('127.0.0.1', port);
+    final manifestB = await clientB.connect('127.0.0.1', port);
+    expect(host.peerCount, 2);
+
+    await Future.wait([
+      clientA.receive(ids: ['f0'], downloadRoot: dirA.path),
+      clientB.receive(ids: ['f0'], downloadRoot: dirB.path),
+    ]);
+
+    for (final dir in [dirA, dirB]) {
+      final received = File('${dir.path}/group.bin');
+      expect(await received.exists(), isTrue);
+      expect(await received.readAsBytes(), await file.readAsBytes());
+    }
+    expect(manifestA.items.length, 1);
+    expect(manifestB.items.length, 1);
+  });
+
+  test('sender can pause and resume the live stream', () async {
+    final file = await writeRandomFile('pausable.bin', 2 * 1024 * 1024 + 5);
+    final items = [TransferItem.fromFile(file)!..id = 'f0'];
+    final firstProgress = Completer<void>();
+
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-pause',
+      events: HostEvents(
+        onProgress: (item, sent) {
+          if (sent >= 64 * 1024 && !firstProgress.isCompleted) {
+            firstProgress.complete();
+          }
+        },
+      ),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final client = TransferClient(
+      deviceName: 'Receiver',
+      instanceId: 'client-pause',
+      events: const ClientEvents(),
+    );
+    addTearDown(client.dispose);
+
+    final dir = await Directory.systemTemp.createTemp('free_send_pause');
+    addTearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    await client.connect('127.0.0.1', port);
+    final receiveFuture = client.receive(
+      ids: ['f0'],
+      downloadRoot: dir.path,
+    );
+    await firstProgress.future.timeout(const Duration(seconds: 5));
+
+    await host.pauseTransfer();
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    await host.resumeTransfer();
+
+    await receiveFuture.timeout(const Duration(seconds: 15));
+    final received = File('${dir.path}/pausable.bin');
+    expect(await received.exists(), isTrue);
+    expect(await received.readAsBytes(), await file.readAsBytes());
   });
 }
 

@@ -3,8 +3,9 @@ abstract final class AppConstants {
   static const appName = 'Free Send';
   static const appTagline = 'Direct transfer. No cloud.';
 
-  /// Bumped whenever the frame layout or handshake changes.
-  static const protocolVersion = 1;
+  /// Bumped whenever the frame layout or handshake changes. Version 2 adds
+  /// folder metadata, per-file checksums, and sender-side pause/resume.
+  static const protocolVersion = 2;
 
   /// UDP port used for session beacons on the local link.
   static const discoveryPort = 47810;
