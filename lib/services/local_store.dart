@@ -17,6 +17,7 @@ class LocalStore {
   static const _kHistory = 'history';
   static const _kAutoUpdate = 'auto_update';
   static const _kMinimizeToTray = 'minimize_to_tray';
+  static const _kPermissionsPrompted = 'permissions_prompted';
 
   late SharedPreferences _prefs;
 
@@ -62,6 +63,13 @@ class LocalStore {
 
   Future<void> setMinimizeToTray(bool value) async {
     await _prefs.setBool(_kMinimizeToTray, value);
+  }
+
+  /// Whether the mobile permission gate has been shown at least once.
+  bool get permissionsPrompted => _prefs.getBool(_kPermissionsPrompted) ?? false;
+
+  Future<void> setPermissionsPrompted(bool value) async {
+    await _prefs.setBool(_kPermissionsPrompted, value);
   }
 
   /// Where received files land. Android keeps them inside app-owned storage so

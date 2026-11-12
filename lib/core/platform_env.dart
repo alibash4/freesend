@@ -1,12 +1,13 @@
 import 'dart:ffi';
 import 'dart:io';
 
-enum PlatformKind { android, windows, linux, macOS, other }
+enum PlatformKind { android, ios, windows, linux, macOS, other }
 
 /// Desktop and mobile capabilities differ mostly around hotspot control.
 abstract final class PlatformEnv {
   static PlatformKind get kind {
     if (Platform.isAndroid) return PlatformKind.android;
+    if (Platform.isIOS) return PlatformKind.ios;
     if (Platform.isWindows) return PlatformKind.windows;
     if (Platform.isLinux) return PlatformKind.linux;
     if (Platform.isMacOS) return PlatformKind.macOS;
@@ -15,6 +16,7 @@ abstract final class PlatformEnv {
 
   static String get label => switch (kind) {
         PlatformKind.android => 'Android',
+        PlatformKind.ios => 'iOS',
         PlatformKind.windows => 'Windows',
         PlatformKind.linux => 'Linux',
         PlatformKind.macOS => 'macOS',

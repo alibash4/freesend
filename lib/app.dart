@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:free_send/services/permissions/app_permissions.dart';
 import 'package:free_send/services/tray_controller.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/screens/permissions_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
@@ -88,7 +90,9 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: state.themeMode,
-        home: const AppShell(),
+        home: state.permissionsPrompted || !AppPermissions.isMobile
+            ? const AppShell()
+            : const PermissionsScreen(),
       ),
     );
   }

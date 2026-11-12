@@ -35,6 +35,7 @@ class UpdateInstaller {
 
   InstallMethod get method => switch (PlatformEnv.kind) {
         PlatformKind.android => InstallMethod.androidPackageInstaller,
+        PlatformKind.ios => InstallMethod.unsupported,
         PlatformKind.linux => InstallMethod.replaceAndRelaunch,
         PlatformKind.windows => InstallMethod.replaceAndRelaunch,
         PlatformKind.macOS => InstallMethod.replaceAndRelaunch,

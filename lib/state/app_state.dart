@@ -24,6 +24,9 @@ class AppState extends ChangeNotifier {
   /// Whether closing the window hides it to the tray instead of quitting.
   bool minimizeToTray = false;
 
+  /// Whether the mobile permission gate has already been shown.
+  bool permissionsPrompted = false;
+
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
 
@@ -48,6 +51,7 @@ class AppState extends ChangeNotifier {
     history = store.history;
     autoUpdate = store.autoUpdate;
     minimizeToTray = store.minimizeToTray;
+    permissionsPrompted = store.permissionsPrompted;
     _ready = true;
     notifyListeners();
   }
@@ -62,6 +66,12 @@ class AppState extends ChangeNotifier {
     minimizeToTray = value;
     notifyListeners();
     await store.setMinimizeToTray(value);
+  }
+
+  Future<void> setPermissionsPrompted(bool value) async {
+    permissionsPrompted = value;
+    notifyListeners();
+    await store.setPermissionsPrompted(value);
   }
 
   Future<void> setDeviceName(String value) async {
