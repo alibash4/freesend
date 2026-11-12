@@ -74,9 +74,10 @@ echo "Wrote $DIST/${NAME}.deb"
 
 # RPM from the same /opt layout, without the Debian control directory.
 copy_bundle "$STAGE/rpmroot/opt/freesend" "rpm"
-mkdir -p "$STAGE/rpmroot/usr/bin" "$STAGE/rpmroot/usr/share/applications"
+mkdir -p "$STAGE/rpmroot/usr/bin" "$STAGE/rpmroot/usr/share/applications" "$STAGE/rpmroot/usr/share/icons/hicolor/256x256/apps"
 cp "$STAGE/deb/usr/bin/freesend" "$STAGE/rpmroot/usr/bin/freesend"
 cp "$ROOT/linux/packaging/freesend.desktop" "$STAGE/rpmroot/usr/share/applications/freesend.desktop"
+cp "$ROOT/linux/runner/resources/app_icon.png" "$STAGE/rpmroot/usr/share/icons/hicolor/256x256/apps/freesend.png"
 # No brace expansion here: /bin/sh on the CI image is dash, which would create
 # one directory literally named "{BUILD,RPMS,SOURCES,SPECS,SRPMS}".
 mkdir -p "$STAGE/rpmbuild/BUILD" "$STAGE/rpmbuild/RPMS" "$STAGE/rpmbuild/SOURCES" "$STAGE/rpmbuild/SPECS" "$STAGE/rpmbuild/SRPMS"
@@ -99,6 +100,7 @@ cp -a %{_sourcedir}/root/. %{buildroot}/
 /opt/freesend
 /usr/bin/freesend
 /usr/share/applications/freesend.desktop
+/usr/share/icons/hicolor/256x256/apps/freesend.png
 EOF
 cp -a "$STAGE/rpmroot" "$STAGE/rpmbuild/SOURCES/root"
 rpmbuild --define "_topdir $STAGE/rpmbuild" -bb "$STAGE/rpmbuild/SPECS/freesend.spec"
