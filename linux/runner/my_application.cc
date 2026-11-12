@@ -14,6 +14,29 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+// The Flutter Linux template has no icon slot, so the window icon is set by
+// hand. The launcher icon itself comes from the .desktop file and the icon
+// theme, which the packaging has to install.
+static void set_window_icon(GtkWindow* window) {
+  g_autofree gchar* executable = g_file_read_link("/proc/self/exe", nullptr);
+  if (executable == nullptr) {
+    return;
+  }
+
+  g_autofree gchar* directory = g_path_get_dirname(executable);
+  const gchar* candidates[] = {
+      "data/app_icon.png",  // layout of a built bundle
+      "app_icon.png",       // layout of an installed prefix
+  };
+  for (gsize i = 0; i < G_N_ELEMENTS(candidates); i++) {
+    g_autofree gchar* path = g_build_filename(directory, candidates[i], nullptr);
+    if (g_file_test(path, G_FILE_TEST_EXISTS)) {
+      gtk_window_set_icon_from_file(window, path, nullptr);
+      return;
+    }
+  }
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -48,6 +71,7 @@ static void my_application_activate(GApplication* application) {
   }
 
   gtk_window_set_default_size(window, 1280, 720);
+  set_window_icon(window);
   gtk_widget_show(GTK_WIDGET(window));
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
