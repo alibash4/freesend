@@ -937,12 +937,13 @@ class _SourceSheet extends StatelessWidget {
             subtitle: const Text('Any file type'),
             onTap: () => Navigator.of(context).pop(_SourceKind.any),
           ),
-          ListTile(
-            leading: const Icon(AppIcons.image),
-            title: const Text('Media library'),
-            subtitle: const Text('Photos, videos, and audio with thumbnails'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.media),
-          ),
+          if (Platform.isAndroid || Platform.isMacOS)
+            ListTile(
+              leading: const Icon(AppIcons.image),
+              title: const Text('Media library'),
+              subtitle: const Text('Photos, videos, and audio with thumbnails'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.media),
+            ),
           ListTile(
             leading: const Icon(AppIcons.video),
             title: const Text('Videos'),
