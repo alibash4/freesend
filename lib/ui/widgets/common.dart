@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/theme/app_icons.dart';

@@ -50,8 +50,8 @@ sudo apt install libayatana-appindicator3-dev      # Debian/Ubuntu build
 sudo dnf install libayatana-appindicator-gtk3      # Fedora runtime
 ```
 
-iOS is intentionally not targeted: Apple does not allow an app to create a
-hotspot.
+The iOS target was removed from this repository: Apple does not allow an app to
+create a hotspot, and the platform is no longer built.
 
 ## How it works
 

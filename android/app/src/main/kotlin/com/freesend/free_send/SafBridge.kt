@@ -53,9 +53,8 @@ class SafBridge(
         }
 
         val rootName = tree.name?.ifBlank { null } ?: "folder"
-        val target = File(
-            File(File(context.cacheDir, "freesend-saf"), safeName(rootName)),
-        )
+        val baseDir = java.io.File(context.cacheDir, "freesend-saf")
+        val target = java.io.File(baseDir, safeName(rootName))
         if (target.exists()) target.deleteRecursively()
         if (!target.mkdirs() && !target.isDirectory) {
             result.error("failed", "Could not create a cache folder.", null)

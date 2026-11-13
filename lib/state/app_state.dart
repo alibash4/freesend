@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/local_store.dart';

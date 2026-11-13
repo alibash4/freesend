@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -10,7 +10,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
-/// First-launch runtime permission gate for Android and iOS.
+/// First-launch runtime permission gate for Android.
 ///
 /// The user can allow the permissions or continue without them; Free Send
 /// still works for manual-address transfers and the file picker when the OS

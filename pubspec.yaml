@@ -13,14 +13,13 @@ dependencies:
   provider: ^6.1.2
   shared_preferences: ^2.3.3
   path_provider: ^2.1.5
-  file_picker: ^8.1.6
+  file_picker: ^13.3.3
   permission_handler: ^11.3.1
   qr_flutter: ^4.1.0
   scroll_animator: ^0.3.0
   mobile_scanner: ">=5.2.3 <6.0.0"
   lucide_icons_flutter: ^4.0.3
   http: ^1.6.0
-  package_info_plus: ^9.0.1
   tray_manager: ^0.5.3
   window_manager: ^0.5.2
   crypto: ^3.0.8
@@ -28,6 +27,7 @@ dependencies:
   photo_manager: ^3.12.0
   photo_manager_image_provider: ^2.2.0
   cryptography: ^2.9.0
+  material_ui: ^1.11.0
 
 dev_dependencies:
   flutter_test:

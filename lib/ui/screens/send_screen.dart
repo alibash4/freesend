@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
@@ -72,9 +72,7 @@ class _SendScreenState extends State<SendScreen> {
     if (_picking) return;
     setState(() => _picking = true);
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: false,
+      final picked = await FilePicker.pickFiles(
         type: switch (kind) {
           _SourceKind.any => FileType.any,
           _SourceKind.photos => FileType.image,
@@ -93,9 +91,8 @@ class _SendScreenState extends State<SendScreen> {
               ]
             : null,
       );
-      if (result == null) return;
       final files = <File>[];
-      for (final picked in result.files) {
+      for (final picked in picked) {
         final path = picked.path;
         if (path != null && path.isNotEmpty) files.add(File(path));
       }
@@ -139,7 +136,7 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   Future<void> _pickFolder(SendController controller) async {
-    var path = await FilePicker.platform.getDirectoryPath(
+    var path = await FilePicker.getDirectoryPath(
       dialogTitle: 'Choose a folder to send',
     );
     if (path == null || path.isEmpty || !mounted) return;

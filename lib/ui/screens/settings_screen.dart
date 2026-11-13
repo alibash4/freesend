@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
@@ -57,7 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _chooseFolder() async {
     final appState = context.read<AppState>();
     try {
-      final path = await FilePicker.platform.getDirectoryPath(
+      final path = await FilePicker.getDirectoryPath(
         dialogTitle: 'Choose where received files go',
       );
       if (path == null || path.isEmpty) return;

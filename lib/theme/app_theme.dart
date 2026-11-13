@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Pure page backgrounds, one accent, and a neutral grey ramp with no colour
 /// cast. Content sits directly on the page; where a section needs grouping it

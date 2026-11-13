@@ -1,6 +1,7 @@
 /// Wire-level and app-wide constants for Free Send.
 abstract final class AppConstants {
   static const appName = 'Free Send';
+  static const appVersion = '1.7.3';
   static const appTagline = 'Direct transfer. No cloud.';
 
   /// Bumped whenever the frame layout or handshake changes. Version 2 adds
