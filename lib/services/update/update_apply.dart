@@ -13,6 +13,8 @@ import 'package:free_send/services/update/package_format.dart';
 /// * deb / rpm — hand the package to the system package manager.
 /// * Windows — extract the zip (it contains `free_send.exe`) over the install
 ///   folder after this process exits, then relaunch.
+/// * macOS — mount the disk image, swap the `.app` bundle it carries for the
+///   running one after this process exits, then relaunch.
 class UpdateApply {
   const UpdateApply();
 
@@ -40,23 +42,53 @@ class UpdateApply {
           launch: Platform.resolvedExecutable,
           extract: 'powershell',
         );
+      case PackageFormat.macOS:
+        await _installDmg(file);
       case PackageFormat.android:
         throw UnsupportedError('Android updates use the package installer.');
     }
   }
 
-  PackageFormat _formatFor(File file) {
-    final name = file.path.toLowerCase();
-    if (name.endsWith('.appimage')) return PackageFormat.appImage;
-    if (name.endsWith('.deb')) return PackageFormat.deb;
-    if (name.endsWith('.rpm')) return PackageFormat.rpm;
-    if (name.endsWith('.tar.gz') || name.endsWith('.tgz')) {
-      return PackageFormat.bundle;
-    }
-    if (name.endsWith('.zip') || name.endsWith('.exe')) {
-      return PackageFormat.windows;
-    }
-    return detectPackageFormat();
+  PackageFormat _formatFor(File file) =>
+      formatForFile(file.path) ?? detectPackageFormat();
+
+  /// The `.app` bundle that holds the running executable, which lives at
+  /// `<bundle>/Contents/MacOS/<executable>`.
+  String get _appBundlePath =>
+      File(Platform.resolvedExecutable).parent.parent.parent.path;
+
+  /// Installs a disk image: mount it, replace the running `.app` with the one
+  /// it carries, then relaunch.
+  ///
+  /// A running bundle cannot be replaced from underneath itself, so — like the
+  /// bundle and Windows zip paths — the work is handed to a detached script
+  /// that waits for this process to exit first.
+  Future<void> _installDmg(File file) async {
+    final bundle = _appBundlePath;
+    final script = await _writeScript('''
+#!/bin/sh
+while kill -0 $pid 2>/dev/null; do sleep 0.2; done
+mountpoint="\$(mktemp -d)"
+if ! hdiutil attach "${file.path}" -nobrowse -readonly -mountpoint "\$mountpoint" >/dev/null 2>&1; then
+  rmdir "\$mountpoint"
+  exit 1
+fi
+app="\$(ls -d "\$mountpoint"/*.app 2>/dev/null | head -1)"
+if [ -z "\$app" ]; then
+  hdiutil detach "\$mountpoint" -force
+  rmdir "\$mountpoint"
+  exit 1
+fi
+rm -rf "$bundle"
+cp -R "\$app" "$bundle"
+# A freshly downloaded bundle is quarantined, which would stop the updated
+# copy from opening. This is the app's own build, so clear the flag.
+xattr -dr com.apple.quarantine "$bundle" 2>/dev/null
+hdiutil detach "\$mountpoint" -force
+rm -rf "\$mountpoint"
+open -n "$bundle"
+''');
+    await Process.start(script, [], mode: ProcessStartMode.detached);
   }
 
   Future<void> _replaceAppImage(File file) async {
@@ -72,9 +104,9 @@ class UpdateApply {
     final script = await _writeScript('''
 #!/bin/sh
 while kill -0 $pid 2>/dev/null; do sleep 0.2; done
-mv -f "$target.new" "$target"
-chmod 755 "$target"
-exec "$target"
+mv -f \"$target.new\" \"$target\"
+chmod 755 \"$target\"
+exec \"$target\"
 ''');
     await Process.start(script, [], mode: ProcessStartMode.detached);
   }
@@ -102,17 +134,17 @@ exec "$target"
   String _linuxScript(File archive, String destination, String launch) => '''
 #!/bin/sh
 while kill -0 $pid 2>/dev/null; do sleep 0.2; done
-rm -rf "$destination"
-mkdir -p "$destination"
-tar -xzf "${archive.path}" -C "$destination"
-chmod 755 "$launch"
-exec "$launch"
+rm -rf \"$destination\"
+mkdir -p \"$destination\"
+tar -xzf \"${archive.path}\" -C \"$destination\"
+chmod 755 \"$launch\"
+exec \"$launch\"
 ''';
 
   String _windowsScript(File archive, String destination, String launch) => '''
 while (Get-Process -Id $pid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }
-Expand-Archive -LiteralPath "${archive.path}" -DestinationPath "$destination" -Force
-Start-Process -FilePath "$launch"
+Expand-Archive -LiteralPath \"${archive.path}\" -DestinationPath \"$destination\" -Force
+Start-Process -FilePath \"$launch\"
 ''';
 
   Future<void> _runPrivileged(List<String> args) async {
