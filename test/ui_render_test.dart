@@ -134,23 +134,19 @@ void main() {
   testWidgets('every tab scrolls with its own controller', (tester) async {
     await pumpApp(tester);
 
-    // The shell keeps all three tabs alive in an IndexedStack, so one shared
-    // ScrollController gets attached to three ScrollPositions at once, which
-    // is what desktop scrollbars reject.
+    // The home tab is a two-button launcher without its own ListView; the
+    // shell keeps the other tabs alive in an IndexedStack.
     final controllers = tester
         .widgetList<ListView>(find.byType(ListView, skipOffstage: false))
         .map((list) => list.controller)
         .toSet();
 
-    expect(controllers.length, 4);
+    expect(controllers.length, 3);
   });
 
   testWidgets('home renders and both flows open', (tester) async {
     await pumpApp(tester);
 
-    expect(find.text('Free Send'), findsOneWidget);
-    expect(find.text('Move files over the link, not the internet.'),
-        findsOneWidget);
     expect(find.text('Send'), findsWidgets);
     expect(find.text('Receive'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -195,7 +191,7 @@ void main() {
   testWidgets('dark mode renders home and receive', (tester) async {
     await appState.setThemeMode(ThemeMode.dark);
     await pumpApp(tester);
-    expect(find.text('Free Send'), findsOneWidget);
+    expect(find.text('Send'), findsWidgets);
     expect(tester.takeException(), isNull);
     await capture(tester, '11-home-dark');
 
