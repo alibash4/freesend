@@ -39,12 +39,40 @@ class FrameChannel {
   Completer<Frame>? _waiter;
   Object? _error;
   bool _closed = false;
+  bool _paused = false;
+  Completer<void>? _resumeWaiter;
 
   bool get isClosed => _closed || _error != null;
+  bool get isPaused => _paused;
 
-  Future<Frame> next({Duration timeout = const Duration(minutes: 5)}) {
+  /// Stops reading from the socket. The OS receive window then fills and the
+  /// sender blocks on write, which is what gives the receiver real control over
+  /// how fast bytes arrive.
+  void pause() {
+    if (_paused || _closed) return;
+    _paused = true;
+    _subscription.pause();
+  }
+
+  void resume() {
+    if (!_paused) return;
+    _paused = false;
+    _subscription.resume();
+    final waiter = _resumeWaiter;
+    _resumeWaiter = null;
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
+  }
+
+  Future<void> get whenResumed {
+    if (!_paused) return Future<void>.value();
+    _resumeWaiter ??= Completer<void>();
+    return _resumeWaiter!.future;
+  }
+
+  Future<Frame> next({Duration timeout = const Duration(minutes: 5)}) async {
+    if (_paused) await whenResumed;
     if (_pending.isNotEmpty) {
-      return Future.value(_pending.removeAt(0));
+      return _pending.removeAt(0);
     }
     if (_error != null) return Future.error(_error!);
     if (_closed) {

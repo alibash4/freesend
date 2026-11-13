@@ -62,6 +62,10 @@ class ReceiveController extends ChangeNotifier {
   bool get isPaused => receivedItems.any(
         (item) => item.status == TransferStatus.paused && !item.done,
       );
+  /// The receiver asked for the stream to stop. Distinct from a sender pause,
+  /// which arrives as a frame while the socket is still being read.
+  bool pausedByMe = false;
+  bool get anyPaused => pausedByMe || isPaused;
   bool get canJoinHotspot => _hotspotService.canJoin;
   bool get isScanning => _scanner.isScanning;
 
@@ -239,6 +243,7 @@ class ReceiveController extends ChangeNotifier {
     final client = _client;
     final manifest = this.manifest;
     if (client == null || manifest == null || selectedIds.isEmpty) return;
+    pausedByMe = false;
     totalBytes = selectedBytes;
     receivedBytes = 0;
     for (final item in receivedItems) {
@@ -314,6 +319,36 @@ class ReceiveController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Pauses the live stream from the receiving side by stopping socket reads.
+  Future<void> pause() async {
+    if (phase != ReceivePhase.transferring || pausedByMe) return;
+    final client = _client;
+    if (client == null) return;
+    pausedByMe = true;
+    speedBytesPerSecond = 0;
+    for (final item in receivedItems) {
+      if (item.status == TransferStatus.active) {
+        item.status = TransferStatus.paused;
+      }
+    }
+    await client.pause();
+    notifyListeners();
+  }
+
+  Future<void> resume() async {
+    if (!pausedByMe) return;
+    pausedByMe = false;
+    _lastSampleAt = null;
+    _lastSampleBytes = receivedBytes;
+    for (final item in receivedItems) {
+      if (item.status == TransferStatus.paused && !item.done) {
+        item.status = TransferStatus.active;
+      }
+    }
+    await _client?.resume();
+    notifyListeners();
+  }
+
   void _onError(String message) {
     if (phase == ReceivePhase.completed) return;
     for (final item in receivedItems) {
@@ -354,6 +389,7 @@ class ReceiveController extends ChangeNotifier {
     if (phase == ReceivePhase.transferring) {
       final bytes = receivedBytes;
       final files = receivedItems.where((item) => item.done).length;
+      pausedByMe = false;
       await _client?.cancel();
       _client = null;
       phase = ReceivePhase.cancelled;
@@ -386,6 +422,7 @@ class ReceiveController extends ChangeNotifier {
     selectedIds.clear();
     errorMessage = null;
     currentFileName = null;
+    pausedByMe = false;
     receivedBytes = 0;
     totalBytes = 0;
     speedBytesPerSecond = 0;

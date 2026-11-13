@@ -51,6 +51,8 @@ abstract final class AppIcons {
   static const IconData check = LucideIcons400.check;
   static const IconData checkCircle = LucideIcons400.circleCheck;
   static const IconData stop = LucideIcons400.square;
+  static const IconData pause = LucideIcons400.pause;
+  static const IconData play = LucideIcons400.play;
   static const IconData alert = LucideIcons400.triangleAlert;
   static const IconData info = LucideIcons400.info;
   static const IconData radar = LucideIcons400.radar;

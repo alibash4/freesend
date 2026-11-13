@@ -393,6 +393,67 @@ void main() {
     expect(await received.readAsBytes(), await file.readAsBytes());
   });
 
+  test('receiver can pause and resume the live stream', () async {
+    final file = await writeRandomFile('receiver-pause.bin', 32 * 1024 * 1024);
+    final items = [TransferItem.fromFile(file)!..id = 'f0'];
+    var hostSent = 0;
+    final firstProgress = Completer<void>();
+
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-receiver-pause',
+      events: HostEvents(
+        onProgress: (item, sent) {
+          hostSent = sent;
+          if (sent >= 256 * 1024 && !firstProgress.isCompleted) {
+            firstProgress.complete();
+          }
+        },
+      ),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final client = TransferClient(
+      deviceName: 'Receiver',
+      instanceId: 'client-receiver-pause',
+      events: const ClientEvents(),
+    );
+    addTearDown(client.dispose);
+
+    final dir = await Directory.systemTemp.createTemp('free_send_recv_pause');
+    addTearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    await client.connect('127.0.0.1', port);
+    final receiveFuture = client.receive(
+      ids: ['f0'],
+      downloadRoot: dir.path,
+    );
+    await firstProgress.future.timeout(const Duration(seconds: 10));
+
+    await client.pause();
+    expect(client.isPaused, isTrue);
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final settled = hostSent;
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    expect(
+      hostSent,
+      closeTo(settled, 64 * 1024),
+      reason: 'a paused receiver must stop draining the socket',
+    );
+
+    await client.resume();
+    expect(client.isPaused, isFalse);
+    await receiveFuture.timeout(const Duration(seconds: 60));
+
+    final received = File('${dir.path}/receiver-pause.bin');
+    expect(await received.exists(), isTrue);
+    expect(await received.readAsBytes(), await file.readAsBytes());
+  });
+
   test('peer progress is per receiver', () {
     const peer = PeerInfo(
       id: 'p0',

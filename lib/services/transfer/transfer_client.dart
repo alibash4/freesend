@@ -54,8 +54,11 @@ class TransferClient {
   FrameChannel? _channel;
   bool _cancelled = false;
   bool _finished = false;
+  bool _pausedByReceiver = false;
+  Completer<void>? _resumeWaiter;
 
   bool get isConnected => _channel != null && !_channel!.isClosed;
+  bool get isPaused => _pausedByReceiver;
 
   Future<TransferManifest> connect(
     String host,
@@ -127,6 +130,9 @@ class TransferClient {
 
     try {
       while (!_cancelled) {
+        if (_pausedByReceiver) {
+          await (_resumeWaiter ??= Completer<void>()).future;
+        }
         final frame = await channel.next(timeout: const Duration(minutes: 15));
         switch (frame.type) {
           case FrameType.fileHeader:
@@ -290,10 +296,50 @@ class TransferClient {
     }
   }
 
+  /// Stops reading from the socket so the sender blocks on write. The session
+  /// stays open, so resuming continues the current file from its last offset.
+  Future<void> pause() async {
+    if (_pausedByReceiver) return;
+    _pausedByReceiver = true;
+    final channel = _channel;
+    if (channel == null) return;
+    channel.pause();
+    if (!channel.isClosed) {
+      try {
+        channel.writer.json(FrameType.pause, {'reason': 'Paused by receiver'});
+        await channel.writer.flush();
+      } on Object {
+        // The peer may already be gone; the local pause still holds.
+      }
+    }
+  }
+
+  Future<void> resume() async {
+    if (!_pausedByReceiver) return;
+    _pausedByReceiver = false;
+    final waiter = _resumeWaiter;
+    _resumeWaiter = null;
+    final channel = _channel;
+    channel?.resume();
+    if (channel != null && !channel.isClosed) {
+      try {
+        channel.writer.json(FrameType.resume, {});
+        await channel.writer.flush();
+      } on Object {
+        // Nothing to do: the local stream still resumes.
+      }
+    }
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
+  }
+
   Future<void> cancel() async {
     _cancelled = true;
+    final waiter = _resumeWaiter;
+    _resumeWaiter = null;
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
     final channel = _channel;
     if (channel != null) {
+      channel.resume();
       if (!channel.isClosed) {
         try {
           channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
@@ -305,6 +351,7 @@ class TransferClient {
       await channel.close();
     }
     _channel = null;
+    _pausedByReceiver = false;
   }
 
   Future<void> dispose() async {

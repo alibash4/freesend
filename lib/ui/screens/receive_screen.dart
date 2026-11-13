@@ -557,10 +557,10 @@ class _ProgressView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (controller.isPaused) ...[
+        if (controller.anyPaused) ...[
           StatusPill(
-            label: 'Paused by sender',
-            icon: AppIcons.stop,
+            label: controller.pausedByMe ? 'Paused by you' : 'Paused by sender',
+            icon: AppIcons.pause,
             color: theme.colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -636,10 +636,29 @@ class _ProgressView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
-        OutlinedButton.icon(
-          onPressed: controller.cancel,
-          icon: const Icon(AppIcons.stop, size: 17),
-          label: const Text('Cancel transfer'),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: controller.pausedByMe
+                    ? controller.resume
+                    : controller.pause,
+                icon: Icon(
+                  controller.pausedByMe ? AppIcons.play : AppIcons.pause,
+                  size: 17,
+                ),
+                label: Text(controller.pausedByMe ? 'Resume' : 'Pause'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: controller.cancel,
+                icon: const Icon(AppIcons.stop, size: 17),
+                label: const Text('Cancel'),
+              ),
+            ),
+          ],
         ),
       ],
     );
