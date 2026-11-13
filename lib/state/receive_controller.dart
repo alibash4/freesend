@@ -11,6 +11,7 @@ import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/transfer/transfer_client.dart';
+import 'package:free_send/services/transfer/transfer_recovery.dart';
 import 'package:free_send/state/app_state.dart';
 
 enum ReceivePhase {
@@ -55,6 +56,15 @@ class ReceiveController extends ChangeNotifier {
   String? currentFileName;
   String saveLocation = '';
 
+  TransferRecovery? _recovery;
+  final Map<String, RecoveryEntry> _recoveryEntries = {};
+  final Map<String, int> resumeOffsets = {};
+  final Map<String, String> resumePaths = {};
+  bool _savingRecovery = false;
+  bool _recoveryDone = false;
+  DateTime _lastRecoverySave = DateTime.fromMillisecondsSinceEpoch(0);
+  int _lastRecoveryBytes = 0;
+
   Stopwatch? _stopwatch;
   DateTime? _lastSampleAt;
   int _lastSampleBytes = 0;
@@ -68,6 +78,9 @@ class ReceiveController extends ChangeNotifier {
   /// which arrives as a frame while the socket is still being read.
   bool pausedByMe = false;
   bool get anyPaused => pausedByMe || isPaused;
+  bool get canResume => resumeOffsets.isNotEmpty;
+  int get resumedBytes =>
+      resumeOffsets.values.fold<int>(0, (sum, value) => sum + value);
   bool get canJoinHotspot => _hotspotService.canJoin;
   bool get isScanning => _scanner.isScanning;
 
@@ -210,6 +223,7 @@ class ReceiveController extends ChangeNotifier {
         ..addAll(manifest.items.map((item) => item.id));
       totalBytes = manifest.totalBytes;
       saveLocation = await appState.store.ensureDownloadDir();
+      await _loadRecovery();
       phase = ReceivePhase.reviewing;
     } on SocketException {
       errorMessage =
@@ -251,17 +265,48 @@ class ReceiveController extends ChangeNotifier {
     if (client == null || manifest == null || selectedIds.isEmpty) return;
     pausedByMe = false;
     totalBytes = selectedBytes;
-    receivedBytes = 0;
+
+    // Only offsets that still have a matching file on disk can be resumed.
+    final resume = <String, int>{};
+    for (final id in selectedIds) {
+      final offset = resumeOffsets[id];
+      final path = resumePaths[id];
+      if (offset == null || path == null || offset <= 0) continue;
+      final file = File(path);
+      try {
+        if (await file.exists() && await file.length() >= offset) {
+          resume[id] = offset;
+        }
+      } on Object {
+        // Treat an unreadable partial as absent.
+      }
+    }
+    final resumePathMap = <String, String>{
+      for (final id in resume.keys) id: resumePaths[id]!,
+    };
+    final baseBytes = resume.values.fold<int>(0, (sum, value) => sum + value);
+
     for (final item in receivedItems) {
       if (!selectedIds.contains(item.id)) continue;
-      item.transferred = 0;
       item.done = false;
       item.status = TransferStatus.pending;
+      final offset = resume[item.id];
+      if (offset != null) {
+        item.transferred = offset;
+        item.receivedPath = resumePathMap[item.id];
+      } else {
+        item.transferred = 0;
+      }
     }
+    receivedBytes = baseBytes;
     speedBytesPerSecond = 0;
     _stopwatch = Stopwatch()..start();
     _lastSampleAt = null;
-    _lastSampleBytes = 0;
+    _lastSampleBytes = receivedBytes;
+    _lastRecoverySave = DateTime.fromMillisecondsSinceEpoch(0);
+    _lastRecoveryBytes = receivedBytes;
+    _recoveryDone = false;
+    _recovery ??= TransferRecovery(saveLocation);
     phase = ReceivePhase.transferring;
     notifyListeners();
 
@@ -269,6 +314,9 @@ class ReceiveController extends ChangeNotifier {
       await client.receive(
         ids: selectedIds.toList(growable: false),
         downloadRoot: saveLocation,
+        resumePaths: resumePathMap,
+        resumeOffsets: resume,
+        baseBytes: baseBytes,
       );
     } on Object catch (_) {
       // The client already reported a specific message via events.
@@ -278,9 +326,78 @@ class ReceiveController extends ChangeNotifier {
       }
       notifyListeners();
     } finally {
+      await _saveRecovery();
       await client.dispose();
       _client = null;
     }
+  }
+
+  Future<void> _loadRecovery() async {
+    resumeOffsets.clear();
+    resumePaths.clear();
+    _recoveryEntries.clear();
+    _recovery = TransferRecovery(saveLocation);
+    final entries = await _recovery!.load();
+    _recoveryEntries.addAll(entries);
+    for (final item in receivedItems) {
+      final entry = entries[item.id];
+      if (entry == null || entry.size != item.size) continue;
+      final file = File(entry.path);
+      try {
+        if (!await file.exists()) continue;
+        final length = await file.length();
+        if (length <= 0 || length >= item.size) continue;
+        resumeOffsets[item.id] = length;
+        resumePaths[item.id] = file.path;
+        item.transferred = length;
+        item.receivedPath = file.path;
+        item.status = TransferStatus.pending;
+      } on Object {
+        // A stale sidecar entry is ignored rather than trusted.
+      }
+    }
+    notifyListeners();
+  }
+
+  Future<void> _saveRecovery() async {
+    final recovery = _recovery;
+    if (recovery == null || _recoveryDone || _savingRecovery) return;
+    _savingRecovery = true;
+    try {
+      await recovery.save(_recoveryEntries.values);
+    } finally {
+      _savingRecovery = false;
+    }
+  }
+
+  void _trackRecovery(TransferItem item) {
+    final path = item.receivedPath;
+    if (path == null || item.transferred <= 0) return;
+    _recoveryEntries[item.id] = RecoveryEntry(
+      id: item.id,
+      name: item.name,
+      size: item.size,
+      path: path,
+      offset: item.transferred,
+      relativePath: item.relativePath,
+    );
+  }
+
+  Future<void> _finishRecovery() async {
+    while (_savingRecovery) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    await _recovery?.clear();
+  }
+
+  void _maybeSaveRecovery() {
+    final now = DateTime.now();
+    final elapsed = now.difference(_lastRecoverySave).inMilliseconds;
+    final moved = (receivedBytes - _lastRecoveryBytes).abs();
+    if (elapsed < 1000 && moved < 1024 * 1024) return;
+    _lastRecoverySave = now;
+    _lastRecoveryBytes = receivedBytes;
+    unawaited(_saveRecovery());
   }
 
   /// Reconnects to the last host and asks only for the files that did not
@@ -309,7 +426,12 @@ class ReceiveController extends ChangeNotifier {
       item.transferred = 0;
       item.done = false;
       item.status = TransferStatus.pending;
+      resumeOffsets.remove(item.id);
+      resumePaths.remove(item.id);
+      _recoveryEntries.remove(item.id);
     }
+    _recoveryDone = false;
+    _recovery ??= TransferRecovery(saveLocation);
     receivedBytes = doneBytes;
     totalBytes = selectedBytes;
     errorMessage = null;
@@ -366,6 +488,7 @@ class ReceiveController extends ChangeNotifier {
     final tracked = _trackedItem(item);
     if (tracked == null) {
       receivedItems.add(item);
+      _trackRecovery(item);
       return;
     }
     tracked.transferred = item.transferred;
@@ -373,12 +496,14 @@ class ReceiveController extends ChangeNotifier {
     tracked.done = item.done;
     tracked.receivedPath ??= item.receivedPath;
     tracked.sha256 ??= item.sha256;
+    _trackRecovery(tracked);
   }
 
   void _onProgress(TransferItem item, int bytes) {
     _mergeItem(item);
     currentFileName = item.name;
     receivedBytes = bytes;
+    _maybeSaveRecovery();
     _sampleSpeed();
     notifyListeners();
   }
@@ -411,13 +536,27 @@ class ReceiveController extends ChangeNotifier {
     receivedBytes = bytes;
     totalBytes = totalBytes == 0 ? bytes : totalBytes;
     phase = ReceivePhase.completed;
+    _recoveryDone = true;
+    _recoveryEntries.clear();
+    resumeOffsets.clear();
+    resumePaths.clear();
+    unawaited(_finishRecovery());
     unawaited(_record(fileCount, bytes, elapsed, true));
     notifyListeners();
   }
 
   void _onStatus(TransferItem item) {
     _mergeItem(item);
+    if (item.status == TransferStatus.done) {
+      _recoveryEntries.remove(item.id);
+      resumeOffsets.remove(item.id);
+      resumePaths.remove(item.id);
+    }
     if (item.status == TransferStatus.paused) currentFileName = item.name;
+    if (item.status == TransferStatus.done ||
+        item.status == TransferStatus.paused) {
+      unawaited(_saveRecovery());
+    }
     notifyListeners();
   }
 
@@ -458,6 +597,7 @@ class ReceiveController extends ChangeNotifier {
     }
     errorMessage = message;
     phase = ReceivePhase.failed;
+    unawaited(_saveRecovery());
     notifyListeners();
   }
 
@@ -492,6 +632,7 @@ class ReceiveController extends ChangeNotifier {
       final bytes = receivedBytes;
       final files = receivedItems.where((item) => item.done).length;
       pausedByMe = false;
+      await _saveRecovery();
       await _client?.cancel();
       _client = null;
       phase = ReceivePhase.cancelled;
@@ -542,6 +683,7 @@ class ReceiveController extends ChangeNotifier {
   void dispose() {
     unawaited(_scanSubscription?.cancel());
     unawaited(_scanner.stop());
+    unawaited(_saveRecovery());
     unawaited(_client?.dispose());
     super.dispose();
   }

@@ -13,6 +13,7 @@ import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 import 'package:free_send/services/transfer/transfer_client.dart';
 import 'package:free_send/services/transfer/transfer_host.dart';
+import 'package:free_send/services/transfer/transfer_recovery.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 
@@ -493,6 +494,112 @@ void main() {
       isFalse,
       reason: 'the retry must reuse the existing path',
     );
+  });
+
+  test('resumes a partial file from the receiver offset', () async {
+    final file = await writeRandomFile('resume.bin', 4 * 1024 * 1024 + 7);
+    final bytes = await file.readAsBytes();
+    final offset = 1024 * 1024 + 3;
+    final partial = File('${targetDir.path}/resume.bin');
+    await partial.writeAsBytes(Uint8List.sublistView(bytes, 0, offset));
+
+    final items = [TransferItem.fromFile(file)!..id = 'f0'];
+    var hostSent = 0;
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-resume',
+      events: HostEvents(
+        onProgress: (item, sent) => hostSent = sent,
+      ),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final client = TransferClient(
+      deviceName: 'Receiver',
+      instanceId: 'client-resume',
+      events: const ClientEvents(),
+    );
+    addTearDown(client.dispose);
+
+    await client.connect('127.0.0.1', port);
+    await client.receive(
+      ids: ['f0'],
+      downloadRoot: targetDir.path,
+      resumePaths: {'f0': partial.path},
+      resumeOffsets: {'f0': offset},
+      baseBytes: offset,
+    );
+
+    expect(await partial.readAsBytes(), bytes);
+    expect(hostSent, file.lengthSync() - offset);
+  });
+
+  test('the receive controller resumes from the recovery sidecar', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({
+      'device_name': 'Receiver',
+      'download_dir': targetDir.path,
+    });
+    final appState = AppState(LocalStore());
+    await appState.init();
+    addTearDown(appState.dispose);
+
+    final file = await writeRandomFile('resume-ctrl.bin', 2 * 1024 * 1024 + 11);
+    final bytes = await file.readAsBytes();
+    final offset = 512 * 1024;
+    final partial = File('${targetDir.path}/resume-ctrl.bin');
+    await partial.writeAsBytes(Uint8List.sublistView(bytes, 0, offset));
+    final recovery = TransferRecovery(targetDir.path);
+    await recovery.save([
+      RecoveryEntry(
+        id: 'f0',
+        name: 'resume-ctrl.bin',
+        size: file.lengthSync(),
+        path: partial.path,
+        offset: offset,
+      ),
+    ]);
+    addTearDown(recovery.clear);
+
+    final items = [TransferItem.fromFile(file)!..id = 'f0'];
+    var hostSent = 0;
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-resume-controller',
+      events: HostEvents(
+        onProgress: (item, sent) => hostSent = sent,
+      ),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final controller = ReceiveController(appState: appState);
+    addTearDown(controller.dispose);
+
+    await controller.connectToAddress('127.0.0.1', port);
+    expect(controller.canResume, isTrue);
+    expect(controller.resumedBytes, offset);
+    expect(host.peerCount, 1);
+
+    await controller.beginReceive();
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    while (controller.phase != ReceivePhase.completed &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+
+    expect(controller.phase, ReceivePhase.completed);
+    expect(await partial.readAsBytes(), bytes);
+    expect(hostSent, file.lengthSync() - offset);
+    final clearDeadline = DateTime.now().add(const Duration(seconds: 3));
+    while (await recovery.file.exists() &&
+        DateTime.now().isBefore(clearDeadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    expect(await recovery.file.exists(), isFalse);
   });
 
   test('the receive controller retries only failed files', () async {

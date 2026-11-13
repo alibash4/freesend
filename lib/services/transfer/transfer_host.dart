@@ -164,6 +164,17 @@ class TransferHost {
         for (final id in (accept.json()['ids'] as List<Object?>? ?? const []))
           if (id is String) id,
       };
+      final offsets = <String, int>{};
+      final rawOffsets = accept.json()['offsets'];
+      if (rawOffsets is Map<Object?, Object?>) {
+        for (final entry in rawOffsets.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (key is String && value is num) {
+            offsets[key] = value.toInt();
+          }
+        }
+      }
       final selected =
           items.where((item) => ids.contains(item.id)).toList(growable: false);
       if (selected.isEmpty) {
@@ -174,7 +185,10 @@ class TransferHost {
       peer.sending = true;
       peer.selectedIds = [for (final item in selected) item.id];
       peer.totalBytes = selected.fold<int>(0, (sum, item) => sum + item.size);
-      peer.transferred = 0;
+      peer.transferred = selected.fold<int>(
+        0,
+        (sum, item) => sum + (offsets[item.id] ?? 0).clamp(0, item.size),
+      );
       peer.completedFiles = 0;
       peer.currentFile = null;
       peer.status = TransferStatus.active;
@@ -184,7 +198,12 @@ class TransferHost {
       final stopwatch = Stopwatch()..start();
       for (final item in selected) {
         if (peer.aborted || channel.isClosed) break;
-        await _sendFile(channel, item, peer);
+        await _sendFile(
+          channel,
+          item,
+          peer,
+          startOffset: offsets[item.id] ?? 0,
+        );
       }
       stopwatch.stop();
 
@@ -263,8 +282,9 @@ class TransferHost {
   Future<int> _sendFile(
     FrameChannel channel,
     TransferItem item,
-    _HostPeer peer,
-  ) async {
+    _HostPeer peer, {
+    int startOffset = 0,
+  }) async {
     final path = item.path;
     if (path == null) return 0;
     final file = File(path);
@@ -277,26 +297,67 @@ class TransferHost {
       return 0;
     }
 
-    final hash = Sha256Stream();
-    final relativeSegments = item.relativePath?.split('/') ?? const <String>[];
-    final relativeDir = relativeSegments.length > 1
-        ? relativeSegments.sublist(0, relativeSegments.length - 1).join('/')
-        : null;
-    channel.writer.json(FrameType.fileHeader, {
-      'id': item.id,
-      'name': item.name,
-      'size': item.size,
-      if (relativeDir != null) 'dir': relativeDir,
-    });
-    item.transferred = 0;
-    item.done = false;
-    item.status = TransferStatus.active;
-    peer.currentFile = item.name;
-    peer.status = TransferStatus.active;
-    _emitPeers();
+    final requested = startOffset.clamp(0, item.size);
+    var offset = requested;
+    String? fullDigest;
+    Sha256Stream? hash;
     var sent = 0;
-    var completed = false;
+
     try {
+      final fileLength = await file.length();
+      if (offset >= item.size || offset >= fileLength) {
+        offset = 0;
+      }
+      if (offset != requested) {
+        // The receiver's partial copy is stale; do not count bytes the sender
+        // is about to send again.
+        peer.transferred -= requested - offset;
+      }
+
+      if (offset > 0) {
+        // A resumed file must still end with the digest of the whole file, so
+        // hash the prefix before seeking to the resume point.
+        final prefix = Sha256Stream();
+        await handle.setPosition(0);
+        var remaining = fileLength;
+        while (remaining > 0) {
+          final chunk = await handle.read(
+            remaining < AppConstants.chunkSize
+                ? remaining
+                : AppConstants.chunkSize,
+          );
+          if (chunk.isEmpty) break;
+          prefix.add(chunk);
+          remaining -= chunk.length;
+        }
+        fullDigest = prefix.finish();
+        await handle.setPosition(offset);
+      } else {
+        hash = Sha256Stream();
+      }
+
+      final relativeSegments =
+          item.relativePath?.split('/') ?? const <String>[];
+      final relativeDir = relativeSegments.length > 1
+          ? relativeSegments
+              .sublist(0, relativeSegments.length - 1)
+              .join('/')
+          : null;
+      channel.writer.json(FrameType.fileHeader, {
+        'id': item.id,
+        'name': item.name,
+        'size': item.size,
+        if (relativeDir != null) 'dir': relativeDir,
+        if (offset > 0) 'offset': offset,
+      });
+      item.transferred = offset;
+      item.done = false;
+      item.status = TransferStatus.active;
+      peer.currentFile = item.name;
+      peer.status = TransferStatus.active;
+      _emitPeers();
+
+      var completed = false;
       while (!peer.aborted && !channel.isClosed) {
         await _waitIfPaused(peer);
         if (peer.aborted || channel.isClosed) break;
@@ -305,7 +366,7 @@ class TransferHost {
           completed = true;
           break;
         }
-        hash.add(chunk);
+        hash?.add(chunk);
         channel.writer.beginDataFrame(chunk.length);
         channel.writer.data(chunk);
         await channel.writer.maybeFlush();
@@ -315,29 +376,30 @@ class TransferHost {
         _emitPeersThrottled(peer);
         events.onProgress?.call(item, sent);
       }
+
+      if (completed && !channel.isClosed && !peer.aborted) {
+        final digest = hash?.finish() ?? fullDigest;
+        channel.writer.json(FrameType.fileEnd, {
+          'id': item.id,
+          'sha256': digest,
+        });
+        await channel.writer.flush();
+        item.sha256 = digest;
+        item.done = true;
+        item.status = TransferStatus.done;
+        peer.completedFiles++;
+        peer.currentFile = null;
+        _emitPeers();
+      }
+      return sent;
     } on FileSystemException catch (error) {
       item.status = TransferStatus.failed;
       channel.writer.error('Read error on ${item.name}: ${error.message}');
       await channel.writer.flush();
+      return sent;
     } finally {
       await handle.close();
     }
-
-    if (completed && !channel.isClosed && !peer.aborted) {
-      final digest = hash.finish();
-      channel.writer.json(FrameType.fileEnd, {
-        'id': item.id,
-        'sha256': digest,
-      });
-      await channel.writer.flush();
-      item.sha256 = digest;
-      item.done = true;
-      item.status = TransferStatus.done;
-      peer.completedFiles++;
-      peer.currentFile = null;
-      _emitPeers();
-    }
-    return sent;
   }
 
   Future<void> _waitIfPaused(_HostPeer peer) async {

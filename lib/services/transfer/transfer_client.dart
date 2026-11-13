@@ -109,6 +109,8 @@ class TransferClient {
     required List<String> ids,
     required String downloadRoot,
     Map<String, String> retryPaths = const <String, String>{},
+    Map<String, String> resumePaths = const <String, String>{},
+    Map<String, int> resumeOffsets = const <String, int>{},
     int baseBytes = 0,
   }) async {
     final channel = _channel;
@@ -120,6 +122,7 @@ class TransferClient {
 
     channel.writer.json(FrameType.accept, {
       'ids': ids,
+      'offsets': resumeOffsets,
       'caps': const ['checksums', 'resume'],
     });
     await channel.writer.flush();
@@ -145,10 +148,13 @@ class TransferClient {
             final rawRelative = json['dir'] as String?;
             final relative = rawRelative == null || rawRelative.isEmpty
                 ? null
-                : rawRelative
-                    .replaceAll('\\', '/')
-                    .replaceAll('/', Platform.pathSeparator);
+                : rawRelative.replaceAll('\\', '/');
             final retryPath = retryPaths[id];
+            final resumePath = resumePaths[id];
+            final reusePath = retryPath ?? resumePath;
+            var offset = retryPath != null
+                ? 0
+                : (resumeOffsets[id] ?? 0).clamp(0, size);
             final root = Directory(downloadRoot);
             if (!await root.exists()) {
               await root.create(recursive: true);
@@ -157,23 +163,24 @@ class TransferClient {
             final String parent;
             final String targetPath;
             final String name;
-            if (retryPath != null) {
-              // A retry must overwrite the partial file it left behind rather
+            if (reusePath != null) {
+              // A retry overwrites the partial file it left behind rather
               // than creating "name (1).ext" next to it.
-              final retryFile = File(retryPath);
-              parent = retryFile.parent.path;
-              if (!await retryFile.parent.exists()) {
-                await retryFile.parent.create(recursive: true);
+              final reuseFile = File(reusePath);
+              parent = reuseFile.parent.path;
+              if (!await reuseFile.parent.exists()) {
+                await reuseFile.parent.create(recursive: true);
               }
-              targetPath = retryFile.path;
-              name = retryFile.uri.pathSegments.last;
+              targetPath = reuseFile.path;
+              name = reuseFile.uri.pathSegments.last;
             } else {
               final unique = uniqueFileName(sanitizeFileName(rawName), taken);
               taken.add(unique.toLowerCase());
-              parent = relative == null || relative.isEmpty
+              parent = relative == null
                   ? root.path
-                  : '${root.path}${Platform.pathSeparator}$relative';
-              if (relative != null && relative.isNotEmpty) {
+                  : '${root.path}${Platform.pathSeparator}'
+                      '${relative.replaceAll('/', Platform.pathSeparator)}';
+              if (relative != null) {
                 await Directory(parent).create(recursive: true);
               }
               targetPath = '$parent${Platform.pathSeparator}$unique';
@@ -181,7 +188,46 @@ class TransferClient {
             }
 
             final target = File(targetPath);
-            handle = await target.open(mode: FileMode.write);
+            if (offset > 0 &&
+                await target.exists() &&
+                await target.length() >= offset) {
+              handle = await target.open(mode: FileMode.append);
+              await handle.truncate(offset);
+            } else {
+              offset = 0;
+              handle = await target.open(mode: FileMode.write);
+            }
+
+            hash = Sha256Stream();
+            if (offset > 0) {
+              // The digest at file end covers the whole file, so the bytes
+              // already on disk have to be folded in before the new ones.
+              final prefix = await target.open();
+              try {
+                var remaining = offset;
+                while (remaining > 0) {
+                  final chunk = await prefix.read(
+                    remaining < AppConstants.chunkSize
+                        ? remaining
+                        : AppConstants.chunkSize,
+                  );
+                  if (chunk.isEmpty) break;
+                  hash.add(chunk);
+                  remaining -= chunk.length;
+                }
+                if (remaining > 0) {
+                  // The partial file is shorter than the sidecar claimed;
+                  // start over instead of padding it.
+                  await handle.close();
+                  handle = await target.open(mode: FileMode.write);
+                  offset = 0;
+                  hash = Sha256Stream();
+                }
+              } finally {
+                await prefix.close();
+              }
+            }
+
             current = TransferItem(
               id: id,
               name: name,
@@ -189,10 +235,10 @@ class TransferClient {
               path: target.path,
               receivedPath: target.path,
               relativePath: relative,
+              transferred: offset,
               sha256: json['sha256'] as String?,
               status: TransferStatus.active,
             );
-            hash = Sha256Stream();
             expectedSha = json['sha256'] as String?;
             events.onStatus?.call(current);
             break;

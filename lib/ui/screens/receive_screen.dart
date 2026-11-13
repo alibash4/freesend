@@ -332,8 +332,30 @@ class _ScanView extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.sm),
               ],
+          ],
+        ),
+        if (controller.canResume) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Icon(
+                AppIcons.history,
+                size: 14,
+                color: theme.colorScheme.accentText,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Partial files resume where they stopped '
+                  '(${formatBytes(controller.resumedBytes)})',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.accentText,
+                  ),
+                ),
+              ),
             ],
           ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         if (PlatformEnv.canJoinHotspot && sessions.isNotEmpty) ...[
           OutlinedButton.icon(
