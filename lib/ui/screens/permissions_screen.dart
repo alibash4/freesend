@@ -146,6 +146,14 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             _PermissionRow(
+              icon: AppIcons.image,
+              title: 'Photos, videos, and audio',
+              body: 'Used by the media browser to show thumbnails and let you '
+                  'pick files.',
+              status: _statusFor(Permission.photos),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _PermissionRow(
               icon: AppIcons.scan,
               title: 'Camera',
               body: 'Only used to scan a pairing QR code. You can still pair '

@@ -7,9 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/services/app_packages.dart';
+import 'package:free_send/services/saf_folders.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
@@ -22,7 +25,7 @@ class SendScreen extends StatefulWidget {
   State<SendScreen> createState() => _SendScreenState();
 }
 
-enum _SourceKind { any, photos, videos, audio, docs, folder }
+enum _SourceKind { any, media, photos, videos, audio, docs, apps, folder }
 
 class _SendScreenState extends State<SendScreen> {
   bool _picking = false;
@@ -54,6 +57,14 @@ class _SendScreenState extends State<SendScreen> {
       }
       return;
     }
+    if (kind == _SourceKind.media) {
+      await _pickMedia(controller);
+      return;
+    }
+    if (kind == _SourceKind.apps) {
+      await _pickApps(controller);
+      return;
+    }
     await _pick(controller, kind);
   }
 
@@ -69,7 +80,11 @@ class _SendScreenState extends State<SendScreen> {
           _SourceKind.photos => FileType.image,
           _SourceKind.videos => FileType.video,
           _SourceKind.audio => FileType.audio,
-          _SourceKind.docs || _SourceKind.folder => FileType.custom,
+          _SourceKind.docs ||
+          _SourceKind.folder ||
+          _SourceKind.media ||
+          _SourceKind.apps =>
+            FileType.custom,
         },
         allowedExtensions: kind == _SourceKind.docs
             ? const [
@@ -93,11 +108,50 @@ class _SendScreenState extends State<SendScreen> {
     }
   }
 
+  Future<void> _pickMedia(SendController controller) async {
+    final files = await Navigator.of(context).push<List<File>>(
+      MaterialPageRoute(builder: (_) => const MediaBrowserScreen()),
+    );
+    if (files == null || files.isEmpty || !mounted) return;
+    controller.addFiles(files);
+  }
+
+  Future<void> _pickApps(SendController controller) async {
+    final apps = await InstalledApps.list();
+    if (!mounted) return;
+    if (apps.isEmpty) {
+      _toast('No installable app bundles were found on this device.');
+      return;
+    }
+    final selected = await showModalBottomSheet<InstalledApp>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _AppsSheet(apps: apps),
+    );
+    if (selected == null || !mounted) return;
+    final file = File(selected.path);
+    if (!await file.exists()) {
+      _toast('That app bundle is no longer readable.');
+      return;
+    }
+    controller.addFiles([file]);
+  }
+
   Future<void> _pickFolder(SendController controller) async {
-    final path = await FilePicker.platform.getDirectoryPath(
+    var path = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Choose a folder to send',
     );
     if (path == null || path.isEmpty || !mounted) return;
+    if (path.startsWith('content://')) {
+      final cached = await SafFolders.copyTreeToCache(path);
+      if (!mounted) return;
+      if (cached == null || cached.isEmpty) {
+        _toast('That Android folder could not be read. Choose it again.');
+        return;
+      }
+      path = cached;
+    }
     final folder = Directory(path);
     if (!await folder.exists()) {
       if (mounted) _toast('That folder is not readable.');
@@ -350,6 +404,21 @@ class _PickView extends StatelessWidget {
               ],
             ],
           ),
+        if (controller.items.isEmpty && controller.recents.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.lg),
+          Text('Recent files', style: theme.textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.xs),
+          for (final recent in controller.recents.take(6))
+            if (File(recent.path).existsSync())
+              InkWell(
+                onTap: picking ? null : () => controller.addFiles([File(recent.path)]),
+                child: FileTile(
+                  name: recent.name,
+                  size: recent.size,
+                  subtitle: 'Tap to add again',
+                ),
+              ),
+        ],
         const SizedBox(height: AppSpacing.md),
         if (controller.items.isNotEmpty)
           Row(
@@ -799,6 +868,52 @@ class _FailedView extends StatelessWidget {
   }
 }
 
+class _AppsSheet extends StatelessWidget {
+  const _AppsSheet({required this.apps});
+
+  final List<InstalledApp> apps;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.65,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text('Send an app', style: theme.textTheme.titleLarge),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: apps.length,
+                itemBuilder: (context, index) {
+                  final app = apps[index];
+                  return ListTile(
+                    leading: const Icon(AppIcons.package),
+                    title: Text(app.name),
+                    subtitle: Text(
+                      app.version.isEmpty ? 'Installed app' : 'Version ${app.version}',
+                    ),
+                    onTap: () => Navigator.of(context).pop(app),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SourceSheet extends StatelessWidget {
   const _SourceSheet();
 
@@ -827,8 +942,9 @@ class _SourceSheet extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(AppIcons.image),
-            title: const Text('Photos'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.photos),
+            title: const Text('Media library'),
+            subtitle: const Text('Photos, videos, and audio with thumbnails'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.media),
           ),
           ListTile(
             leading: const Icon(AppIcons.video),
@@ -845,6 +961,12 @@ class _SourceSheet extends StatelessWidget {
             title: const Text('Documents'),
             subtitle: const Text('PDF, Office, text, CSV'),
             onTap: () => Navigator.of(context).pop(_SourceKind.docs),
+          ),
+          ListTile(
+            leading: const Icon(AppIcons.package),
+            title: const Text('Apps'),
+            subtitle: const Text('Installable app bundles on this device'),
+            onTap: () => Navigator.of(context).pop(_SourceKind.apps),
           ),
           ListTile(
             leading: const Icon(AppIcons.folder),

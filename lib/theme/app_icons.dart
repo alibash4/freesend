@@ -50,6 +50,8 @@ abstract final class AppIcons {
   // State.
   static const IconData check = LucideIcons400.check;
   static const IconData checkCircle = LucideIcons400.circleCheck;
+  static const IconData circle = LucideIcons400.circle;
+  static const IconData package = LucideIcons400.package;
   static const IconData stop = LucideIcons400.square;
   static const IconData pause = LucideIcons400.pause;
   static const IconData play = LucideIcons400.play;

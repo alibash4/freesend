@@ -10,5 +10,7 @@ class MainActivity : FlutterActivity() {
         HotspotBridge(applicationContext, messenger)
         UpdateBridge(applicationContext, messenger)
         TransferBridge(applicationContext, messenger)
+        AppPackagesBridge(applicationContext, messenger)
+        SafBridge(applicationContext, messenger)
     }
 }

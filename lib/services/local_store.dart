@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_record.dart';
 
 /// Thin persistence layer over SharedPreferences: settings plus transfer
@@ -15,6 +16,7 @@ class LocalStore {
   static const _kThemeMode = 'theme_mode';
   static const _kDownloadDir = 'download_dir';
   static const _kHistory = 'history';
+  static const _kRecentFiles = 'recent_files';
   static const _kAutoUpdate = 'auto_update';
   static const _kMinimizeToTray = 'minimize_to_tray';
   static const _kPermissionsPrompted = 'permissions_prompted';
@@ -141,5 +143,42 @@ class LocalStore {
 
   Future<void> clearHistory() async {
     await _prefs.remove(_kHistory);
+  }
+
+  /// Recently picked files, newest first. Used by the send screen so a repeat
+  /// transfer can start without walking the system picker again.
+  List<RecentFile> get recentFiles {
+    final raw = _prefs.getStringList(_kRecentFiles) ?? const [];
+    final records = <RecentFile>[];
+    for (final entry in raw) {
+      try {
+        final decoded = jsonDecode(entry);
+        if (decoded is Map<String, Object?>) {
+          final record = RecentFile.fromJson(decoded);
+          if (record != null) records.add(record);
+        }
+      } on FormatException {
+        // Skip a corrupt entry.
+      }
+    }
+    records.sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    return records;
+  }
+
+  Future<void> addRecentFiles(Iterable<File> files) async {
+    final byPath = {for (final record in recentFiles) record.path: record};
+    for (final file in files) {
+      final record = RecentFile.fromFile(file);
+      if (record != null) byPath[record.path] = record;
+    }
+    final all = byPath.values.toList()
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    await _prefs.setStringList(
+      _kRecentFiles,
+      [
+        for (final record in all.take(AppConstants.maxRecentFiles))
+          jsonEncode(record.toJson()),
+      ],
+    );
   }
 }

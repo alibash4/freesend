@@ -14,6 +14,15 @@
         tools:targetApi="33" />
     <!-- Only used to read the pairing QR code; the app works without a camera. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Media browser: read photos, videos, and audio the user selects. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <!-- Self-update: hand a downloaded APK to the system package installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Keep the process alive while a transfer is running in the background. -->

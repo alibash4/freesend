@@ -27,4 +27,5 @@ abstract final class AppConstants {
   static const progressInterval = Duration(milliseconds: 90);
 
   static const maxHistoryEntries = 60;
+  static const maxRecentFiles = 24;
 }

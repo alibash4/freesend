@@ -7,6 +7,7 @@ import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/models/peer_info.dart';
+import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
@@ -37,6 +38,9 @@ class SendController extends ChangeNotifier {
   final SessionBroadcaster _broadcaster = SessionBroadcaster();
 
   final List<TransferItem> items = [];
+
+  /// Files picked recently, newest first. Kept in sync with [LocalStore].
+  late List<RecentFile> recents = _loadRecents();
 
   SendPhase phase = SendPhase.idle;
   HotspotInfo? hotspot;
@@ -112,6 +116,7 @@ class SendController extends ChangeNotifier {
       existing.add(file.path);
     }
     _recalculateTotal();
+    _remember(files);
     notifyListeners();
   }
 
@@ -149,7 +154,27 @@ class SendController extends ChangeNotifier {
     if (added.isEmpty) return;
     items.addAll(added);
     _recalculateTotal();
+    _remember(files);
     notifyListeners();
+  }
+
+  List<RecentFile> _loadRecents() {
+    try {
+      return appState.store.recentFiles;
+    } on Object {
+      return const [];
+    }
+  }
+
+  void _remember(Iterable<File> files) {
+    final readable = files.where((file) => file.existsSync()).toList();
+    if (readable.isEmpty) return;
+    unawaited(
+      appState.store.addRecentFiles(readable).then((_) {
+        recents = appState.store.recentFiles;
+        notifyListeners();
+      }),
+    );
   }
 
   void removeItem(TransferItem item) {
