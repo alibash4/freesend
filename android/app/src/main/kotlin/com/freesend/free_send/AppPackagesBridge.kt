@@ -33,12 +33,30 @@ class AppPackagesBridge(
             .filter { info: ApplicationInfo ->
                 !info.sourceDir.isNullOrEmpty() && File(info.sourceDir).exists()
             }
-            .map { info: ApplicationInfo ->
-                mapOf(
-                    "name" to packageManager.getApplicationLabel(info).toString(),
-                    "path" to info.sourceDir,
-                    "version" to (info.versionName ?: ""),
+            .flatMap { info: ApplicationInfo ->
+                val label = packageManager.getApplicationLabel(info).toString()
+                val version = ""
+                val bundles = mutableListOf(
+                    mapOf(
+                        "name" to label,
+                        "path" to info.sourceDir,
+                        "version" to version,
+                    ),
                 )
+                // Modern apps ship split APKs; send each one as a separate
+                // bundle so an install on the other side has everything.
+                info.splitSourceDirs?.forEachIndexed { index, path ->
+                    if (File(path).exists()) {
+                        bundles.add(
+                            mapOf(
+                                "name" to "$label (part ${index + 1})",
+                                "path" to path,
+                                "version" to version,
+                            ),
+                        )
+                    }
+                }
+                bundles
             }
             .sortedBy { it["name"]?.lowercase() ?: "" }
             .toList()
