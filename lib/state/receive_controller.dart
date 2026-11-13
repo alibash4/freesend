@@ -38,6 +38,8 @@ class ReceiveController extends ChangeNotifier {
   List<DiscoveredSession> sessions = const [];
   TransferManifest? manifest;
   TransferClient? _client;
+  String? _host;
+  int? _port;
   StreamSubscription<List<DiscoveredSession>>? _scanSubscription;
 
   String? errorMessage;
@@ -166,6 +168,17 @@ class ReceiveController extends ChangeNotifier {
     }
   }
 
+  TransferClient _newClient() => TransferClient(
+        deviceName: appState.deviceName,
+        instanceId: appState.instanceId,
+        events: ClientEvents(
+          onProgress: _onProgress,
+          onStatus: _onStatus,
+          onFinished: _onFinished,
+          onError: _onError,
+        ),
+      );
+
   Future<void> connectToSession(DiscoveredSession session) async {
     await connectToAddress(session.ip, session.port, label: session.deviceName);
   }
@@ -181,20 +194,13 @@ class ReceiveController extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
 
-    final client = TransferClient(
-      deviceName: appState.deviceName,
-      instanceId: appState.instanceId,
-      events: ClientEvents(
-        onProgress: _onProgress,
-        onStatus: _onStatus,
-        onFinished: _onFinished,
-        onError: _onError,
-      ),
-    );
+    final client = _newClient();
     _client = client;
     try {
       final manifest = await client.connect(ip, port);
       await _scanner.stop();
+      _host = ip;
+      _port = port;
       this.manifest = manifest;
       receivedItems
         ..clear()
@@ -247,6 +253,9 @@ class ReceiveController extends ChangeNotifier {
     totalBytes = selectedBytes;
     receivedBytes = 0;
     for (final item in receivedItems) {
+      if (!selectedIds.contains(item.id)) continue;
+      item.transferred = 0;
+      item.done = false;
       item.status = TransferStatus.pending;
     }
     speedBytesPerSecond = 0;
@@ -274,9 +283,101 @@ class ReceiveController extends ChangeNotifier {
     }
   }
 
+  /// Reconnects to the last host and asks only for the files that did not
+  /// finish. Partial files are truncated and written again from byte zero.
+  Future<void> retryFailed() async {
+    final host = _host;
+    final port = _port;
+    if (host == null || port == null || phase == ReceivePhase.transferring) {
+      return;
+    }
+    final failed = receivedItems
+        .where((item) => !item.done && selectedIds.contains(item.id))
+        .toList(growable: false);
+    if (failed.isEmpty) return;
+
+    final retryIds = {for (final item in failed) item.id};
+    final retryPaths = <String, String>{
+      for (final item in failed)
+        if (item.receivedPath != null) item.id: item.receivedPath!,
+    };
+    final doneBytes = receivedItems
+        .where((item) => item.done && selectedIds.contains(item.id))
+        .fold<int>(0, (sum, item) => sum + item.size);
+
+    for (final item in failed) {
+      item.transferred = 0;
+      item.done = false;
+      item.status = TransferStatus.pending;
+    }
+    receivedBytes = doneBytes;
+    totalBytes = selectedBytes;
+    errorMessage = null;
+    pausedByMe = false;
+    phase = ReceivePhase.joining;
+    notifyListeners();
+
+    final client = _newClient();
+    _client = client;
+    try {
+      final manifest = await client.connect(host, port);
+      this.manifest = manifest;
+      // Keep the objects the UI already knows about; the host may have added
+      // files since the first attempt, but a retry must not reset the progress
+      // of the ones that already succeeded.
+      final byId = {for (final item in receivedItems) item.id: item};
+      receivedItems
+        ..clear()
+        ..addAll(manifest.items.map((item) => byId[item.id] ?? item));
+      _stopwatch = Stopwatch()..start();
+      _lastSampleAt = null;
+      _lastSampleBytes = receivedBytes;
+      phase = ReceivePhase.transferring;
+      notifyListeners();
+      await client.receive(
+        ids: retryIds.toList(growable: false),
+        downloadRoot: saveLocation,
+        retryPaths: retryPaths,
+        baseBytes: doneBytes,
+      );
+    } on SocketException {
+      errorMessage = 'Could not reach $host:$port. Make sure both devices are '
+          'on the same hotspot.';
+      phase = ReceivePhase.failed;
+    } on Object catch (error) {
+      if (phase != ReceivePhase.completed) {
+        errorMessage ??= _describe(error);
+        phase = ReceivePhase.failed;
+      }
+    }
+    await client.dispose();
+    _client = null;
+    notifyListeners();
+  }
+
+  TransferItem? _trackedItem(TransferItem item) {
+    for (final candidate in receivedItems) {
+      if (candidate.id == item.id) return candidate;
+    }
+    return null;
+  }
+
+  void _mergeItem(TransferItem item) {
+    final tracked = _trackedItem(item);
+    if (tracked == null) {
+      receivedItems.add(item);
+      return;
+    }
+    tracked.transferred = item.transferred;
+    tracked.status = item.status;
+    tracked.done = item.done;
+    tracked.receivedPath ??= item.receivedPath;
+    tracked.sha256 ??= item.sha256;
+  }
+
   void _onProgress(TransferItem item, int bytes) {
+    _mergeItem(item);
     currentFileName = item.name;
-    item.status = TransferStatus.active;
     receivedBytes = bytes;
     _sampleSpeed();
     notifyListeners();
@@ -315,6 +416,7 @@ class ReceiveController extends ChangeNotifier {
   }
 
   void _onStatus(TransferItem item) {
+    _mergeItem(item);
     if (item.status == TransferStatus.paused) currentFileName = item.name;
     notifyListeners();
   }

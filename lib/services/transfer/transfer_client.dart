@@ -108,13 +108,15 @@ class TransferClient {
   Future<void> receive({
     required List<String> ids,
     required String downloadRoot,
+    Map<String, String> retryPaths = const <String, String>{},
+    int baseBytes = 0,
   }) async {
     final channel = _channel;
     if (channel == null) throw ProtocolException('Not connected');
 
     final stopwatch = Stopwatch()..start();
     var receivedFiles = 0;
-    var receivedBytes = 0;
+    var receivedBytes = baseBytes;
 
     channel.writer.json(FrameType.accept, {
       'ids': ids,
@@ -137,28 +139,52 @@ class TransferClient {
         switch (frame.type) {
           case FrameType.fileHeader:
             final json = frame.json();
-            final name = sanitizeFileName((json['name'] as String?) ?? 'file');
+            final id = (json['id'] as String?) ?? '';
+            final rawName = (json['name'] as String?) ?? 'file';
             final size = (json['size'] as num?)?.toInt() ?? 0;
-            final unique = uniqueFileName(name, taken);
-            taken.add(unique.toLowerCase());
+            final rawRelative = json['dir'] as String?;
+            final relative = rawRelative == null || rawRelative.isEmpty
+                ? null
+                : rawRelative
+                    .replaceAll('\\', '/')
+                    .replaceAll('/', Platform.pathSeparator);
+            final retryPath = retryPaths[id];
             final root = Directory(downloadRoot);
             if (!await root.exists()) {
               await root.create(recursive: true);
             }
-            final relative = (json['dir'] as String?)
-                ?.replaceAll('\\', '/')
-                .replaceAll('/', Platform.pathSeparator);
-            final parent = relative == null || relative.isEmpty
-                ? root.path
-                : '${root.path}${Platform.pathSeparator}$relative';
-            if (relative != null && relative.isNotEmpty) {
-              await Directory(parent).create(recursive: true);
+
+            final String parent;
+            final String targetPath;
+            final String name;
+            if (retryPath != null) {
+              // A retry must overwrite the partial file it left behind rather
+              // than creating "name (1).ext" next to it.
+              final retryFile = File(retryPath);
+              parent = retryFile.parent.path;
+              if (!await retryFile.parent.exists()) {
+                await retryFile.parent.create(recursive: true);
+              }
+              targetPath = retryFile.path;
+              name = retryFile.uri.pathSegments.last;
+            } else {
+              final unique = uniqueFileName(sanitizeFileName(rawName), taken);
+              taken.add(unique.toLowerCase());
+              parent = relative == null || relative.isEmpty
+                  ? root.path
+                  : '${root.path}${Platform.pathSeparator}$relative';
+              if (relative != null && relative.isNotEmpty) {
+                await Directory(parent).create(recursive: true);
+              }
+              targetPath = '$parent${Platform.pathSeparator}$unique';
+              name = unique;
             }
-            final target = File('$parent${Platform.pathSeparator}$unique');
+
+            final target = File(targetPath);
             handle = await target.open(mode: FileMode.write);
             current = TransferItem(
-              id: (json['id'] as String?) ?? '',
-              name: unique,
+              id: id,
+              name: name,
               size: size,
               path: target.path,
               receivedPath: target.path,

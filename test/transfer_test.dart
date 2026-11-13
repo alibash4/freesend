@@ -4,13 +4,17 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
+import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 import 'package:free_send/services/transfer/transfer_client.dart';
 import 'package:free_send/services/transfer/transfer_host.dart';
+import 'package:free_send/state/app_state.dart';
+import 'package:free_send/state/receive_controller.dart';
 
 /// End-to-end exercise of the real socket protocol on localhost: host serves
 /// files, client writes them to disk, bytes must match and callbacks must fire.
@@ -452,6 +456,111 @@ void main() {
     final received = File('${dir.path}/receiver-pause.bin');
     expect(await received.exists(), isTrue);
     expect(await received.readAsBytes(), await file.readAsBytes());
+  });
+
+  test('a retry overwrites the partial file instead of renaming it', () async {
+    final file = await writeRandomFile('retry.bin', 64 * 1024);
+    final items = [TransferItem.fromFile(file)!..id = 'f0'];
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-retry-path',
+      events: const HostEvents(),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final partial = File('${targetDir.path}/retry.bin');
+    await partial.writeAsBytes([1, 2, 3, 4]);
+
+    final client = TransferClient(
+      deviceName: 'Receiver',
+      instanceId: 'client-retry-path',
+      events: const ClientEvents(),
+    );
+    addTearDown(client.dispose);
+
+    await client.connect('127.0.0.1', port);
+    await client.receive(
+      ids: ['f0'],
+      downloadRoot: targetDir.path,
+      retryPaths: {'f0': partial.path},
+    );
+
+    expect(await partial.readAsBytes(), await file.readAsBytes());
+    expect(
+      await File('${targetDir.path}/retry (1).bin').exists(),
+      isFalse,
+      reason: 'the retry must reuse the existing path',
+    );
+  });
+
+  test('the receive controller retries only failed files', () async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({
+      'device_name': 'Receiver',
+      'download_dir': targetDir.path,
+    });
+    final appState = AppState(LocalStore());
+    await appState.init();
+    addTearDown(appState.dispose);
+
+    final a = await writeRandomFile('retry-a.bin', 64 * 1024);
+    final b = await writeRandomFile('retry-b.bin', 64 * 1024);
+    final bBytes = await b.readAsBytes();
+    final items = [
+      TransferItem.fromFile(a)!..id = 'f0',
+      TransferItem.fromFile(b)!..id = 'f1',
+    ];
+
+    final host = TransferHost(
+      items: items,
+      deviceName: 'Sender',
+      instanceId: 'host-controller-retry',
+      events: const HostEvents(),
+    );
+    final port = await host.start();
+    addTearDown(host.dispose);
+
+    final controller = ReceiveController(appState: appState);
+    addTearDown(controller.dispose);
+
+    await controller.connectToAddress('127.0.0.1', port);
+    controller.saveLocation = targetDir.path;
+
+    // The sender cannot open the second file, so only the first one finishes.
+    await b.delete();
+    await controller.beginReceive();
+    final deadline = DateTime.now().add(const Duration(seconds: 10));
+    while (controller.phase != ReceivePhase.failed &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    expect(controller.phase, ReceivePhase.failed);
+    expect(
+      controller.receivedItems.firstWhere((item) => item.id == 'f0').done,
+      isTrue,
+      reason: 'error=${controller.errorMessage}',
+    );
+
+    await b.writeAsBytes(bBytes);
+    await controller.retryFailed();
+    final retryDeadline = DateTime.now().add(const Duration(seconds: 15));
+    while (controller.phase != ReceivePhase.completed &&
+        DateTime.now().isBefore(retryDeadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+
+    expect(controller.phase, ReceivePhase.completed);
+    expect(controller.receivedItems.every((item) => item.done), isTrue);
+    expect(
+      await File('${targetDir.path}/retry-a.bin').readAsBytes(),
+      await a.readAsBytes(),
+    );
+    expect(
+      await File('${targetDir.path}/retry-b.bin').readAsBytes(),
+      bBytes,
+    );
   });
 
   test('peer progress is per receiver', () {

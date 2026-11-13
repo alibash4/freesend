@@ -775,6 +775,10 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cancelled = controller.phase == ReceivePhase.cancelled;
+    final failed = controller.receivedItems
+        .where((item) =>
+            !item.done && controller.selectedIds.contains(item.id))
+        .length;
     return Column(
       children: [
         const SizedBox(height: AppSpacing.lg),
@@ -806,6 +810,14 @@ class _ErrorView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
+        if (failed > 0 && !cancelled) ...[
+          FilledButton.icon(
+            onPressed: controller.retryFailed,
+            icon: const Icon(AppIcons.refresh, size: 17),
+            label: Text('Retry $failed file${failed == 1 ? '' : 's'}'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         FilledButton(onPressed: () => onRetry(), child: const Text('Scan again')),
       ],
     );
