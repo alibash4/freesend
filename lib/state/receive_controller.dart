@@ -80,6 +80,8 @@ class ReceiveController extends ChangeNotifier {
   /// The receiver asked for the stream to stop. Distinct from a sender pause,
   /// which arrives as a frame while the socket is still being read.
   bool pausedByMe = false;
+  bool encrypted = false;
+  String? securityCode;
   bool get anyPaused => pausedByMe || isPaused;
   bool get canResume => resumeOffsets.isNotEmpty;
   int get resumedBytes =>
@@ -187,6 +189,7 @@ class ReceiveController extends ChangeNotifier {
   TransferClient _newClient() => TransferClient(
         deviceName: appState.deviceName,
         instanceId: appState.instanceId,
+        store: appState.store,
         events: ClientEvents(
           onProgress: _onProgress,
           onStatus: _onStatus,
@@ -218,6 +221,8 @@ class ReceiveController extends ChangeNotifier {
       _host = ip;
       _port = port;
       this.manifest = manifest;
+      encrypted = manifest.encrypted;
+      securityCode = manifest.securityCode;
       receivedItems
         ..clear()
         ..addAll(manifest.items);
@@ -684,6 +689,8 @@ class ReceiveController extends ChangeNotifier {
     errorMessage = null;
     currentFileName = null;
     pausedByMe = false;
+    encrypted = false;
+    securityCode = null;
     receivedBytes = 0;
     totalBytes = 0;
     speedBytesPerSecond = 0;

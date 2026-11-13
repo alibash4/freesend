@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/models/trusted_device.dart';
+import 'package:free_send/services/device_identity.dart';
+import 'package:free_send/services/local_store.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/transfer/checksum.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
+import 'package:free_send/services/transfer/secure_channel.dart';
 
 /// What the host offers after the handshake.
 class TransferManifest {
@@ -14,11 +19,17 @@ class TransferManifest {
     required this.hostName,
     required this.hostPlatform,
     required this.items,
+    this.hostInstanceId,
+    this.encrypted = false,
+    this.securityCode,
   });
 
   final String hostName;
   final String? hostPlatform;
   final List<TransferItem> items;
+  final String? hostInstanceId;
+  final bool encrypted;
+  final String? securityCode;
 
   int get totalBytes => items.fold<int>(0, (sum, item) => sum + item.size);
 }
@@ -45,11 +56,13 @@ class TransferClient {
     required this.deviceName,
     required this.events,
     required this.instanceId,
+    this.store,
   });
 
   final String deviceName;
   final ClientEvents events;
   final String instanceId;
+  final LocalStore? store;
 
   FrameChannel? _channel;
   bool _cancelled = false;
@@ -69,15 +82,70 @@ class TransferClient {
     final channel = FrameChannel(socket);
     _channel = channel;
     try {
-      channel.writer.json(FrameType.hello, {
+      final handshake = await SecureHandshake.create();
+      final clientPublicKey = await handshake.publicKey;
+      await channel.writer.json(FrameType.hello, {
         'v': AppConstants.protocolVersion,
         'name': deviceName,
         'platform': Platform.operatingSystem,
-        'caps': const ['checksums', 'resume'],
+        'key': base64.encode(clientPublicKey),
+        'nonce': base64.encode(handshake.salt),
+        'caps': const ['checksums', 'resume', 'encryption'],
       });
       await channel.writer.flush();
 
-      final frame = await channel.next(timeout: timeout);
+      var frame = await channel.next(timeout: timeout);
+      if (frame.type == FrameType.helloAck) {
+        final ack = frame.json();
+        final hostKey = (ack['key'] as String?) ?? '';
+        final instance = (ack['instanceId'] as String?) ?? '';
+        final identity = (ack['identity'] as String?) ?? '';
+        final signature = (ack['signature'] as String?) ?? '';
+        if (hostKey.isEmpty) {
+          throw ProtocolException('The sender did not provide a key');
+        }
+        if (identity.isNotEmpty && signature.isNotEmpty) {
+          final signed = utf8.encode(
+            '$hostKey|${base64.encode(handshake.salt)}|$instance',
+          );
+          final trusted = store?.trustedDevices
+              .where((device) => device.instanceId == instance)
+              .toList(growable: false);
+          if (trusted != null && trusted.isNotEmpty) {
+            if (trusted.first.publicKey != identity) {
+              throw ProtocolException(
+                'This sender\'s identity changed. Stop and verify the device '
+                'before sending anything.',
+              );
+            }
+          } else {
+            final valid = await DeviceIdentity.verify(
+              signed,
+              base64.decode(signature),
+              identity,
+            );
+            if (!valid) {
+              throw ProtocolException('The sender\'s identity signature is invalid');
+            }
+            if (store != null) {
+              await store!.trustDevice(TrustedDevice(
+                instanceId: instance,
+                name: (ack['name'] as String?) ?? 'Nearby device',
+                publicKey: identity,
+                fingerprint: (ack['fingerprint'] as String?) ?? '',
+                addedAt: DateTime.now(),
+              ));
+            }
+          }
+        }
+        final key = await handshake.derive(base64.decode(hostKey));
+        final cipher = SecureChannel(key);
+        channel.useCipher(encrypt: cipher.seal, decrypt: cipher.open);
+        await channel.writer.json(FrameType.helloConfirm, {});
+        await channel.writer.flush();
+        frame = await channel.next(timeout: timeout);
+      }
+
       if (frame.type == FrameType.error) {
         throw ProtocolException(
           frame.json()['message'] as String? ?? 'The other device refused the connection',
@@ -95,6 +163,9 @@ class TransferClient {
         hostName: (json['name'] as String?) ?? 'Nearby device',
         hostPlatform: json['platform'] as String?,
         items: files,
+        hostInstanceId: json['instanceId'] as String?,
+        encrypted: channel.isEncrypted,
+        securityCode: json['fingerprint'] as String?,
       );
     } on Object {
       await channel.close();
@@ -120,7 +191,7 @@ class TransferClient {
     var receivedFiles = 0;
     var receivedBytes = baseBytes;
 
-    channel.writer.json(FrameType.accept, {
+    await channel.writer.json(FrameType.accept, {
       'ids': ids,
       'offsets': resumeOffsets,
       'caps': const ['checksums', 'resume'],
@@ -289,7 +360,7 @@ class TransferClient {
             current = null;
             hash = null;
             expectedSha = null;
-            channel.writer.json(FrameType.ackFile, {'id': file?.id ?? ''});
+            await channel.writer.json(FrameType.ackFile, {'id': file?.id ?? ''});
             await channel.writer.flush();
             break;
 
@@ -314,7 +385,7 @@ class TransferClient {
             // deliver the courtesy ack must not turn a good transfer bad.
             if (!channel.isClosed) {
               try {
-                channel.writer.json(FrameType.ackAll, {'bytes': receivedBytes});
+                await channel.writer.json(FrameType.ackAll, {'bytes': receivedBytes});
                 await channel.writer.flush();
               } on Object {
                 // The host may already have closed its side.
@@ -378,7 +449,7 @@ class TransferClient {
     channel.pause();
     if (!channel.isClosed) {
       try {
-        channel.writer.json(FrameType.pause, {'reason': 'Paused by receiver'});
+        await channel.writer.json(FrameType.pause, {'reason': 'Paused by receiver'});
         await channel.writer.flush();
       } on Object {
         // The peer may already be gone; the local pause still holds.
@@ -395,7 +466,7 @@ class TransferClient {
     channel?.resume();
     if (channel != null && !channel.isClosed) {
       try {
-        channel.writer.json(FrameType.resume, {});
+        await channel.writer.json(FrameType.resume, {});
         await channel.writer.flush();
       } on Object {
         // Nothing to do: the local stream still resumes.
@@ -414,7 +485,7 @@ class TransferClient {
       channel.resume();
       if (!channel.isClosed) {
         try {
-          channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
+          await channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
           await channel.writer.flush();
         } on Object {
           // Peer already gone.

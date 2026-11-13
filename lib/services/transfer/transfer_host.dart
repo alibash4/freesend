@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
+import 'package:free_send/services/device_identity.dart';
+import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/transfer/checksum.dart';
+import 'package:free_send/services/transfer/secure_channel.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 
@@ -52,12 +56,15 @@ class TransferHost {
     required this.deviceName,
     required this.events,
     required this.instanceId,
+    this.identityStore,
   });
 
   final List<TransferItem> items;
   final String deviceName;
   final HostEvents events;
   final String instanceId;
+  final LocalStore? identityStore;
+  DeviceIdentity? _identity;
 
   ServerSocket? _server;
   final Map<String, _HostPeer> _peers = {};
@@ -66,6 +73,12 @@ class TransferHost {
   Completer<void>? _resumeWaiter;
   int _peerCounter = 0;
   int _port = AppConstants.transferPort;
+
+  Future<DeviceIdentity> _deviceIdentity() {
+    final existing = _identity;
+    if (existing != null) return Future<DeviceIdentity>.value(existing);
+    return DeviceIdentity.load(identityStore).then((value) => _identity = value);
+  }
 
   bool get isListening => _server != null;
   int get port => _port;
@@ -118,7 +131,7 @@ class TransferHost {
       final payload = hello.json();
       final version = (payload['v'] as num?)?.toInt() ?? 1;
       if (version < 1 || version > AppConstants.protocolVersion) {
-        channel.writer.error(
+        await channel.writer.error(
           'Version mismatch: this device speaks Free Send protocol '
           'v$AppConstants.protocolVersion',
         );
@@ -134,7 +147,42 @@ class TransferHost {
       events.onPeerConnected?.call(peer.name, peer.platform);
       _emitPeers();
 
-      channel.writer.json(FrameType.session, {
+      final clientKey = payload['key'];
+      if (version >= 3 && clientKey is String && clientKey.isNotEmpty) {
+        final salt = base64.decode(
+          (payload['nonce'] as String?) ?? base64.encode(_zeroSalt),
+        );
+        final handshake = await SecureHandshake.withSalt(salt);
+        final hostPublicKey = await handshake.publicKey;
+        final cipher = SecureChannel(await handshake.derive(base64.decode(clientKey)));
+
+        final identity = await _deviceIdentity();
+        final signedMessage = utf8.encode(
+          '${base64.encode(hostPublicKey)}|${base64.encode(salt)}|$instanceId',
+        );
+        final signature = await identity.sign(signedMessage);
+        // The receiver may answer as soon as it sees the ack; hold the read
+        // loop until the cipher is installed so the answer is decrypted.
+        channel.pause();
+        await channel.writer.json(FrameType.helloAck, {
+          'v': 3,
+          'key': base64.encode(hostPublicKey),
+          'identity': identity.publicKeyBase64,
+          'fingerprint': identity.fingerprint,
+          'instanceId': instanceId,
+          'signature': base64.encode(signature),
+        });
+        await channel.writer.flush();
+        channel.useCipher(encrypt: cipher.seal, decrypt: cipher.open);
+        channel.resume();
+        peer.encrypted = true;
+        final confirm = await channel.next(timeout: const Duration(seconds: 20));
+        if (confirm.type != FrameType.helloConfirm) {
+          throw ProtocolException('The receiver did not confirm the key');
+        }
+      }
+
+      await channel.writer.json(FrameType.session, {
         'v': AppConstants.protocolVersion,
         'name': deviceName,
         'platform': Platform.operatingSystem,
@@ -142,6 +190,8 @@ class TransferHost {
         'files': [for (final item in items) item.toWire()],
         'totalBytes': items.fold<int>(0, (sum, item) => sum + item.size),
         'caps': const ['folders', 'checksums', 'pause'],
+        'instanceId': instanceId,
+        'fingerprint': _identity?.fingerprint,
       });
       await channel.writer.flush();
 
@@ -178,7 +228,7 @@ class TransferHost {
       final selected =
           items.where((item) => ids.contains(item.id)).toList(growable: false);
       if (selected.isEmpty) {
-        channel.writer.error('No files were selected');
+        await channel.writer.error('No files were selected');
         await channel.close();
         return;
       }
@@ -216,7 +266,7 @@ class TransferHost {
       }
 
       final total = selected.fold<int>(0, (sum, item) => sum + item.transferred);
-      channel.writer.json(FrameType.transferEnd, {
+      await channel.writer.json(FrameType.transferEnd, {
         'files': selected.length,
         'bytes': total,
       });
@@ -292,7 +342,7 @@ class TransferHost {
     try {
       handle = await file.open();
     } on FileSystemException {
-      channel.writer.error('Cannot read ${item.name}');
+      await channel.writer.error('Cannot read ${item.name}');
       await channel.writer.flush();
       return 0;
     }
@@ -343,7 +393,7 @@ class TransferHost {
               .sublist(0, relativeSegments.length - 1)
               .join('/')
           : null;
-      channel.writer.json(FrameType.fileHeader, {
+      await channel.writer.json(FrameType.fileHeader, {
         'id': item.id,
         'name': item.name,
         'size': item.size,
@@ -367,8 +417,12 @@ class TransferHost {
           break;
         }
         hash?.add(chunk);
-        channel.writer.beginDataFrame(chunk.length);
-        channel.writer.data(chunk);
+        if (channel.writer.isEncrypted) {
+          await channel.writer.frame(FrameType.data, chunk);
+        } else {
+          channel.writer.beginDataFrame(chunk.length);
+          channel.writer.data(chunk);
+        }
         await channel.writer.maybeFlush();
         item.transferred += chunk.length;
         sent += chunk.length;
@@ -379,7 +433,7 @@ class TransferHost {
 
       if (completed && !channel.isClosed && !peer.aborted) {
         final digest = hash?.finish() ?? fullDigest;
-        channel.writer.json(FrameType.fileEnd, {
+        await channel.writer.json(FrameType.fileEnd, {
           'id': item.id,
           'sha256': digest,
         });
@@ -394,7 +448,7 @@ class TransferHost {
       return sent;
     } on FileSystemException catch (error) {
       item.status = TransferStatus.failed;
-      channel.writer.error('Read error on ${item.name}: ${error.message}');
+      await channel.writer.error('Read error on ${item.name}: ${error.message}');
       await channel.writer.flush();
       return sent;
     } finally {
@@ -421,7 +475,7 @@ class TransferHost {
     for (final peer in _peers.values) {
       if (peer.finished || peer.channel.isClosed) continue;
       try {
-        peer.channel.writer.json(FrameType.pause, {'reason': reason});
+        await peer.channel.writer.json(FrameType.pause, {'reason': reason});
         await peer.channel.writer.flush();
       } on Object {
         // The peer may already be gone.
@@ -435,7 +489,7 @@ class TransferHost {
     for (final peer in _peers.values) {
       if (peer.finished || peer.channel.isClosed) continue;
       try {
-        peer.channel.writer.json(FrameType.resume, {});
+        await peer.channel.writer.json(FrameType.resume, {});
         await peer.channel.writer.flush();
       } on Object {
         // The peer may already be gone.
@@ -457,7 +511,7 @@ class TransferHost {
       peer.aborted = true;
       peer.status = TransferStatus.failed;
       try {
-        peer.channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
+        await peer.channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
         await peer.channel.writer.flush();
       } on Object {
         // Peer may already be gone.
@@ -512,6 +566,7 @@ class _HostPeer {
   bool aborted = false;
   bool sending = false;
   bool finished = false;
+  bool encrypted = false;
   List<String> selectedIds = const [];
   int transferred = 0;
   int totalBytes = 0;
@@ -532,3 +587,5 @@ class _HostPeer {
         status: status,
       );
 }
+
+const _zeroSalt = <int>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];

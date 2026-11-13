@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/models/recent_file.dart';
+import 'package:free_send/models/trusted_device.dart';
 import 'package:free_send/models/transfer_record.dart';
 
 /// Thin persistence layer over SharedPreferences: settings plus transfer
@@ -17,6 +18,9 @@ class LocalStore {
   static const _kDownloadDir = 'download_dir';
   static const _kHistory = 'history';
   static const _kRecentFiles = 'recent_files';
+  static const _kIdentitySeed = 'identity_seed';
+  static const _kIdentityKey = 'identity_key';
+  static const _kTrustedDevices = 'trusted_devices';
   static const _kAutoUpdate = 'auto_update';
   static const _kMinimizeToTray = 'minimize_to_tray';
   static const _kPermissionsPrompted = 'permissions_prompted';
@@ -163,6 +167,55 @@ class LocalStore {
     }
     records.sort((a, b) => b.addedAt.compareTo(a.addedAt));
     return records;
+  }
+
+  String? get deviceIdentitySeed => _prefs.getString(_kIdentitySeed);
+  String? get deviceIdentityKey => _prefs.getString(_kIdentityKey);
+
+  Future<void> saveDeviceIdentity({
+    required String seed,
+    required String publicKey,
+  }) async {
+    await _prefs.setString(_kIdentitySeed, seed);
+    await _prefs.setString(_kIdentityKey, publicKey);
+  }
+
+  List<TrustedDevice> get trustedDevices {
+    final raw = _prefs.getStringList(_kTrustedDevices) ?? const [];
+    final devices = <TrustedDevice>[];
+    for (final entry in raw) {
+      try {
+        final decoded = jsonDecode(entry);
+        if (decoded is Map<String, Object?>) {
+          final device = TrustedDevice.fromJson(decoded);
+          if (device != null) devices.add(device);
+        }
+      } on FormatException {
+        // Skip a corrupt entry.
+      }
+    }
+    devices.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return devices;
+  }
+
+  Future<void> trustDevice(TrustedDevice device) async {
+    final all = [device, ...trustedDevices];
+    final byId = <String, TrustedDevice>{};
+    for (final entry in all) byId[entry.instanceId] = entry;
+    await _prefs.setStringList(
+      _kTrustedDevices,
+      [for (final entry in byId.values) jsonEncode(entry.toJson())],
+    );
+  }
+
+  Future<void> forgetDevice(String instanceId) async {
+    final remaining = trustedDevices
+        .where((device) => device.instanceId != instanceId)
+        .toList(growable: false);
+    await _prefs.setStringList(
+      _kTrustedDevices,
+      [for (final device in remaining) jsonEncode(device.toJson())],
+    );
   }
 
   Future<void> addRecentFiles(Iterable<File> files) async {

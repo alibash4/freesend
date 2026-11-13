@@ -226,6 +226,7 @@ class SendController extends ChangeNotifier {
         items: items,
         deviceName: appState.deviceName,
         instanceId: appState.instanceId,
+        identityStore: appState.store,
         events: HostEvents(
           onPeersChanged: _onPeersChanged,
           onPeerFinished: _onPeerFinished,

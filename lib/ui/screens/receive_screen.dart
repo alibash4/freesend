@@ -548,6 +548,24 @@ class _ReviewView extends StatelessWidget {
             ),
           ],
         ),
+        if (controller.encrypted) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Icon(AppIcons.lock, size: 14, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Encrypted session'
+                  '${controller.securityCode == null ? '' : ' · ${controller.securityCode}'}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         FilledButton.icon(
           onPressed: selectedCount == 0 ? null : controller.beginReceive,
@@ -579,6 +597,12 @@ class _ProgressView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (controller.encrypted)
+          StatusPill(
+            label: 'Encrypted',
+            icon: AppIcons.lock,
+            color: theme.colorScheme.primary,
+          ),
         if (controller.anyPaused) ...[
           StatusPill(
             label: controller.pausedByMe ? 'Paused by you' : 'Paused by sender',

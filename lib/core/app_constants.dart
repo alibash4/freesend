@@ -4,8 +4,9 @@ abstract final class AppConstants {
   static const appTagline = 'Direct transfer. No cloud.';
 
   /// Bumped whenever the frame layout or handshake changes. Version 2 adds
-  /// folder metadata, per-file checksums, and sender-side pause/resume.
-  static const protocolVersion = 2;
+  /// folder metadata, per-file checksums, sender-side pause/resume, and
+  /// X25519/AES-GCM encryption.
+  static const protocolVersion = 3;
 
   /// UDP port used for session beacons on the local link.
   static const discoveryPort = 47810;
