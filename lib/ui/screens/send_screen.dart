@@ -45,6 +45,7 @@ class _SendScreenState extends State<SendScreen> {
     final kind = await showModalBottomSheet<_SourceKind>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) => const _SourceSheet(),
     );
     if (kind == null || !mounted) return;
@@ -86,8 +87,17 @@ class _SendScreenState extends State<SendScreen> {
         },
         allowedExtensions: kind == _SourceKind.docs
             ? const [
-                'pdf', 'doc', 'docx', 'txt', 'md', 'rtf',
-                'xls', 'xlsx', 'csv', 'ppt', 'pptx',
+                'pdf',
+                'doc',
+                'docx',
+                'txt',
+                'md',
+                'rtf',
+                'xls',
+                'xlsx',
+                'csv',
+                'ppt',
+                'pptx',
               ]
             : null,
       );
@@ -247,7 +257,8 @@ class _SendScreenState extends State<SendScreen> {
                         key: ValueKey('preparing'),
                         label: 'Opening the hotspot…',
                       ),
-                    SendPhase.waitingForPeer || SendPhase.transferring =>
+                    SendPhase.waitingForPeer ||
+                    SendPhase.transferring =>
                       _SessionView(
                         key: const ValueKey('session'),
                         controller: controller,
@@ -313,7 +324,8 @@ class _PickView extends StatelessWidget {
     final theme = Theme.of(context);
     final needle = query.trim().toLowerCase();
     final visible = controller.items
-        .where((item) => needle.isEmpty || item.name.toLowerCase().contains(needle))
+        .where((item) =>
+            needle.isEmpty || item.name.toLowerCase().contains(needle))
         .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,7 +372,8 @@ class _PickView extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(AppIcons.folderOpen, size: 17),
-                    label: Text(picking ? 'Opening…' : 'Choose files or folder'),
+                    label:
+                        Text(picking ? 'Opening…' : 'Choose files or folder'),
                   ),
                 ),
               ],
@@ -408,7 +421,9 @@ class _PickView extends StatelessWidget {
           for (final recent in controller.recents.take(6))
             if (File(recent.path).existsSync())
               InkWell(
-                onTap: picking ? null : () => controller.addFiles([File(recent.path)]),
+                onTap: picking
+                    ? null
+                    : () => controller.addFiles([File(recent.path)]),
                 child: FileTile(
                   name: recent.name,
                   size: recent.size,
@@ -523,7 +538,8 @@ class _SessionView extends StatelessWidget {
                       : controller.hasPeer
                           ? '${controller.peerName ?? 'Device'} connected'
                           : 'Waiting for a device',
-              icon: paused ? AppIcons.stop : (transferring ? AppIcons.zap : null),
+              icon:
+                  paused ? AppIcons.stop : (transferring ? AppIcons.zap : null),
               color: transferring ? theme.colorScheme.primary : null,
             ),
             const Spacer(),
@@ -897,7 +913,9 @@ class _AppsSheet extends StatelessWidget {
                     leading: const Icon(AppIcons.package),
                     title: Text(app.name),
                     subtitle: Text(
-                      app.version.isEmpty ? 'Installed app' : 'Version ${app.version}',
+                      app.version.isEmpty
+                          ? 'Installed app'
+                          : 'Version ${app.version}',
                     ),
                     onTap: () => Navigator.of(context).pop(app),
                   );
@@ -918,62 +936,69 @@ class _SourceSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
-              AppSpacing.lg,
-              AppSpacing.sm,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'Add to this transfer',
+                style: theme.textTheme.titleLarge,
+              ),
             ),
-            child: Text('Add to this transfer', style: theme.textTheme.titleLarge),
-          ),
-          ListTile(
-            leading: const Icon(AppIcons.folderOpen),
-            title: const Text('Files'),
-            subtitle: const Text('Any file type'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.any),
-          ),
-          if (Platform.isAndroid || Platform.isMacOS)
             ListTile(
-              leading: const Icon(AppIcons.image),
-              title: const Text('Media library'),
-              subtitle: const Text('Photos, videos, and audio with thumbnails'),
-              onTap: () => Navigator.of(context).pop(_SourceKind.media),
+              leading: const Icon(AppIcons.folderOpen),
+              title: const Text('Files'),
+              subtitle: const Text('Any file type'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.any),
             ),
-          ListTile(
-            leading: const Icon(AppIcons.video),
-            title: const Text('Videos'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.videos),
-          ),
-          ListTile(
-            leading: const Icon(AppIcons.music),
-            title: const Text('Audio'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.audio),
-          ),
-          ListTile(
-            leading: const Icon(AppIcons.fileText),
-            title: const Text('Documents'),
-            subtitle: const Text('PDF, Office, text, CSV'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.docs),
-          ),
-          ListTile(
-            leading: const Icon(AppIcons.package),
-            title: const Text('Apps'),
-            subtitle: const Text('Installable app bundles on this device'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.apps),
-          ),
-          ListTile(
-            leading: const Icon(AppIcons.folder),
-            title: const Text('Folder'),
-            subtitle: const Text('Send a whole folder tree'),
-            onTap: () => Navigator.of(context).pop(_SourceKind.folder),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
+            if (Platform.isAndroid || Platform.isMacOS)
+              ListTile(
+                leading: const Icon(AppIcons.image),
+                title: const Text('Media library'),
+                subtitle:
+                    const Text('Photos, videos, and audio with thumbnails'),
+                onTap: () => Navigator.of(context).pop(_SourceKind.media),
+              ),
+            ListTile(
+              leading: const Icon(AppIcons.video),
+              title: const Text('Videos'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.videos),
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.music),
+              title: const Text('Audio'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.audio),
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.fileText),
+              title: const Text('Documents'),
+              subtitle: const Text('PDF, Office, text, CSV'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.docs),
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.package),
+              title: const Text('Apps'),
+              subtitle: const Text('Installable app bundles on this device'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.apps),
+            ),
+            ListTile(
+              leading: const Icon(AppIcons.folder),
+              title: const Text('Folder'),
+              subtitle: const Text('Send a whole folder tree'),
+              onTap: () => Navigator.of(context).pop(_SourceKind.folder),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ),
       ),
     );
   }
