@@ -21,7 +21,7 @@ class TrayController with TrayListener, WindowListener {
   bool _initialized = false;
   bool _quitting = false;
 
-  static const _tooltip = 'Free Send';
+  static const _tooltip = 'FreeSend';
 
   Future<void> init() async {
     if (_initialized || !PlatformEnv.supportsTray) return;
@@ -52,8 +52,9 @@ class TrayController with TrayListener, WindowListener {
 
   String get _iconAsset {
     if (Platform.isWindows) return 'assets/tray/app_icon.ico';
-    if (Platform.isLinux) return 'assets/tray/app_icon_32_white.png';
-    return 'assets/tray/app_icon_64.png';
+    // Full-bleed at a generous size: the tray host scales it to its own
+    // height, so padding would only shrink the mark.
+    return 'assets/tray/app_icon_256.png';
   }
 
   Future<void> _setMenu() async {
@@ -62,13 +63,13 @@ class TrayController with TrayListener, WindowListener {
         items: [
           MenuItem(
             key: 'open',
-            label: 'Open Free Send',
+            label: 'Open FreeSend',
             onClick: (_) => unawaited(showWindow()),
           ),
           MenuItem.separator(),
           MenuItem(
             key: 'quit',
-            label: 'Quit Free Send',
+            label: 'Quit FreeSend',
             onClick: (_) => unawaited(quit()),
           ),
         ],
