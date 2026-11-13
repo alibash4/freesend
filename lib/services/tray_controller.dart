@@ -32,7 +32,10 @@ class TrayController with TrayListener, WindowListener {
       trayManager.addListener(this);
 
       await trayManager.setIcon(_iconAsset);
-      await trayManager.setToolTip(_tooltip);
+      if (Platform.isWindows) {
+        // tray_manager has no Linux tooltip implementation.
+        await trayManager.setToolTip(_tooltip);
+      }
       await _setMenu();
 
       // Only intercept close once the icon exists: a hidden window with no
@@ -47,9 +50,11 @@ class TrayController with TrayListener, WindowListener {
     }
   }
 
-  String get _iconAsset => Platform.isWindows
-      ? 'assets/tray/app_icon.ico'
-      : 'assets/tray/app_icon_64.png';
+  String get _iconAsset {
+    if (Platform.isWindows) return 'assets/tray/app_icon.ico';
+    if (Platform.isLinux) return 'assets/tray/app_icon_32_white.png';
+    return 'assets/tray/app_icon_64.png';
+  }
 
   Future<void> _setMenu() async {
     await trayManager.setContextMenu(
@@ -82,7 +87,9 @@ class TrayController with TrayListener, WindowListener {
   Future<void> quit() async {
     if (_quitting) return;
     _quitting = true;
-    await trayManager.destroy();
+    if (!Platform.isLinux) {
+      await trayManager.destroy();
+    }
     await windowManager.setPreventClose(false);
     await windowManager.destroy();
   }

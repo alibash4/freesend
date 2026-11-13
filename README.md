@@ -46,8 +46,9 @@ lifecycle and there is no close-to-tray toggle.
 Linux builds need the tray library at build time and run time:
 
 ```bash
-sudo apt install libayatana-appindicator3-dev      # Debian/Ubuntu build
-sudo dnf install libayatana-appindicator-gtk3      # Fedora runtime
+sudo apt install libayatana-appindicator3-dev        # Debian/Ubuntu build
+sudo dnf install libayatana-appindicator-gtk3-devel  # Fedora build
+sudo dnf install libayatana-appindicator-gtk3        # Fedora runtime
 ```
 
 The iOS target was removed from this repository: Apple does not allow an app to
