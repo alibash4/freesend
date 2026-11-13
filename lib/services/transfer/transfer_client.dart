@@ -175,7 +175,7 @@ class TransferClient {
   }
 
   /// Writes every accepted file under [downloadRoot], creating a
-  /// `Free Send` subfolder when the root is a shared directory.
+  /// `FreeSend` subfolder when the root is a shared directory.
   Future<void> receive({
     required List<String> ids,
     required String downloadRoot,

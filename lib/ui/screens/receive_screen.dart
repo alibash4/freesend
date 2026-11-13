@@ -83,7 +83,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('That is not a Free Send pairing code.'),
+            content: Text('That is not a FreeSend pairing code.'),
           ),
         );
       return;

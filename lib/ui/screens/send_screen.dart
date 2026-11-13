@@ -660,7 +660,7 @@ class _SessionView extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    'On the other device, open Free Send, choose Receive, and '
+                    'On the other device, open FreeSend, choose Receive, and '
                     'scan the code above — or join this hotspot and the session '
                     'appears on its own.',
                     style: theme.textTheme.bodySmall?.copyWith(

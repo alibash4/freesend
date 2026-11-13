@@ -44,7 +44,7 @@ class PairingCard extends StatelessWidget {
               dataModuleShape: QrDataModuleShape.square,
               color: AppColors.ink,
             ),
-            semanticsLabel: 'Free Send pairing code',
+            semanticsLabel: 'FreeSend pairing code',
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -57,9 +57,9 @@ class PairingCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(
           code.hasHotspot
-              ? 'On the other device, open Free Send, choose Receive, and scan '
+              ? 'On the other device, open FreeSend, choose Receive, and scan '
                   'this. It joins the hotspot and connects on its own.'
-              : 'On the other device, open Free Send, choose Receive, and scan '
+              : 'On the other device, open FreeSend, choose Receive, and scan '
                   'this to connect without typing an address.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall,

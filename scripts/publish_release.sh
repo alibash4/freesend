@@ -29,18 +29,18 @@ VERSION="${CI_COMMIT_TAG#v}"
 
 # link name|uploaded file name|directory|built artifact
 ASSETS="
-Free Send for Android (32-bit)|${PROJECT_NAME}-${VERSION}-android-32bit.apk|${APK_DIR}|app-armeabi-v7a-release.apk
-Free Send for Android (64-bit)|${PROJECT_NAME}-${VERSION}-android-64bit.apk|${APK_DIR}|app-arm64-v8a-release.apk
-Free Send for Android (universal)|${PROJECT_NAME}-${VERSION}-android-universal.apk|${APK_DIR}|app-release.apk
-Free Send for Linux x86_64 (AppImage)|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage
-Free Send for Linux x86_64 (deb)|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb
-Free Send for Linux x86_64 (rpm)|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm
-Free Send for Linux x86_64 (bundle)|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz
-Free Send for Linux aarch64 (AppImage)|${PROJECT_NAME}-${VERSION}-linux-aarch64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.AppImage
-Free Send for Linux aarch64 (deb)|${PROJECT_NAME}-${VERSION}-linux-aarch64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.deb
-Free Send for Linux aarch64 (rpm)|${PROJECT_NAME}-${VERSION}-linux-aarch64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.rpm
-Free Send for Linux aarch64 (bundle)|${PROJECT_NAME}-${VERSION}-linux-aarch64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.tar.gz
-Free Send for Windows (exe)|${PROJECT_NAME}-${VERSION}-windows-x64.zip|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-windows-x64.zip
+FreeSend for Android (32-bit)|${PROJECT_NAME}-${VERSION}-android-32bit.apk|${APK_DIR}|app-armeabi-v7a-release.apk
+FreeSend for Android (64-bit)|${PROJECT_NAME}-${VERSION}-android-64bit.apk|${APK_DIR}|app-arm64-v8a-release.apk
+FreeSend for Android (universal)|${PROJECT_NAME}-${VERSION}-android-universal.apk|${APK_DIR}|app-release.apk
+FreeSend for Linux x86_64 (AppImage)|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.AppImage
+FreeSend for Linux x86_64 (deb)|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.deb
+FreeSend for Linux x86_64 (rpm)|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.rpm
+FreeSend for Linux x86_64 (bundle)|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-x86_64.tar.gz
+FreeSend for Linux aarch64 (AppImage)|${PROJECT_NAME}-${VERSION}-linux-aarch64.AppImage|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.AppImage
+FreeSend for Linux aarch64 (deb)|${PROJECT_NAME}-${VERSION}-linux-aarch64.deb|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.deb
+FreeSend for Linux aarch64 (rpm)|${PROJECT_NAME}-${VERSION}-linux-aarch64.rpm|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.rpm
+FreeSend for Linux aarch64 (bundle)|${PROJECT_NAME}-${VERSION}-linux-aarch64.tar.gz|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-linux-aarch64.tar.gz
+FreeSend for Windows (exe)|${PROJECT_NAME}-${VERSION}-windows-x64.zip|${DIST_DIR}|${PROJECT_NAME}-${VERSION}-windows-x64.zip
 "
 
 # Changelog: every commit since the previous tag, newest first. Only used when

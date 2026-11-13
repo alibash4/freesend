@@ -8,7 +8,7 @@ import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 
-/// Full-screen QR reader. Pops the parsed [PairingCode] as soon as a Free Send
+/// Full-screen QR reader. Pops the parsed [PairingCode] as soon as a FreeSend
 /// payload is recognised, or null when the user backs out.
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -116,7 +116,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                   child: Text(
                     _unrecognised
-                        ? 'That code is not from Free Send. Point the camera at '
+                        ? 'That code is not from FreeSend. Point the camera at '
                             'the code on the sending device.'
                         : 'Point the camera at the code on the sending device.',
                     textAlign: TextAlign.center,
@@ -164,7 +164,7 @@ class _ScanScreenState extends State<ScanScreen> {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 denied
-                    ? 'Free Send needs the camera only to read the pairing code. '
+                    ? 'FreeSend needs the camera only to read the pairing code. '
                         'Allow it in system settings, or type the code instead.'
                     : detail ??
                         'Another app may be using the camera. You can also type '

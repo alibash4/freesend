@@ -206,7 +206,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _UpdateRow(
                   label: 'Minimize to tray on close',
                   subtitle:
-                      'Keep Free Send running in the tray when the window is '
+                      'Keep FreeSend running in the tray when the window is '
                       'closed.',
                   value: appState.minimizeToTray,
                   onChanged: (value) => appState.setMinimizeToTray(value),
@@ -215,7 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const SectionHeader(title: 'Data'),
               Text(
-                'Free Send keeps a local list of past transfers and nothing '
+                'FreeSend keeps a local list of past transfers and nothing '
                 'else. Files are never uploaded — the two devices talk '
                 'directly over the hotspot link.',
                 style: theme.textTheme.bodySmall,
@@ -236,7 +236,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _UpdateRow(
                 label: 'Check automatically',
                 subtitle:
-                    'Look for a newer release every time Free Send starts.',
+                    'Look for a newer release every time FreeSend starts.',
                 value: appState.autoUpdate,
                 onChanged: (value) async {
                   await appState.setAutoUpdate(value);

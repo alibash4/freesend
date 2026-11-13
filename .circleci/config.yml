@@ -42,7 +42,7 @@ jobs:
             cp -R "$APP" "$STAGE/"
             ln -s /Applications "$STAGE/Applications"
             hdiutil create \
-              -volname "Free Send" \
+              -volname "FreeSend" \
               -srcfolder "$STAGE" \
               -fs HFS+ \
               -format UDZO \
@@ -60,7 +60,7 @@ jobs:
             : "${CIRCLE_TAG:?This job only runs on tags.}"
 
             GITLAB_API="https://gitlab.com/api/v4/projects/88767048"
-            ASSET_NAME="Free Send for macOS (dmg)"
+            ASSET_NAME="FreeSend for macOS (dmg)"
             FILE="dist/freesend-macos.dmg"
 
             if [ ! -f "$FILE" ]; then

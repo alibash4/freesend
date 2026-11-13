@@ -1,6 +1,6 @@
-/// Wire-level and app-wide constants for Free Send.
+/// Wire-level and app-wide constants for FreeSend.
 abstract final class AppConstants {
-  static const appName = 'Free Send';
+  static const appName = 'FreeSend';
   static const appVersion = '1.7.3';
   static const appTagline = 'Direct transfer. No cloud.';
 

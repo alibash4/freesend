@@ -15,7 +15,7 @@ desktops.
 
 ## Product Purpose
 
-Free Send moves files directly between devices over a local link. It exists so
+FreeSend moves files directly between devices over a local link. It exists so
 a transfer does not depend on an account, an upload, a subscription, or a
 content feed. Success is a predictable, resumable transfer that arrives intact
 and works the same way on every supported platform.
@@ -82,7 +82,7 @@ Resolved implementation decisions:
 
 ## Brand Commitments
 
-Name: Free Send. Promise: direct transfer, no cloud. The current restrained
+Name: FreeSend. Promise: direct transfer, no cloud. The current restrained
 accent-and-neutral visual system stays the baseline; the user chose features
 first, so this pass does not replace the visual world.
 

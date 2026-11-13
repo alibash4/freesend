@@ -218,7 +218,7 @@ class SendController extends ChangeNotifier {
       hotspot = await _hotspotService.start(deviceName: appState.deviceName);
       if (hotspot!.note != null) {
         // Surfaced in the connection panel, not as an error.
-        debugPrint('Free Send: ${hotspot!.note}');
+        debugPrint('FreeSend: ${hotspot!.note}');
       }
 
       final bindAddress = hotspot?.ip ?? await localIpv4();
@@ -258,7 +258,7 @@ class SendController extends ChangeNotifier {
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
-      _fail('Could not open the transfer listener. Allow Free Send through the system '
+      _fail('Could not open the transfer listener. Allow FreeSend through the system '
           'firewall on private networks, then try again (${error.message}).');
     } on Object catch (error) {
       _fail('Could not start sharing: $error');

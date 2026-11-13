@@ -84,7 +84,7 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, _) => MaterialApp(
-        title: 'Free Send',
+        title: 'FreeSend',
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
         theme: AppTheme.light(),

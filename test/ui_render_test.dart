@@ -437,7 +437,7 @@ void main() {
                     'assets': {
                       'links': [
                         {
-                          'name': 'Free Send for Linux',
+                          'name': 'FreeSend for Linux',
                           'direct_asset_url':
                               'https://gitlab.com/a/freesend.AppImage',
                         },
@@ -469,7 +469,7 @@ void main() {
     unawaited(UpdateSheet.show(tester.element(find.byType(AppShell))));
     await tester.pumpAndSettle();
 
-    expect(find.text('Free Send 9.9.9 is available'), findsOneWidget);
+    expect(find.text('FreeSend 9.9.9 is available'), findsOneWidget);
     expect(find.text('Faster handshakes and a new icon.'), findsOneWidget);
     expect(find.text('Download update'), findsOneWidget);
     expect(tester.takeException(), isNull);

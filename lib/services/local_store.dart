@@ -116,7 +116,7 @@ class LocalStore {
       downloads = null;
     }
     downloads ??= await getApplicationDocumentsDirectory();
-    return Directory('${downloads.path}${Platform.pathSeparator}Free Send');
+    return Directory('${downloads.path}${Platform.pathSeparator}FreeSend');
   }
 
   List<TransferRecord> get history {

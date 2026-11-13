@@ -12,7 +12,7 @@ import 'package:free_send/ui/widgets/common.dart';
 
 /// First-launch runtime permission gate for Android.
 ///
-/// The user can allow the permissions or continue without them; Free Send
+/// The user can allow the permissions or continue without them; FreeSend
 /// still works for manual-address transfers and the file picker when the OS
 /// denies the discovery/camera grants.
 class PermissionsScreen extends StatefulWidget {
@@ -106,7 +106,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Free Send needs access to the local link and camera to find '
+              'FreeSend needs access to the local link and camera to find '
               'nearby devices and scan pairing codes. Nothing leaves your '
               'network.',
               style: theme.textTheme.bodyMedium,
@@ -117,7 +117,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 icon: AppIcons.wifi,
                 title: 'Location / nearby devices',
                 body: 'Required by Android to create or join a hotspot and '
-                    'discover other Free Send devices.',
+                    'discover other FreeSend devices.',
                 status: _statusFor(Permission.locationWhenInUse),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -140,7 +140,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             _PermissionRow(
               icon: AppIcons.info,
               title: 'Notifications',
-              body: 'Shows transfer progress while Free Send is in the '
+              body: 'Shows transfer progress while FreeSend is in the '
                   'background.',
               status: _statusFor(Permission.notification),
             ),
@@ -175,7 +175,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Permissions granted. Free Send is ready.',
+                        'Permissions granted. FreeSend is ready.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppColors.success,
                         ),

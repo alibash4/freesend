@@ -56,7 +56,7 @@ class UpdateSheet extends StatelessWidget {
                 Text(
                   update == null
                       ? 'Checking for updates'
-                      : 'Free Send ${update.version} is available',
+                      : 'FreeSend ${update.version} is available',
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 2),

@@ -64,7 +64,7 @@ class PairingCode {
     ).toString();
   }
 
-  /// Returns null for anything that is not a Free Send pairing payload, so a QR
+  /// Returns null for anything that is not a FreeSend pairing payload, so a QR
   /// code belonging to some other app is ignored instead of half-applied.
   static PairingCode? tryParse(String raw) {
     final text = raw.trim();

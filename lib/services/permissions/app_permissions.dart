@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:permission_handler/permission_handler.dart';
 
-/// The runtime permissions Free Send needs on its mobile builds.
+/// The runtime permissions FreeSend needs on its mobile builds.
 ///
 /// Desktop builds do not have a runtime permission prompt for local sockets,
 /// the tray, or the file picker, so [isMobile] is the gate the UI uses.
@@ -47,6 +47,6 @@ abstract final class AppPermissions {
   /// explains it instead of pretending to request it.
   static String get localNetworkNote => Platform.isIOS
       ? 'iOS will ask for local network access the first time you open Receive '
-          'or start a transfer. Allow it so Free Send can find the other device.'
+          'or start a transfer. Allow it so FreeSend can find the other device.'
       : '';
 }

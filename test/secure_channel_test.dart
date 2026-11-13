@@ -16,8 +16,8 @@ void main() {
 
     final hostCipher = SecureChannel(hostKey);
     final clientCipher = SecureChannel(clientKey);
-    final sealed = await hostCipher.seal(utf8.encode('hello Free Send'));
-    expect(utf8.decode(await clientCipher.open(sealed)), 'hello Free Send');
+    final sealed = await hostCipher.seal(utf8.encode('hello FreeSend'));
+    expect(utf8.decode(await clientCipher.open(sealed)), 'hello FreeSend');
   });
 
   test('a tampered frame is rejected', () async {

@@ -132,7 +132,7 @@ class TransferHost {
       final version = (payload['v'] as num?)?.toInt() ?? 1;
       if (version < 1 || version > AppConstants.protocolVersion) {
         await channel.writer.error(
-          'Version mismatch: this device speaks Free Send protocol '
+          'Version mismatch: this device speaks FreeSend protocol '
           'v$AppConstants.protocolVersion',
         );
         await channel.close();

@@ -73,7 +73,7 @@ Version: ${VERSION}
 Section: net
 Priority: optional
 Architecture: ${DEB_ARCH}
-Maintainer: Free Send <freesend@localhost>
+Maintainer: FreeSend <freesend@localhost>
 Installed-Size: ${INSTALLED_SIZE}
 Depends: libgtk-3-0, libayatana-appindicator3-1 | libappindicator3-1
 Description: Direct, hotspot-only file transfer.
