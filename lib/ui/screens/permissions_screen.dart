@@ -138,6 +138,14 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               const SizedBox(height: AppSpacing.md),
             ],
             _PermissionRow(
+              icon: AppIcons.info,
+              title: 'Notifications',
+              body: 'Shows transfer progress while Free Send is in the '
+                  'background.',
+              status: _statusFor(Permission.notification),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _PermissionRow(
               icon: AppIcons.scan,
               title: 'Camera',
               body: 'Only used to scan a pairing QR code. You can still pair '

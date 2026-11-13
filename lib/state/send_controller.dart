@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
@@ -12,6 +13,7 @@ import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_host.dart';
 import 'package:free_send/state/app_state.dart';
 
@@ -53,6 +55,7 @@ class SendController extends ChangeNotifier {
   bool paused = false;
 
   TransferHost? _host;
+  final TransferForeground _foreground = TransferForeground();
   Stopwatch? _stopwatch;
   DateTime? _lastSampleAt;
   int _lastSampleBytes = 0;
@@ -209,6 +212,10 @@ class SendController extends ChangeNotifier {
       );
       port = await host.start();
       _host = host;
+      await _foreground.start(
+        title: 'Ready to share',
+        text: '${items.length} file${items.length == 1 ? '' : 's'} · waiting for a receiver',
+      );
 
       await _broadcaster.start(
         instanceId: appState.instanceId,
@@ -303,6 +310,10 @@ class SendController extends ChangeNotifier {
     currentFileName = item.name;
     item.status = TransferStatus.active;
     sentBytes = items.fold<int>(0, (sum, entry) => sum + entry.transferred);
+    unawaited(_foreground.update(
+      title: 'Sending ${formatBytes(sentBytes)} of ${formatBytes(totalBytes)}',
+      text: currentFileName,
+    ));
     _sampleSpeed();
     if (phase != SendPhase.transferring) {
       phase = SendPhase.transferring;
@@ -354,6 +365,7 @@ class SendController extends ChangeNotifier {
       }
     }
     phase = SendPhase.completed;
+    unawaited(_foreground.stop());
     _finishSession(files: fileCount, bytes: bytes, duration: elapsed, ok: true);
     notifyListeners();
   }
@@ -366,6 +378,7 @@ class SendController extends ChangeNotifier {
   void _fail(String message) {
     errorMessage = message;
     phase = SendPhase.failed;
+    unawaited(_foreground.stop());
     unawaited(_teardown());
     notifyListeners();
   }
@@ -376,6 +389,7 @@ class SendController extends ChangeNotifier {
     final files = items.where((item) => item.transferred > 0).length;
     phase = SendPhase.cancelled;
     paused = false;
+    unawaited(_foreground.stop());
     notifyListeners();
     await _teardown();
     if (bytes > 0) {
@@ -411,6 +425,7 @@ class SendController extends ChangeNotifier {
   }
 
   Future<void> _teardown() async {
+    await _foreground.stop();
     await _broadcaster.stop();
     await _host?.dispose();
     _host = null;

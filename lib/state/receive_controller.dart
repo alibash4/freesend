@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/core/format.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
@@ -11,6 +12,7 @@ import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/transfer/transfer_client.dart';
+import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_recovery.dart';
 import 'package:free_send/state/app_state.dart';
 
@@ -34,6 +36,7 @@ class ReceiveController extends ChangeNotifier {
   final AppState appState;
   final HotspotService _hotspotService;
   final SessionScanner _scanner = SessionScanner();
+  final TransferForeground _foreground = TransferForeground();
 
   ReceivePhase phase = ReceivePhase.idle;
   List<DiscoveredSession> sessions = const [];
@@ -308,6 +311,10 @@ class ReceiveController extends ChangeNotifier {
     _recoveryDone = false;
     _recovery ??= TransferRecovery(saveLocation);
     phase = ReceivePhase.transferring;
+    await _foreground.start(
+      title: 'Receiving files',
+      text: '${selectedIds.length} file${selectedIds.length == 1 ? '' : 's'} · ${formatBytes(totalBytes)}',
+    );
     notifyListeners();
 
     try {
@@ -455,6 +462,10 @@ class ReceiveController extends ChangeNotifier {
       _lastSampleAt = null;
       _lastSampleBytes = receivedBytes;
       phase = ReceivePhase.transferring;
+      await _foreground.start(
+        title: 'Retrying transfer',
+        text: '${retryIds.length} file${retryIds.length == 1 ? '' : 's'} failed earlier',
+      );
       notifyListeners();
       await client.receive(
         ids: retryIds.toList(growable: false),
@@ -503,6 +514,10 @@ class ReceiveController extends ChangeNotifier {
     _mergeItem(item);
     currentFileName = item.name;
     receivedBytes = bytes;
+    unawaited(_foreground.update(
+      title: 'Receiving ${formatBytes(receivedBytes)} of ${formatBytes(totalBytes)}',
+      text: currentFileName,
+    ));
     _maybeSaveRecovery();
     _sampleSpeed();
     notifyListeners();
@@ -536,6 +551,7 @@ class ReceiveController extends ChangeNotifier {
     receivedBytes = bytes;
     totalBytes = totalBytes == 0 ? bytes : totalBytes;
     phase = ReceivePhase.completed;
+    unawaited(_foreground.stop());
     _recoveryDone = true;
     _recoveryEntries.clear();
     resumeOffsets.clear();
@@ -597,6 +613,7 @@ class ReceiveController extends ChangeNotifier {
     }
     errorMessage = message;
     phase = ReceivePhase.failed;
+    unawaited(_foreground.stop());
     unawaited(_saveRecovery());
     notifyListeners();
   }
@@ -632,6 +649,7 @@ class ReceiveController extends ChangeNotifier {
       final bytes = receivedBytes;
       final files = receivedItems.where((item) => item.done).length;
       pausedByMe = false;
+      unawaited(_foreground.stop());
       await _saveRecovery();
       await _client?.cancel();
       _client = null;
@@ -676,6 +694,7 @@ class ReceiveController extends ChangeNotifier {
       item.status = TransferStatus.pending;
     }
     phase = ReceivePhase.idle;
+    unawaited(_foreground.stop());
     notifyListeners();
   }
 
@@ -683,6 +702,7 @@ class ReceiveController extends ChangeNotifier {
   void dispose() {
     unawaited(_scanSubscription?.cancel());
     unawaited(_scanner.stop());
+    unawaited(_foreground.stop());
     unawaited(_saveRecovery());
     unawaited(_client?.dispose());
     super.dispose();

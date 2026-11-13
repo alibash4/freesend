@@ -15,6 +15,7 @@ abstract final class AppPermissions {
         Permission.locationWhenInUse,
         Permission.nearbyWifiDevices,
         Permission.camera,
+        Permission.notification,
       ];
     }
     if (Platform.isIOS) {
