@@ -14,6 +14,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:free_send/models/peer_info.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/pairing_code.dart';
@@ -101,6 +102,9 @@ void main() {
             theme: _withFont(light),
             darkTheme: _withFont(dark),
             themeMode: state.themeMode,
+            locale: const Locale('en'),
+            supportedLocales: const [Locale('en'), Locale('ar')],
+            localizationsDelegates: [AppLocalizations.delegate],
             home: home,
           ),
         ),

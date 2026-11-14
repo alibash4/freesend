@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -30,22 +31,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _clear(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear history?'),
-        content: const Text(
-          'This only removes the local list of past transfers. Received files '
-          'stay on disk.',
-        ),
+        title: Text(l10n.clearHistoryTitle),
+        content: Text(l10n.clearHistoryBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n.clearHistoryConfirm),
           ),
         ],
       ),
@@ -60,6 +59,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final theme = Theme.of(context);
     final appState = context.watch<AppState>();
     final records = appState.history;
+    final l10n = AppLocalizations.of(context);
 
     final totalBytes = records.fold<int>(0, (sum, record) => sum + record.bytes);
 
@@ -72,12 +72,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Row(
             children: [
               Expanded(
-                child: const AppPageTitle('History'),
+                child: AppPageTitle(l10n.history),
               ),
               if (records.isNotEmpty)
                 TextButton(
                   onPressed: () => _clear(context),
-                  child: const Text('Clear'),
+                  child: Text(l10n.clear),
                 ),
             ],
           ),
@@ -86,9 +86,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           padding: kPagePadding.copyWith(top: AppSpacing.xs),
           child: Text(
             records.isEmpty
-                ? 'Nothing has moved yet.'
-                : '${formatCount(records.length, 'transfer')} · '
-                    '${formatBytes(totalBytes)} moved',
+                ? l10n.nothingMoved
+                : l10n.transfersMoved(records.length, formatBytes(totalBytes)),
             style: theme.textTheme.bodySmall,
           ),
         ),
@@ -98,11 +97,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             padding: kPagePadding,
              child: EmptyState(
                icon: AppIcons.history,
-              title: 'No history',
-              message:
-                  'Completed and cancelled transfers are recorded here, on this '
-                  'device only.',
-            ),
+               title: l10n.noHistoryTitle,
+               message: l10n.noHistoryMessage,
+             ),
           )
         else
           Padding(
@@ -131,6 +128,7 @@ class _RecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final isSend = record.direction == TransferDirection.send;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -169,8 +167,8 @@ class _RecordCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${isSend ? 'Sent' : 'Received'} · '
-                  '${formatCount(record.fileCount, 'file')} · '
+                  '${isSend ? l10n.sent : l10n.received} · '
+                  '${l10n.fileCount(record.fileCount)} · '
                   '${formatSpeed(record.averageBytesPerSecond)}',
                   style: theme.textTheme.bodySmall,
                 ),
@@ -184,7 +182,9 @@ class _RecordCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.sm),
                     if (!record.succeeded)
                       StatusPill(
-                        label: record.bytes > 0 ? 'Interrupted' : 'Failed',
+                        label: record.bytes > 0
+                            ? l10n.interrupted
+                            : l10n.failed,
                         color: scheme.error,
                       ),
                   ],

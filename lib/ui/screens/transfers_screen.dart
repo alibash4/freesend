@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/state/app_state.dart';
@@ -43,6 +44,7 @@ class _TransfersScreenState extends State<TransfersScreen> {
     final receive = context.watch<ReceiveController>();
     final appState = context.watch<AppState>();
     final records = appState.history;
+    final l10n = AppLocalizations.of(context);
     final hasActive = send.isBusy ||
         receive.phase == ReceivePhase.transferring ||
         receive.phase == ReceivePhase.reviewing;
@@ -53,13 +55,13 @@ class _TransfersScreenState extends State<TransfersScreen> {
       children: [
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.md),
-          child: const AppPageTitle('Transfers'),
+          child: AppPageTitle(l10n.transfers),
         ),
         if (hasActive) ...[
           Padding(
             padding: kPagePadding.copyWith(top: AppSpacing.xs),
             child: Text(
-              'Live on this device',
+              l10n.liveOnThisDevice,
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -84,21 +86,23 @@ class _TransfersScreenState extends State<TransfersScreen> {
             padding: kPagePadding,
              child: EmptyState(
                icon: AppIcons.zap,
-              title: 'Nothing transferring',
-              message:
-                  'Start a send or receive and the live transfer, its queue, '
-                  'and its controls will appear here.',
-            ),
+               title: l10n.nothingTransferring,
+               message: l10n.nothingTransferringMessage,
+             ),
           ),
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.xs),
           child: SectionHeader(
-            title: 'Recent',
+            title: l10n.recent,
             action: records.isEmpty
                 ? null
                 : Text(
-                    '${formatCount(records.length, 'transfer')} · '
-                    '${formatBytes(records.fold<int>(0, (sum, r) => sum + r.bytes))}',
+                    l10n.transfersMoved(
+                      records.length,
+                      formatBytes(
+                        records.fold<int>(0, (sum, r) => sum + r.bytes),
+                      ),
+                    ),
                     style: theme.textTheme.bodySmall,
                   ),
           ),
@@ -108,11 +112,9 @@ class _TransfersScreenState extends State<TransfersScreen> {
             padding: kPagePadding,
              child: EmptyState(
                icon: AppIcons.history,
-              title: 'No history yet',
-              message:
-                  'Finished and cancelled transfers are recorded here, on this '
-                  'device only.',
-            ),
+               title: l10n.noHistoryYetTitle,
+               message: l10n.noHistoryYetMessage,
+             ),
           )
         else
           Padding(
@@ -140,6 +142,7 @@ class _SendTransferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,10 +151,12 @@ class _SendTransferCard extends StatelessWidget {
             children: [
               StatusPill(
                 label: controller.paused
-                    ? 'Paused'
+                    ? l10n.paused
                     : controller.hasPeer
-                        ? 'Sending to ${controller.peerName ?? 'device'}'
-                        : 'Waiting for a device',
+                        ? l10n.sendingTo(
+                            controller.peerName ?? l10n.device,
+                          )
+                        : l10n.waitingForDevice,
                 color: controller.paused
                     ? theme.colorScheme.onSurfaceVariant
                     : theme.colorScheme.primary,
@@ -159,7 +164,7 @@ class _SendTransferCard extends StatelessWidget {
               ),
               const Spacer(),
               if (controller.peerCount > 1)
-                StatusPill(label: '${controller.peerCount} devices'),
+                StatusPill(label: l10n.deviceCount(controller.peerCount)),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -174,13 +179,13 @@ class _SendTransferCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _Metric(
-                  label: 'Speed',
+                  label: l10n.speed,
                   value: formatSpeed(controller.speedBytesPerSecond),
                 ),
               ),
               Expanded(
                 child: _Metric(
-                  label: 'Remaining',
+                  label: l10n.remaining,
                   value: formatEta(
                     controller.remainingBytes,
                     controller.speedBytesPerSecond,
@@ -189,7 +194,7 @@ class _SendTransferCard extends StatelessWidget {
               ),
               Expanded(
                 child: _Metric(
-                  label: 'Files',
+                  label: l10n.files,
                   value: '${controller.items.length}',
                 ),
               ),
@@ -207,7 +212,7 @@ class _SendTransferCard extends StatelessWidget {
               name: item.name,
               size: item.size,
               progress: item.progress,
-              subtitle: _statusLabel(item),
+              subtitle: _statusLabel(l10n, item),
               trailing: item.status == TransferStatus.done
                   ? Icon(
                       AppIcons.check,
@@ -225,7 +230,7 @@ class _SendTransferCard extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: controller.resumeTransfer,
                     icon: Icon(AppIcons.forward, size: 17),
-                    label: const Text('Resume'),
+                    label: Text(l10n.resume),
                   ),
                 )
               else
@@ -235,7 +240,7 @@ class _SendTransferCard extends StatelessWidget {
                         ? controller.pauseTransfer
                         : null,
                     icon: Icon(AppIcons.stop, size: 17),
-                    label: const Text('Pause'),
+                    label: Text(l10n.pause),
                   ),
                 ),
               const SizedBox(width: AppSpacing.sm),
@@ -243,7 +248,7 @@ class _SendTransferCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: controller.cancelSession,
                   icon: Icon(AppIcons.close, size: 17),
-                  label: const Text('Stop'),
+                  label: Text(l10n.stop),
                 ),
               ),
             ],
@@ -253,15 +258,18 @@ class _SendTransferCard extends StatelessWidget {
     );
   }
 
-  String _statusLabel(TransferItem item) {
+  String _statusLabel(AppLocalizations l10n, TransferItem item) {
     return switch (item.status) {
-      TransferStatus.done =>
-        '${formatBytes(item.size)} · sent',
-      TransferStatus.paused =>
-        '${formatBytes(item.transferred)} of ${formatBytes(item.size)} · paused',
-      TransferStatus.failed => 'Failed',
-      TransferStatus.active =>
-        '${formatBytes(item.transferred)} of ${formatBytes(item.size)}',
+      TransferStatus.done => l10n.statusSent(formatBytes(item.size)),
+      TransferStatus.paused => l10n.statusPaused(
+          formatBytes(item.transferred),
+          formatBytes(item.size),
+        ),
+      TransferStatus.failed => l10n.failed,
+      TransferStatus.active => l10n.statusActive(
+          formatBytes(item.transferred),
+          formatBytes(item.size),
+        ),
       TransferStatus.pending => formatBytes(item.size),
     };
   }
@@ -275,6 +283,7 @@ class _ReceiveOfferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final manifest = controller.manifest;
     if (manifest == null) return const SizedBox.shrink();
     return SurfaceCard(
@@ -282,7 +291,7 @@ class _ReceiveOfferCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           StatusPill(
-            label: 'Incoming offer',
+            label: l10n.incomingOffer,
             icon: AppIcons.download,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -292,8 +301,8 @@ class _ReceiveOfferCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '${formatCount(manifest.items.length, 'file')} · '
-            '${formatBytes(manifest.totalBytes)} · review in Receive',
+            '${l10n.fileCount(manifest.items.length)} · '
+            '${formatBytes(manifest.totalBytes)} · ${l10n.reviewInReceive}',
             style: theme.textTheme.bodySmall,
           ),
         ],
@@ -310,6 +319,7 @@ class _ReceiveTransferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,8 +328,10 @@ class _ReceiveTransferCard extends StatelessWidget {
             children: [
               StatusPill(
                 label: controller.isPaused
-                    ? 'Paused by sender'
-                    : 'Receiving from ${controller.manifest?.hostName ?? 'device'}',
+                    ? l10n.pausedBySender
+                    : l10n.receivingFrom(
+                        controller.manifest?.hostName ?? l10n.device,
+                      ),
                 icon: controller.isPaused
                     ? AppIcons.stop
                     : AppIcons.receive,
@@ -340,13 +352,13 @@ class _ReceiveTransferCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _Metric(
-                  label: 'Speed',
+                  label: l10n.speed,
                   value: formatSpeed(controller.speedBytesPerSecond),
                 ),
               ),
               Expanded(
                 child: _Metric(
-                  label: 'Remaining',
+                  label: l10n.remaining,
                   value: formatEta(
                     (controller.totalBytes - controller.receivedBytes)
                         .clamp(0, controller.totalBytes),
@@ -366,12 +378,16 @@ class _ReceiveTransferCard extends StatelessWidget {
               progress: item.progress,
               subtitle: switch (item.status) {
                 TransferStatus.done =>
-                  '${formatBytes(item.size)} · saved',
-                TransferStatus.paused =>
-                  '${formatBytes(item.transferred)} of ${formatBytes(item.size)} · paused',
-                TransferStatus.failed => 'Failed',
-                TransferStatus.active =>
-                  '${formatBytes(item.transferred)} of ${formatBytes(item.size)}',
+                  l10n.statusSaved(formatBytes(item.size)),
+                TransferStatus.paused => l10n.statusPaused(
+                    formatBytes(item.transferred),
+                    formatBytes(item.size),
+                  ),
+                TransferStatus.failed => l10n.failed,
+                TransferStatus.active => l10n.statusActive(
+                    formatBytes(item.transferred),
+                    formatBytes(item.size),
+                  ),
                 TransferStatus.pending => formatBytes(item.size),
               },
               trailing: item.status == TransferStatus.done
@@ -387,7 +403,7 @@ class _ReceiveTransferCard extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: controller.cancel,
             icon: Icon(AppIcons.stop, size: 17),
-            label: const Text('Cancel transfer'),
+            label: Text(l10n.cancelTransfer),
           ),
         ],
       ),
@@ -403,6 +419,7 @@ class _RecordRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final isSend = record.direction.name == 'send';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -440,8 +457,8 @@ class _RecordRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${isSend ? 'Sent' : 'Received'} · '
-                  '${formatCount(record.fileCount, 'file')} · '
+                  '${isSend ? l10n.sent : l10n.received} · '
+                  '${l10n.fileCount(record.fileCount)} · '
                   '${formatTimestamp(record.timestamp)}',
                   style: theme.textTheme.bodySmall,
                 ),

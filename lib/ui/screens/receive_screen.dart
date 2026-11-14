@@ -11,6 +11,7 @@ import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/state/receive_controller.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
@@ -109,9 +110,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<ReceiveController>();
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Receive'),
+        title: Text(l10n.receiveTitle),
         leading: IconButton(
           icon: Icon(AppIcons.back),
           onPressed: () => Navigator.of(context).pop(),
@@ -121,13 +123,13 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
               (controller.phase == ReceivePhase.idle ||
                   controller.phase == ReceivePhase.scanning))
             IconButton(
-              tooltip: 'Scan pairing code',
+              tooltip: l10n.scanPairingCode,
               onPressed: () => _openScanner(controller),
               icon: Icon(AppIcons.scan),
             ),
           if (controller.phase == ReceivePhase.scanning)
             IconButton(
-              tooltip: 'Rescan',
+              tooltip: l10n.rescan,
               onPressed: controller.startScanning,
               icon: Icon(AppIcons.refresh),
             ),
@@ -207,6 +209,7 @@ class _ScanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final sessions = controller.sessions;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,7 +218,7 @@ class _ScanView extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                'Nearby sessions',
+                l10n.nearbySessions,
                 style: theme.textTheme.headlineSmall,
               ),
             ),
@@ -232,8 +235,8 @@ class _ScanView extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(
           controller.isScanning
-              ? 'Listening on the hotspot for a device that is sharing.'
-              : 'Scanning is paused.',
+              ? l10n.listeningHotspot
+              : l10n.scanningPaused,
           style: theme.textTheme.bodySmall,
         ),
         if (controller.hotspotNotice != null) ...[

@@ -15,6 +15,7 @@ import 'package:free_send/models/transfer_record.dart';
 class LocalStore {
   static const _kDeviceName = 'device_name';
   static const _kThemeMode = 'theme_mode';
+  static const _kLocale = 'locale';
   static const _kDownloadDir = 'download_dir';
   static const _kHistory = 'history';
   static const _kRecentFiles = 'recent_files';
@@ -49,6 +50,12 @@ class LocalStore {
 
   Future<void> setThemeMode(String value) async {
     await _prefs.setString(_kThemeMode, value);
+  }
+
+  String get localeName => _prefs.getString(_kLocale) ?? 'ar';
+
+  Future<void> setLocale(String value) async {
+    await _prefs.setString(_kLocale, value);
   }
 
   String? get storedDownloadDir => _prefs.getString(_kDownloadDir);

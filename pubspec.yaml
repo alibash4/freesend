@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
   provider: ^6.1.2
   shared_preferences: ^2.3.3
   path_provider: ^2.1.5
@@ -36,6 +39,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
   assets:
     - assets/tray/
     - assets/freesend.png

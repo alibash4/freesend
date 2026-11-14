@@ -63,7 +63,7 @@ abstract final class AppTypography {
     fontFamily: 'Cairo',
     fontSize: 16,
     height: 1.3,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     letterSpacing: -0.1,
   );
 

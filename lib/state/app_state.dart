@@ -16,6 +16,7 @@ class AppState extends ChangeNotifier {
   late String deviceName;
   String downloadDir = '';
   ThemeMode themeMode = ThemeMode.system;
+  Locale locale = const Locale('ar');
   List<TransferRecord> history = const [];
 
   /// Whether to look for a newer release on launch.
@@ -48,6 +49,7 @@ class AppState extends ChangeNotifier {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
+    locale = store.localeName == 'en' ? const Locale('en') : const Locale('ar');
     history = store.history;
     autoUpdate = store.autoUpdate;
     minimizeToTray = store.minimizeToTray;
@@ -86,6 +88,12 @@ class AppState extends ChangeNotifier {
     themeMode = mode;
     notifyListeners();
     await store.setThemeMode(mode.name);
+  }
+
+  Future<void> setLocale(Locale value) async {
+    locale = value;
+    notifyListeners();
+    await store.setLocale(value.languageCode);
   }
 
   Future<void> setDownloadDir(String path) async {
