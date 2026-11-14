@@ -56,7 +56,7 @@ class UpdateBridge(
         if (!canInstall()) {
             result.error(
                 "permission",
-                "Allow Free Send to install apps from its settings page, " +
+                "Allow FreeSend to install apps from its settings page, " +
                     "then try again.",
                 null,
             )
@@ -80,7 +80,7 @@ class UpdateBridge(
         }
     }
 
-    /** Whether the user has granted "install unknown apps" to Free Send. */
+    /** Whether the user has granted "install unknown apps" to FreeSend. */
     private fun canInstall(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
 

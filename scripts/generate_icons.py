@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Regenerate every Free Send launcher icon from the source logo.
+"""Regenerate every FreeSend launcher icon from the source logo.
 
 Windows and Linux use the logo exactly as it is. Android gets an adaptive
 icon: a #121212 background layer plus the logo as the foreground layer, so
 the launcher applies the squircle mask itself. macOS never masks icons, so
 Apple's continuous-corner squircle is drawn behind the logo instead.
+
+The desktop tray icons are the mark alone, filling the whole canvas: the tray
+host scales them to its own height, so any padding only shrinks the artwork.
 
 Usage:
     python3 scripts/generate_icons.py [logo.png]
@@ -32,6 +35,10 @@ SQUIRCLE_COLOR = (0x12, 0x12, 0x12, 0xFF)
 # 66% is the largest size that survives every launcher mask: above it a
 # circular mask starts biting the mark's tips.
 MARK_FRACTION = 0.66
+
+# The tray icons are full-bleed and the tray host picks the display size, so
+# one generous resolution covers every DPI.
+TRAY_SIZE = 256
 
 # Apple's continuous-corner rounded rectangle, reverse-engineered from the
 # macOS icon mask by Liam Rosenfeld: the corner radius is 45% of half the
@@ -262,19 +269,16 @@ def _png_bytes(image):
     return buffer.getvalue()
 
 
-def write_windows(logo):
-    """Write the ICO by hand so every entry is a premultiplied resize."""
-    path = REPO / "windows/runner/resources/app_icon.ico"
-    sizes = [16, 24, 32, 48, 64, 128, 256]
-    images = [_resize_rgba(logo, (size, size)) for size in sizes]
-
+def _write_ico(path, images):
+    """Write an ICO by hand so every entry is a premultiplied resize."""
     # Icon resource header, then one 16-byte directory entry per size, then the
     # PNG payloads. Windows picks the entry that fits the current DPI best.
     header = struct.pack("<HHH", 0, 1, len(images))
     offset = len(header) + 16 * len(images)
     directory = bytearray()
     payload = bytearray()
-    for size, image in zip(sizes, images):
+    for image in images:
+        size = image.width
         data = _png_bytes(image)
         directory += struct.pack(
             "<BBBBHHII",
@@ -292,10 +296,40 @@ def write_windows(logo):
     print(f"  {path.relative_to(REPO)}")
 
 
+ICO_SIZES = [16, 24, 32, 48, 64, 128, 256]
+
+
+def write_windows(logo):
+    path = REPO / "windows/runner/resources/app_icon.ico"
+    _write_ico(path, [_resize_rgba(logo, (size, size)) for size in ICO_SIZES])
+
+
+def write_tray_windows(logo):
+    """The Windows tray icon: the same full-bleed mark as the PNG trays."""
+    path = REPO / "assets/tray/app_icon.ico"
+    mark = _mark(logo)
+    _write_ico(path, [_fit_mark(mark, size) for size in ICO_SIZES])
+
+
 def write_linux(logo):
     path = REPO / "linux/runner/resources/app_icon.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     logo.save(path)
+    print(f"  {path.relative_to(REPO)}")
+
+
+def tray_icon(logo, size):
+    """The mark filling the whole canvas; the tray host picks the size."""
+    scaled = size * SUPERSAMPLE
+    canvas = Image.new("RGBA", (scaled, scaled), (0, 0, 0, 0))
+    _compose(canvas, _fit_mark(_mark(logo), scaled))
+    return _resize_rgba(canvas, (size, size))
+
+
+def write_tray(logo):
+    path = REPO / "assets/tray/app_icon_256.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tray_icon(logo, TRAY_SIZE).save(path)
     print(f"  {path.relative_to(REPO)}")
 
 
@@ -311,6 +345,8 @@ def main():
     write_linux(logo)
     write_android(logo)
     write_macos(logo)
+    write_tray(logo)
+    write_tray_windows(logo)
 
 
 if __name__ == "__main__":

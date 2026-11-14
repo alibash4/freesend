@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -19,7 +19,9 @@ class SectionHeader extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: AppTypography.sectionTitle.copyWith(
+                color: Theme.of(context).colorScheme.accentText,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

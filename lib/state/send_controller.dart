@@ -4,14 +4,17 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/models/peer_info.dart';
+import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_host.dart';
 import 'package:free_send/state/app_state.dart';
 
@@ -36,6 +39,9 @@ class SendController extends ChangeNotifier {
 
   final List<TransferItem> items = [];
 
+  /// Files picked recently, newest first. Kept in sync with [LocalStore].
+  late List<RecentFile> recents = _loadRecents();
+
   SendPhase phase = SendPhase.idle;
   HotspotInfo? hotspot;
   String? errorMessage;
@@ -53,6 +59,7 @@ class SendController extends ChangeNotifier {
   bool paused = false;
 
   TransferHost? _host;
+  final TransferForeground _foreground = TransferForeground();
   Stopwatch? _stopwatch;
   DateTime? _lastSampleAt;
   int _lastSampleBytes = 0;
@@ -109,6 +116,7 @@ class SendController extends ChangeNotifier {
       existing.add(file.path);
     }
     _recalculateTotal();
+    _remember(files);
     notifyListeners();
   }
 
@@ -146,7 +154,27 @@ class SendController extends ChangeNotifier {
     if (added.isEmpty) return;
     items.addAll(added);
     _recalculateTotal();
+    _remember(files);
     notifyListeners();
+  }
+
+  List<RecentFile> _loadRecents() {
+    try {
+      return appState.store.recentFiles;
+    } on Object {
+      return const [];
+    }
+  }
+
+  void _remember(Iterable<File> files) {
+    final readable = files.where((file) => file.existsSync()).toList();
+    if (readable.isEmpty) return;
+    unawaited(
+      appState.store.addRecentFiles(readable).then((_) {
+        recents = appState.store.recentFiles;
+        notifyListeners();
+      }),
+    );
   }
 
   void removeItem(TransferItem item) {
@@ -190,7 +218,7 @@ class SendController extends ChangeNotifier {
       hotspot = await _hotspotService.start(deviceName: appState.deviceName);
       if (hotspot!.note != null) {
         // Surfaced in the connection panel, not as an error.
-        debugPrint('Free Send: ${hotspot!.note}');
+        debugPrint('FreeSend: ${hotspot!.note}');
       }
 
       final bindAddress = hotspot?.ip ?? await localIpv4();
@@ -198,6 +226,7 @@ class SendController extends ChangeNotifier {
         items: items,
         deviceName: appState.deviceName,
         instanceId: appState.instanceId,
+        identityStore: appState.store,
         events: HostEvents(
           onPeersChanged: _onPeersChanged,
           onPeerFinished: _onPeerFinished,
@@ -209,6 +238,10 @@ class SendController extends ChangeNotifier {
       );
       port = await host.start();
       _host = host;
+      await _foreground.start(
+        title: 'Ready to share',
+        text: '${items.length} file${items.length == 1 ? '' : 's'} · waiting for a receiver',
+      );
 
       await _broadcaster.start(
         instanceId: appState.instanceId,
@@ -225,7 +258,7 @@ class SendController extends ChangeNotifier {
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
-      _fail('Could not open the transfer listener. Allow Free Send through the system '
+      _fail('Could not open the transfer listener. Allow FreeSend through the system '
           'firewall on private networks, then try again (${error.message}).');
     } on Object catch (error) {
       _fail('Could not start sharing: $error');
@@ -303,6 +336,10 @@ class SendController extends ChangeNotifier {
     currentFileName = item.name;
     item.status = TransferStatus.active;
     sentBytes = items.fold<int>(0, (sum, entry) => sum + entry.transferred);
+    unawaited(_foreground.update(
+      title: 'Sending ${formatBytes(sentBytes)} of ${formatBytes(totalBytes)}',
+      text: currentFileName,
+    ));
     _sampleSpeed();
     if (phase != SendPhase.transferring) {
       phase = SendPhase.transferring;
@@ -354,6 +391,7 @@ class SendController extends ChangeNotifier {
       }
     }
     phase = SendPhase.completed;
+    unawaited(_foreground.stop());
     _finishSession(files: fileCount, bytes: bytes, duration: elapsed, ok: true);
     notifyListeners();
   }
@@ -366,6 +404,7 @@ class SendController extends ChangeNotifier {
   void _fail(String message) {
     errorMessage = message;
     phase = SendPhase.failed;
+    unawaited(_foreground.stop());
     unawaited(_teardown());
     notifyListeners();
   }
@@ -376,6 +415,7 @@ class SendController extends ChangeNotifier {
     final files = items.where((item) => item.transferred > 0).length;
     phase = SendPhase.cancelled;
     paused = false;
+    unawaited(_foreground.stop());
     notifyListeners();
     await _teardown();
     if (bytes > 0) {
@@ -405,12 +445,18 @@ class SendController extends ChangeNotifier {
       timestamp: DateTime.now(),
       durationMs: duration.inMilliseconds,
       succeeded: ok,
+      fileNames: items
+          .where((item) => item.done || item.transferred > 0)
+          .map((item) => item.name)
+          .take(4)
+          .toList(growable: false),
     );
     lastRecord = record;
     await appState.recordTransfer(record);
   }
 
   Future<void> _teardown() async {
+    await _foreground.stop();
     await _broadcaster.stop();
     await _host?.dispose();
     _host = null;

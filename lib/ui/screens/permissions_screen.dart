@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -10,9 +10,9 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
-/// First-launch runtime permission gate for Android and iOS.
+/// First-launch runtime permission gate for Android.
 ///
-/// The user can allow the permissions or continue without them; Free Send
+/// The user can allow the permissions or continue without them; FreeSend
 /// still works for manual-address transfers and the file picker when the OS
 /// denies the discovery/camera grants.
 class PermissionsScreen extends StatefulWidget {
@@ -106,7 +106,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Free Send needs access to the local link and camera to find '
+              'FreeSend needs access to the local link and camera to find '
               'nearby devices and scan pairing codes. Nothing leaves your '
               'network.',
               style: theme.textTheme.bodyMedium,
@@ -117,7 +117,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 icon: AppIcons.wifi,
                 title: 'Location / nearby devices',
                 body: 'Required by Android to create or join a hotspot and '
-                    'discover other Free Send devices.',
+                    'discover other FreeSend devices.',
                 status: _statusFor(Permission.locationWhenInUse),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -138,6 +138,22 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               const SizedBox(height: AppSpacing.md),
             ],
             _PermissionRow(
+              icon: AppIcons.info,
+              title: 'Notifications',
+              body: 'Shows transfer progress while FreeSend is in the '
+                  'background.',
+              status: _statusFor(Permission.notification),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _PermissionRow(
+              icon: AppIcons.image,
+              title: 'Photos, videos, and audio',
+              body: 'Used by the media browser to show thumbnails and let you '
+                  'pick files.',
+              status: _statusFor(Permission.photos),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _PermissionRow(
               icon: AppIcons.scan,
               title: 'Camera',
               body: 'Only used to scan a pairing QR code. You can still pair '
@@ -151,7 +167,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       AppIcons.checkCircle,
                       size: 18,
                       color: AppColors.success,
@@ -159,7 +175,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Permissions granted. Free Send is ready.',
+                        'Permissions granted. FreeSend is ready.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppColors.success,
                         ),
@@ -184,7 +200,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(AppIcons.check, size: 17),
+                  : Icon(AppIcons.check, size: 17),
               label: Text(
                 _requesting
                     ? 'Requesting…'
@@ -197,7 +213,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               const SizedBox(height: AppSpacing.sm),
               OutlinedButton.icon(
                 onPressed: _openSettings,
-                icon: const Icon(AppIcons.settings, size: 17),
+                icon: Icon(AppIcons.settings, size: 17),
                 label: const Text('Open system settings'),
               ),
             ],

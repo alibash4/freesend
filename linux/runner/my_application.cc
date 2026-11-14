@@ -42,7 +42,7 @@ static void my_application_activate(GApplication* application) {
 
   // Let the window manager draw the native frame instead of a GTK header bar,
   // the same way nyxlab does it.
-  gtk_window_set_title(window, "Free Send");
+  gtk_window_set_title(window, "FreeSend");
   gtk_window_set_titlebar(window, nullptr);
 
   gtk_window_set_default_size(window, 1280, 720);

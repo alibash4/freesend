@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
@@ -56,7 +56,7 @@ class UpdateSheet extends StatelessWidget {
                 Text(
                   update == null
                       ? 'Checking for updates'
-                      : 'Free Send ${update.version} is available',
+                      : 'FreeSend ${update.version} is available',
                   style: theme.textTheme.titleLarge,
                 ),
                 const SizedBox(height: 2),
@@ -170,7 +170,7 @@ class UpdateSheet extends StatelessWidget {
           children: [
             FilledButton.icon(
               onPressed: controller.download,
-              icon: const Icon(AppIcons.download, size: 17),
+              icon: Icon(AppIcons.download, size: 17),
               label: const Text('Download update'),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -188,7 +188,7 @@ class UpdateSheet extends StatelessWidget {
                 await controller.install();
                 if (context.mounted) Navigator.of(context).pop();
               },
-              icon: const Icon(AppIcons.checkCircle, size: 17),
+              icon: Icon(AppIcons.checkCircle, size: 17),
               label: const Text('Install and restart'),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -219,7 +219,7 @@ class UpdateSheet extends StatelessWidget {
           children: [
             FilledButton.icon(
               onPressed: controller.checkManually,
-              icon: const Icon(AppIcons.refresh, size: 17),
+              icon: Icon(AppIcons.refresh, size: 17),
               label: const Text('Try again'),
             ),
             const SizedBox(height: AppSpacing.sm),

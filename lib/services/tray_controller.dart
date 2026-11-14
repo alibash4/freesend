@@ -21,7 +21,7 @@ class TrayController with TrayListener, WindowListener {
   bool _initialized = false;
   bool _quitting = false;
 
-  static const _tooltip = 'Free Send';
+  static const _tooltip = 'FreeSend';
 
   Future<void> init() async {
     if (_initialized || !PlatformEnv.supportsTray) return;
@@ -32,7 +32,10 @@ class TrayController with TrayListener, WindowListener {
       trayManager.addListener(this);
 
       await trayManager.setIcon(_iconAsset);
-      await trayManager.setToolTip(_tooltip);
+      if (Platform.isWindows) {
+        // tray_manager has no Linux tooltip implementation.
+        await trayManager.setToolTip(_tooltip);
+      }
       await _setMenu();
 
       // Only intercept close once the icon exists: a hidden window with no
@@ -47,9 +50,12 @@ class TrayController with TrayListener, WindowListener {
     }
   }
 
-  String get _iconAsset => Platform.isWindows
-      ? 'assets/tray/app_icon.ico'
-      : 'assets/tray/app_icon_64.png';
+  String get _iconAsset {
+    if (Platform.isWindows) return 'assets/tray/app_icon.ico';
+    // Full-bleed at a generous size: the tray host scales it to its own
+    // height, so padding would only shrink the mark.
+    return 'assets/tray/app_icon_256.png';
+  }
 
   Future<void> _setMenu() async {
     await trayManager.setContextMenu(
@@ -57,13 +63,13 @@ class TrayController with TrayListener, WindowListener {
         items: [
           MenuItem(
             key: 'open',
-            label: 'Open Free Send',
+            label: 'Open FreeSend',
             onClick: (_) => unawaited(showWindow()),
           ),
           MenuItem.separator(),
           MenuItem(
             key: 'quit',
-            label: 'Quit Free Send',
+            label: 'Quit FreeSend',
             onClick: (_) => unawaited(quit()),
           ),
         ],
@@ -82,7 +88,9 @@ class TrayController with TrayListener, WindowListener {
   Future<void> quit() async {
     if (_quitting) return;
     _quitting = true;
-    await trayManager.destroy();
+    if (!Platform.isLinux) {
+      await trayManager.destroy();
+    }
     await windowManager.setPreventClose(false);
     await windowManager.destroy();
   }

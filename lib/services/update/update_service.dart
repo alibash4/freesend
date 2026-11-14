@@ -21,8 +21,8 @@ class UpdateNotAvailableException implements Exception {
 ///
 /// Asset link names carry a platform word (`android`, `linux`, `windows`,
 /// `macos`), a format marker (`(32-bit)`, `(64-bit)`, `(universal)`,
-/// `(AppImage)`, `(deb)`, `(rpm)`, `(bundle)`, `(exe)`) and, where a platform
-/// ships more than one architecture, the architecture word (`x86_64`,
+/// `(AppImage)`, `(deb)`, `(rpm)`, `(bundle)`, `(exe)`, `(dmg)`) and, where a
+/// platform ships more than one architecture, the architecture word (`x86_64`,
 /// `aarch64`).
 class UpdateService {
   UpdateService({

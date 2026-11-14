@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/models/trusted_device.dart';
+import 'package:free_send/services/device_identity.dart';
+import 'package:free_send/services/local_store.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/transfer/checksum.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
+import 'package:free_send/services/transfer/secure_channel.dart';
 
 /// What the host offers after the handshake.
 class TransferManifest {
@@ -14,11 +19,17 @@ class TransferManifest {
     required this.hostName,
     required this.hostPlatform,
     required this.items,
+    this.hostInstanceId,
+    this.encrypted = false,
+    this.securityCode,
   });
 
   final String hostName;
   final String? hostPlatform;
   final List<TransferItem> items;
+  final String? hostInstanceId;
+  final bool encrypted;
+  final String? securityCode;
 
   int get totalBytes => items.fold<int>(0, (sum, item) => sum + item.size);
 }
@@ -45,17 +56,22 @@ class TransferClient {
     required this.deviceName,
     required this.events,
     required this.instanceId,
+    this.store,
   });
 
   final String deviceName;
   final ClientEvents events;
   final String instanceId;
+  final LocalStore? store;
 
   FrameChannel? _channel;
   bool _cancelled = false;
   bool _finished = false;
+  bool _pausedByReceiver = false;
+  Completer<void>? _resumeWaiter;
 
   bool get isConnected => _channel != null && !_channel!.isClosed;
+  bool get isPaused => _pausedByReceiver;
 
   Future<TransferManifest> connect(
     String host,
@@ -66,15 +82,70 @@ class TransferClient {
     final channel = FrameChannel(socket);
     _channel = channel;
     try {
-      channel.writer.json(FrameType.hello, {
+      final handshake = await SecureHandshake.create();
+      final clientPublicKey = await handshake.publicKey;
+      await channel.writer.json(FrameType.hello, {
         'v': AppConstants.protocolVersion,
         'name': deviceName,
         'platform': Platform.operatingSystem,
-        'caps': const ['checksums', 'resume'],
+        'key': base64.encode(clientPublicKey),
+        'nonce': base64.encode(handshake.salt),
+        'caps': const ['checksums', 'resume', 'encryption'],
       });
       await channel.writer.flush();
 
-      final frame = await channel.next(timeout: timeout);
+      var frame = await channel.next(timeout: timeout);
+      if (frame.type == FrameType.helloAck) {
+        final ack = frame.json();
+        final hostKey = (ack['key'] as String?) ?? '';
+        final instance = (ack['instanceId'] as String?) ?? '';
+        final identity = (ack['identity'] as String?) ?? '';
+        final signature = (ack['signature'] as String?) ?? '';
+        if (hostKey.isEmpty) {
+          throw ProtocolException('The sender did not provide a key');
+        }
+        if (identity.isNotEmpty && signature.isNotEmpty) {
+          final signed = utf8.encode(
+            '$hostKey|${base64.encode(handshake.salt)}|$instance',
+          );
+          final trusted = store?.trustedDevices
+              .where((device) => device.instanceId == instance)
+              .toList(growable: false);
+          if (trusted != null && trusted.isNotEmpty) {
+            if (trusted.first.publicKey != identity) {
+              throw ProtocolException(
+                'This sender\'s identity changed. Stop and verify the device '
+                'before sending anything.',
+              );
+            }
+          } else {
+            final valid = await DeviceIdentity.verify(
+              signed,
+              base64.decode(signature),
+              identity,
+            );
+            if (!valid) {
+              throw ProtocolException('The sender\'s identity signature is invalid');
+            }
+            if (store != null) {
+              await store!.trustDevice(TrustedDevice(
+                instanceId: instance,
+                name: (ack['name'] as String?) ?? 'Nearby device',
+                publicKey: identity,
+                fingerprint: (ack['fingerprint'] as String?) ?? '',
+                addedAt: DateTime.now(),
+              ));
+            }
+          }
+        }
+        final key = await handshake.derive(base64.decode(hostKey));
+        final cipher = SecureChannel(key);
+        channel.useCipher(encrypt: cipher.seal, decrypt: cipher.open);
+        await channel.writer.json(FrameType.helloConfirm, {});
+        await channel.writer.flush();
+        frame = await channel.next(timeout: timeout);
+      }
+
       if (frame.type == FrameType.error) {
         throw ProtocolException(
           frame.json()['message'] as String? ?? 'The other device refused the connection',
@@ -92,6 +163,9 @@ class TransferClient {
         hostName: (json['name'] as String?) ?? 'Nearby device',
         hostPlatform: json['platform'] as String?,
         items: files,
+        hostInstanceId: json['instanceId'] as String?,
+        encrypted: channel.isEncrypted,
+        securityCode: json['fingerprint'] as String?,
       );
     } on Object {
       await channel.close();
@@ -101,20 +175,25 @@ class TransferClient {
   }
 
   /// Writes every accepted file under [downloadRoot], creating a
-  /// `Free Send` subfolder when the root is a shared directory.
+  /// `FreeSend` subfolder when the root is a shared directory.
   Future<void> receive({
     required List<String> ids,
     required String downloadRoot,
+    Map<String, String> retryPaths = const <String, String>{},
+    Map<String, String> resumePaths = const <String, String>{},
+    Map<String, int> resumeOffsets = const <String, int>{},
+    int baseBytes = 0,
   }) async {
     final channel = _channel;
     if (channel == null) throw ProtocolException('Not connected');
 
     final stopwatch = Stopwatch()..start();
     var receivedFiles = 0;
-    var receivedBytes = 0;
+    var receivedBytes = baseBytes;
 
-    channel.writer.json(FrameType.accept, {
+    await channel.writer.json(FrameType.accept, {
       'ids': ids,
+      'offsets': resumeOffsets,
       'caps': const ['checksums', 'resume'],
     });
     await channel.writer.flush();
@@ -127,40 +206,110 @@ class TransferClient {
 
     try {
       while (!_cancelled) {
+        if (_pausedByReceiver) {
+          await (_resumeWaiter ??= Completer<void>()).future;
+        }
         final frame = await channel.next(timeout: const Duration(minutes: 15));
         switch (frame.type) {
           case FrameType.fileHeader:
             final json = frame.json();
-            final name = sanitizeFileName((json['name'] as String?) ?? 'file');
+            final id = (json['id'] as String?) ?? '';
+            final rawName = (json['name'] as String?) ?? 'file';
             final size = (json['size'] as num?)?.toInt() ?? 0;
-            final unique = uniqueFileName(name, taken);
-            taken.add(unique.toLowerCase());
+            final rawRelative = json['dir'] as String?;
+            final relative = rawRelative == null || rawRelative.isEmpty
+                ? null
+                : rawRelative.replaceAll('\\', '/');
+            final retryPath = retryPaths[id];
+            final resumePath = resumePaths[id];
+            final reusePath = retryPath ?? resumePath;
+            var offset = retryPath != null
+                ? 0
+                : (resumeOffsets[id] ?? 0).clamp(0, size);
             final root = Directory(downloadRoot);
             if (!await root.exists()) {
               await root.create(recursive: true);
             }
-            final relative = (json['dir'] as String?)
-                ?.replaceAll('\\', '/')
-                .replaceAll('/', Platform.pathSeparator);
-            final parent = relative == null || relative.isEmpty
-                ? root.path
-                : '${root.path}${Platform.pathSeparator}$relative';
-            if (relative != null && relative.isNotEmpty) {
-              await Directory(parent).create(recursive: true);
+
+            final String parent;
+            final String targetPath;
+            final String name;
+            if (reusePath != null) {
+              // A retry overwrites the partial file it left behind rather
+              // than creating "name (1).ext" next to it.
+              final reuseFile = File(reusePath);
+              parent = reuseFile.parent.path;
+              if (!await reuseFile.parent.exists()) {
+                await reuseFile.parent.create(recursive: true);
+              }
+              targetPath = reuseFile.path;
+              name = reuseFile.uri.pathSegments.last;
+            } else {
+              final unique = uniqueFileName(sanitizeFileName(rawName), taken);
+              taken.add(unique.toLowerCase());
+              parent = relative == null
+                  ? root.path
+                  : '${root.path}${Platform.pathSeparator}'
+                      '${relative.replaceAll('/', Platform.pathSeparator)}';
+              if (relative != null) {
+                await Directory(parent).create(recursive: true);
+              }
+              targetPath = '$parent${Platform.pathSeparator}$unique';
+              name = unique;
             }
-            final target = File('$parent${Platform.pathSeparator}$unique');
-            handle = await target.open(mode: FileMode.write);
+
+            final target = File(targetPath);
+            if (offset > 0 &&
+                await target.exists() &&
+                await target.length() >= offset) {
+              handle = await target.open(mode: FileMode.append);
+              await handle.truncate(offset);
+            } else {
+              offset = 0;
+              handle = await target.open(mode: FileMode.write);
+            }
+
+            hash = Sha256Stream();
+            if (offset > 0) {
+              // The digest at file end covers the whole file, so the bytes
+              // already on disk have to be folded in before the new ones.
+              final prefix = await target.open();
+              try {
+                var remaining = offset;
+                while (remaining > 0) {
+                  final chunk = await prefix.read(
+                    remaining < AppConstants.chunkSize
+                        ? remaining
+                        : AppConstants.chunkSize,
+                  );
+                  if (chunk.isEmpty) break;
+                  hash.add(chunk);
+                  remaining -= chunk.length;
+                }
+                if (remaining > 0) {
+                  // The partial file is shorter than the sidecar claimed;
+                  // start over instead of padding it.
+                  await handle.close();
+                  handle = await target.open(mode: FileMode.write);
+                  offset = 0;
+                  hash = Sha256Stream();
+                }
+              } finally {
+                await prefix.close();
+              }
+            }
+
             current = TransferItem(
-              id: (json['id'] as String?) ?? '',
-              name: unique,
+              id: id,
+              name: name,
               size: size,
               path: target.path,
               receivedPath: target.path,
               relativePath: relative,
+              transferred: offset,
               sha256: json['sha256'] as String?,
               status: TransferStatus.active,
             );
-            hash = Sha256Stream();
             expectedSha = json['sha256'] as String?;
             events.onStatus?.call(current);
             break;
@@ -211,7 +360,7 @@ class TransferClient {
             current = null;
             hash = null;
             expectedSha = null;
-            channel.writer.json(FrameType.ackFile, {'id': file?.id ?? ''});
+            await channel.writer.json(FrameType.ackFile, {'id': file?.id ?? ''});
             await channel.writer.flush();
             break;
 
@@ -236,7 +385,7 @@ class TransferClient {
             // deliver the courtesy ack must not turn a good transfer bad.
             if (!channel.isClosed) {
               try {
-                channel.writer.json(FrameType.ackAll, {'bytes': receivedBytes});
+                await channel.writer.json(FrameType.ackAll, {'bytes': receivedBytes});
                 await channel.writer.flush();
               } on Object {
                 // The host may already have closed its side.
@@ -290,13 +439,53 @@ class TransferClient {
     }
   }
 
+  /// Stops reading from the socket so the sender blocks on write. The session
+  /// stays open, so resuming continues the current file from its last offset.
+  Future<void> pause() async {
+    if (_pausedByReceiver) return;
+    _pausedByReceiver = true;
+    final channel = _channel;
+    if (channel == null) return;
+    channel.pause();
+    if (!channel.isClosed) {
+      try {
+        await channel.writer.json(FrameType.pause, {'reason': 'Paused by receiver'});
+        await channel.writer.flush();
+      } on Object {
+        // The peer may already be gone; the local pause still holds.
+      }
+    }
+  }
+
+  Future<void> resume() async {
+    if (!_pausedByReceiver) return;
+    _pausedByReceiver = false;
+    final waiter = _resumeWaiter;
+    _resumeWaiter = null;
+    final channel = _channel;
+    channel?.resume();
+    if (channel != null && !channel.isClosed) {
+      try {
+        await channel.writer.json(FrameType.resume, {});
+        await channel.writer.flush();
+      } on Object {
+        // Nothing to do: the local stream still resumes.
+      }
+    }
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
+  }
+
   Future<void> cancel() async {
     _cancelled = true;
+    final waiter = _resumeWaiter;
+    _resumeWaiter = null;
+    if (waiter != null && !waiter.isCompleted) waiter.complete();
     final channel = _channel;
     if (channel != null) {
+      channel.resume();
       if (!channel.isClosed) {
         try {
-          channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
+          await channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
           await channel.writer.flush();
         } on Object {
           // Peer already gone.
@@ -305,6 +494,7 @@ class TransferClient {
       await channel.close();
     }
     _channel = null;
+    _pausedByReceiver = false;
   }
 
   Future<void> dispose() async {

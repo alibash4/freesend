@@ -74,18 +74,18 @@ void main() {
                 'assets': {
                   'links': [
                     {
-                      'name': 'Free Send for Android',
+                      'name': 'FreeSend for Android',
                       'direct_asset_url': 'https://gitlab.com/a/freesend.apk',
                       'size': 1024,
                     },
                     {
-                      'name': 'Free Send for Linux',
+                      'name': 'FreeSend for Linux',
                       'direct_asset_url':
                           'https://gitlab.com/a/freesend.AppImage',
                       'size': 2048,
                     },
                     {
-                      'name': 'Free Send for Windows',
+                      'name': 'FreeSend for Windows',
                       'direct_asset_url': 'https://gitlab.com/a/freesend.exe',
                       'size': 4096,
                     },
@@ -120,7 +120,7 @@ void main() {
                 'assets': {
                   'links': [
                     {
-                      'name': 'Free Send for Windows',
+                      'name': 'FreeSend for Windows',
                       'direct_asset_url': 'https://gitlab.com/a/freesend.exe',
                     },
                   ],
@@ -132,7 +132,7 @@ void main() {
                 'assets': {
                   'links': [
                     {
-                      'name': 'Free Send for Linux',
+                      'name': 'FreeSend for Linux',
                       'direct_asset_url':
                           'https://gitlab.com/a/freesend.AppImage',
                     },
@@ -180,7 +180,7 @@ void main() {
                 'assets': {
                   'links': [
                     {
-                      'name': 'Free Send for Linux',
+                      'name': 'FreeSend for Linux',
                       'direct_asset_url':
                           'https://gitlab.com/a/freesend.AppImage',
                     },
@@ -203,23 +203,23 @@ void main() {
       'assets': {
         'links': [
           {
-            'name': 'Free Send for Android (32-bit)',
+            'name': 'FreeSend for Android (32-bit)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-32.apk',
             'size': 22,
           },
           {
-            'name': 'Free Send for Android (64-bit)',
+            'name': 'FreeSend for Android (64-bit)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-64.apk',
             'size': 26,
           },
           {
-            'name': 'Free Send for Android',
+            'name': 'FreeSend for Android',
             'direct_asset_url': 'https://gitlab.com/a/freesend-universal.apk',
             'size': 69,
           },
           {
             // Another platform's asset must never be considered.
-            'name': 'Free Send for Linux',
+            'name': 'FreeSend for Linux',
             'direct_asset_url': 'https://gitlab.com/a/freesend.AppImage',
           },
         ],
@@ -269,7 +269,7 @@ void main() {
             'assets': {
               'links': [
                 {
-                  'name': 'Free Send for Android',
+                  'name': 'FreeSend for Android',
                   'direct_asset_url': 'https://gitlab.com/a/freesend.apk',
                 },
               ],
@@ -292,27 +292,31 @@ void main() {
       'assets': {
         'links': [
           {
-            'name': 'Free Send for Linux (AppImage)',
+            'name': 'FreeSend for Linux (AppImage)',
             'direct_asset_url': 'https://gitlab.com/a/freesend.AppImage',
           },
           {
-            'name': 'Free Send for Linux (deb)',
+            'name': 'FreeSend for Linux (deb)',
             'direct_asset_url': 'https://gitlab.com/a/freesend.deb',
           },
           {
-            'name': 'Free Send for Linux (rpm)',
+            'name': 'FreeSend for Linux (rpm)',
             'direct_asset_url': 'https://gitlab.com/a/freesend.rpm',
           },
           {
-            'name': 'Free Send for Linux (bundle)',
+            'name': 'FreeSend for Linux (bundle)',
             'direct_asset_url': 'https://gitlab.com/a/freesend.tar.gz',
           },
           {
-            'name': 'Free Send for Windows (exe)',
+            'name': 'FreeSend for Windows (exe)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-windows.zip',
           },
           {
-            'name': 'Free Send for Android (64-bit)',
+            'name': 'FreeSend for macOS (dmg)',
+            'direct_asset_url': 'https://gitlab.com/a/freesend-macos.dmg',
+          },
+          {
+            'name': 'FreeSend for Android (64-bit)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-64.apk',
           },
         ],
@@ -368,7 +372,7 @@ void main() {
             'assets': {
               'links': [
                 {
-                  'name': 'Free Send for Linux (bundle)',
+                  'name': 'FreeSend for Linux (bundle)',
                   'direct_asset_url': 'https://gitlab.com/a/freesend.tar.gz',
                 },
               ],
@@ -380,6 +384,40 @@ void main() {
       final info = await service.fetchLatest();
       expect(info!.downloadUrl, endsWith('.tar.gz'));
     });
+
+    test('macOS downloads the DMG', () async {
+      final info = await fetch(PlatformKind.macOS, PackageFormat.macOS);
+      expect(info!.downloadUrl, endsWith('.dmg'));
+    });
+
+    test('macOS prefers the DMG when a release carries more than one build',
+        () async {
+      final service = UpdateService(
+        platform: PlatformKind.macOS,
+        packageFormat: PackageFormat.macOS,
+        client: MockClient((_) async => http.Response(jsonEncode([
+          {
+            'tag_name': 'v1.4.0',
+            'description': '',
+            'assets': {
+              'links': [
+                {
+                  'name': 'FreeSend for macOS (zip)',
+                  'direct_asset_url': 'https://gitlab.com/a/freesend-macos.zip',
+                },
+                {
+                  'name': 'FreeSend for macOS (dmg)',
+                  'direct_asset_url': 'https://gitlab.com/a/freesend-macos.dmg',
+                },
+              ],
+            },
+          },
+        ]), 200)),
+      );
+      addTearDown(service.dispose);
+      final info = await service.fetchLatest();
+      expect(info!.downloadUrl, endsWith('.dmg'));
+    });
   });
 
   group('UpdateService linux architecture', () {
@@ -389,19 +427,19 @@ void main() {
       'assets': {
         'links': [
           {
-            'name': 'Free Send for Linux x86_64 (AppImage)',
+            'name': 'FreeSend for Linux x86_64 (AppImage)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-x86_64.AppImage',
           },
           {
-            'name': 'Free Send for Linux aarch64 (AppImage)',
+            'name': 'FreeSend for Linux aarch64 (AppImage)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-aarch64.AppImage',
           },
           {
-            'name': 'Free Send for Linux x86_64 (deb)',
+            'name': 'FreeSend for Linux x86_64 (deb)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-x86_64.deb',
           },
           {
-            'name': 'Free Send for Linux aarch64 (deb)',
+            'name': 'FreeSend for Linux aarch64 (deb)',
             'direct_asset_url': 'https://gitlab.com/a/freesend-aarch64.deb',
           },
         ],
@@ -452,7 +490,7 @@ void main() {
             'assets': {
               'links': [
                 {
-                  'name': 'Free Send for Linux (AppImage)',
+                  'name': 'FreeSend for Linux (AppImage)',
                   'direct_asset_url':
                       'https://gitlab.com/a/freesend.AppImage',
                 },
@@ -477,7 +515,7 @@ void main() {
             'assets': {
               'links': [
                 {
-                  'name': 'Free Send for Linux x86_64 (AppImage)',
+                  'name': 'FreeSend for Linux x86_64 (AppImage)',
                   'direct_asset_url':
                       'https://gitlab.com/a/freesend-x86_64.AppImage',
                 },
@@ -511,6 +549,23 @@ void main() {
         detectPackageFormat(environment: {}, markerText: 'rpm'),
         PackageFormat.rpm,
       );
+    });
+
+    test('package-kind selects the disk image', () {
+      expect(
+        detectPackageFormat(environment: {}, markerText: 'dmg'),
+        PackageFormat.macOS,
+      );
+    });
+
+    test('macOS asset names carry the dmg marker', () {
+      expect(formatMarkers(PackageFormat.macOS), contains('(dmg)'));
+    });
+
+    test('a downloaded file maps by its extension', () {
+      expect(formatForFile('/tmp/FreeSend.dmg'), PackageFormat.macOS);
+      expect(formatForFile('/tmp/freesend.tar.gz'), PackageFormat.bundle);
+      expect(formatForFile('/tmp/freesend.apk'), isNull);
     });
   });
 

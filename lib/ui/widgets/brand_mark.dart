@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/theme/app_icons.dart';
 
@@ -40,7 +40,7 @@ class BrandTitle extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Free Send',
+          'FreeSend',
           style: theme.textTheme.titleLarge?.copyWith(
             letterSpacing: -0.3,
             fontWeight: FontWeight.w700,

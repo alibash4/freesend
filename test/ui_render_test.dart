@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,12 +45,17 @@ void main() {
       'Roboto-Bold.ttf',
     ]);
     await _loadFont('MaterialIcons', ['MaterialIcons-Regular.otf']);
-    // Package fonts are not part of the test bundle, so the Lucide build the
-    // app icons use (weight 400 = 2px stroke) is registered by hand.
+    // Package fonts are not part of the test bundle, so the two UIcons builds
+    // the app icons use are registered by hand.
     await _loadPackageFont(
-      family: 'packages/lucide_icons_flutter/Lucide400',
-      package: 'lucide_icons_flutter',
-      asset: 'assets/build_font/LucideVariable-w400.ttf',
+      family: 'uicons_regular_rounded',
+      package: 'uicons_regular_rounded',
+      asset: 'font/uicons_regular_rounded.ttf',
+    );
+    await _loadPackageFont(
+      family: 'uicons_solid_rounded',
+      package: 'uicons_solid_rounded',
+      asset: 'font/uicons_solid_rounded.ttf',
     );
   });
 
@@ -134,29 +139,25 @@ void main() {
   testWidgets('every tab scrolls with its own controller', (tester) async {
     await pumpApp(tester);
 
-    // The shell keeps all three tabs alive in an IndexedStack, so one shared
-    // ScrollController gets attached to three ScrollPositions at once, which
-    // is what desktop scrollbars reject.
+    // The home tab is a two-button launcher without its own ListView; the
+    // shell keeps the other tabs alive in an IndexedStack.
     final controllers = tester
         .widgetList<ListView>(find.byType(ListView, skipOffstage: false))
         .map((list) => list.controller)
         .toSet();
 
-    expect(controllers.length, 4);
+    expect(controllers.length, 3);
   });
 
   testWidgets('home renders and both flows open', (tester) async {
     await pumpApp(tester);
 
-    expect(find.text('Free Send'), findsOneWidget);
-    expect(find.text('Move files over the link, not the internet.'),
-        findsOneWidget);
-    expect(find.text('Send'), findsWidgets);
-    expect(find.text('Receive'), findsWidgets);
+    expect(find.text('Send File'), findsWidgets);
+    expect(find.text('Receive File'), findsWidgets);
     expect(tester.takeException(), isNull);
     await capture(tester, '01-home-light');
 
-    await tester.tap(find.text('Send').first);
+    await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
     expect(find.text('Pick what to send'), findsOneWidget);
     expect(find.text('Nothing selected'), findsOneWidget);
@@ -166,7 +167,7 @@ void main() {
     await tester.tap(find.byIcon(AppIcons.back));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Receive').first);
+    await tester.tap(find.text('Receive File').first);
     await settle(tester);
     expect(find.text('Nearby sessions'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -195,11 +196,11 @@ void main() {
   testWidgets('dark mode renders home and receive', (tester) async {
     await appState.setThemeMode(ThemeMode.dark);
     await pumpApp(tester);
-    expect(find.text('Free Send'), findsOneWidget);
+    expect(find.text('Send File'), findsWidgets);
     expect(tester.takeException(), isNull);
     await capture(tester, '11-home-dark');
 
-    await tester.tap(find.text('Receive').first);
+    await tester.tap(find.text('Receive File').first);
     await settle(tester);
     expect(find.text('Nearby sessions'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -263,7 +264,7 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     controller.addFiles([file]);
 
-    await tester.tap(find.text('Send').first);
+    await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
     // The card only exists once the session is really up, so start one: a real
     // listener and beacon socket on loopback.
@@ -300,7 +301,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await capture(tester, '07-home-narrow');
 
-    final receiveCard = find.text('Receive').first;
+    final receiveCard = find.text('Receive File').first;
     await tester.ensureVisible(receiveCard);
     await tester.pumpAndSettle();
     await tester.tap(receiveCard);
@@ -318,8 +319,8 @@ void main() {
     await tester.pumpWidget(harness(home: const AppShell()));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Send'), findsOneWidget);
-    expect(find.text('Receive'), findsOneWidget);
+    expect(find.text('Send File'), findsOneWidget);
+    expect(find.text('Receive File'), findsOneWidget);
     await capture(tester, '14-home-wide');
   });
 
@@ -441,7 +442,7 @@ void main() {
                     'assets': {
                       'links': [
                         {
-                          'name': 'Free Send for Linux',
+                          'name': 'FreeSend for Linux',
                           'direct_asset_url':
                               'https://gitlab.com/a/freesend.AppImage',
                         },
@@ -473,7 +474,7 @@ void main() {
     unawaited(UpdateSheet.show(tester.element(find.byType(AppShell))));
     await tester.pumpAndSettle();
 
-    expect(find.text('Free Send 9.9.9 is available'), findsOneWidget);
+    expect(find.text('FreeSend 9.9.9 is available'), findsOneWidget);
     expect(find.text('Faster handshakes and a new icon.'), findsOneWidget);
     expect(find.text('Download update'), findsOneWidget);
     expect(tester.takeException(), isNull);

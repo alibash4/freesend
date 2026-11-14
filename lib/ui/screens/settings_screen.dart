@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
@@ -9,6 +9,7 @@ import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
@@ -57,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _chooseFolder() async {
     final appState = context.read<AppState>();
     try {
-      final path = await FilePicker.platform.getDirectoryPath(
+      final path = await FilePicker.getDirectoryPath(
         dialogTitle: 'Choose where received files go',
       );
       if (path == null || path.isEmpty) return;
@@ -116,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.md),
-          child: Text('Settings', style: theme.textTheme.headlineSmall),
+          child: const AppPageTitle('Settings'),
         ),
         const SizedBox(height: AppSpacing.lg),
         Padding(
@@ -166,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
                   onPressed: _chooseFolder,
-                  icon: const Icon(AppIcons.folderOpen, size: 17),
+                  icon: Icon(AppIcons.folderOpen, size: 17),
                   label: const Text('Change folder'),
                 ),
               ),
@@ -184,7 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 child: Row(
                   children: [
-                    for (final (mode, label, icon) in const [
+                    for (final (mode, label, icon) in [
                       (ThemeMode.light, 'Light', AppIcons.sun),
                       (ThemeMode.dark, 'Dark', AppIcons.moon),
                       (ThemeMode.system, 'Auto', AppIcons.auto),
@@ -206,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _UpdateRow(
                   label: 'Minimize to tray on close',
                   subtitle:
-                      'Keep Free Send running in the tray when the window is '
+                      'Keep FreeSend running in the tray when the window is '
                       'closed.',
                   value: appState.minimizeToTray,
                   onChanged: (value) => appState.setMinimizeToTray(value),
@@ -215,7 +216,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const SectionHeader(title: 'Data'),
               Text(
-                'Free Send keeps a local list of past transfers and nothing '
+                'FreeSend keeps a local list of past transfers and nothing '
                 'else. Files are never uploaded — the two devices talk '
                 'directly over the hotspot link.',
                 style: theme.textTheme.bodySmall,
@@ -227,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: appState.history.isEmpty
                       ? null
                       : () => _clearHistory(appState),
-                  icon: const Icon(AppIcons.trash, size: 17),
+                  icon: Icon(AppIcons.trash, size: 17),
                   label: const Text('Clear transfer history'),
                 ),
               ),
@@ -236,7 +237,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _UpdateRow(
                 label: 'Check automatically',
                 subtitle:
-                    'Look for a newer release every time Free Send starts.',
+                    'Look for a newer release every time FreeSend starts.',
                 value: appState.autoUpdate,
                 onChanged: (value) async {
                   await appState.setAutoUpdate(value);
@@ -249,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
                   onPressed: _checkNow,
-                  icon: const Icon(AppIcons.refresh, size: 17),
+                  icon: Icon(AppIcons.refresh, size: 17),
                   label: const Text('Check for updates'),
                 ),
               ),

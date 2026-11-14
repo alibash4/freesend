@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
+import 'package:free_send/services/device_identity.dart';
+import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/transfer/checksum.dart';
+import 'package:free_send/services/transfer/secure_channel.dart';
 import 'package:free_send/services/transfer/frame_channel.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 
@@ -52,12 +56,15 @@ class TransferHost {
     required this.deviceName,
     required this.events,
     required this.instanceId,
+    this.identityStore,
   });
 
   final List<TransferItem> items;
   final String deviceName;
   final HostEvents events;
   final String instanceId;
+  final LocalStore? identityStore;
+  DeviceIdentity? _identity;
 
   ServerSocket? _server;
   final Map<String, _HostPeer> _peers = {};
@@ -66,6 +73,12 @@ class TransferHost {
   Completer<void>? _resumeWaiter;
   int _peerCounter = 0;
   int _port = AppConstants.transferPort;
+
+  Future<DeviceIdentity> _deviceIdentity() {
+    final existing = _identity;
+    if (existing != null) return Future<DeviceIdentity>.value(existing);
+    return DeviceIdentity.load(identityStore).then((value) => _identity = value);
+  }
 
   bool get isListening => _server != null;
   int get port => _port;
@@ -118,8 +131,8 @@ class TransferHost {
       final payload = hello.json();
       final version = (payload['v'] as num?)?.toInt() ?? 1;
       if (version < 1 || version > AppConstants.protocolVersion) {
-        channel.writer.error(
-          'Version mismatch: this device speaks Free Send protocol '
+        await channel.writer.error(
+          'Version mismatch: this device speaks FreeSend protocol '
           'v$AppConstants.protocolVersion',
         );
         await channel.close();
@@ -134,7 +147,42 @@ class TransferHost {
       events.onPeerConnected?.call(peer.name, peer.platform);
       _emitPeers();
 
-      channel.writer.json(FrameType.session, {
+      final clientKey = payload['key'];
+      if (version >= 3 && clientKey is String && clientKey.isNotEmpty) {
+        final salt = base64.decode(
+          (payload['nonce'] as String?) ?? base64.encode(_zeroSalt),
+        );
+        final handshake = await SecureHandshake.withSalt(salt);
+        final hostPublicKey = await handshake.publicKey;
+        final cipher = SecureChannel(await handshake.derive(base64.decode(clientKey)));
+
+        final identity = await _deviceIdentity();
+        final signedMessage = utf8.encode(
+          '${base64.encode(hostPublicKey)}|${base64.encode(salt)}|$instanceId',
+        );
+        final signature = await identity.sign(signedMessage);
+        // The receiver may answer as soon as it sees the ack; hold the read
+        // loop until the cipher is installed so the answer is decrypted.
+        channel.pause();
+        await channel.writer.json(FrameType.helloAck, {
+          'v': 3,
+          'key': base64.encode(hostPublicKey),
+          'identity': identity.publicKeyBase64,
+          'fingerprint': identity.fingerprint,
+          'instanceId': instanceId,
+          'signature': base64.encode(signature),
+        });
+        await channel.writer.flush();
+        channel.useCipher(encrypt: cipher.seal, decrypt: cipher.open);
+        channel.resume();
+        peer.encrypted = true;
+        final confirm = await channel.next(timeout: const Duration(seconds: 20));
+        if (confirm.type != FrameType.helloConfirm) {
+          throw ProtocolException('The receiver did not confirm the key');
+        }
+      }
+
+      await channel.writer.json(FrameType.session, {
         'v': AppConstants.protocolVersion,
         'name': deviceName,
         'platform': Platform.operatingSystem,
@@ -142,6 +190,8 @@ class TransferHost {
         'files': [for (final item in items) item.toWire()],
         'totalBytes': items.fold<int>(0, (sum, item) => sum + item.size),
         'caps': const ['folders', 'checksums', 'pause'],
+        'instanceId': instanceId,
+        'fingerprint': _identity?.fingerprint,
       });
       await channel.writer.flush();
 
@@ -164,17 +214,31 @@ class TransferHost {
         for (final id in (accept.json()['ids'] as List<Object?>? ?? const []))
           if (id is String) id,
       };
+      final offsets = <String, int>{};
+      final rawOffsets = accept.json()['offsets'];
+      if (rawOffsets is Map<Object?, Object?>) {
+        for (final entry in rawOffsets.entries) {
+          final key = entry.key;
+          final value = entry.value;
+          if (key is String && value is num) {
+            offsets[key] = value.toInt();
+          }
+        }
+      }
       final selected =
           items.where((item) => ids.contains(item.id)).toList(growable: false);
       if (selected.isEmpty) {
-        channel.writer.error('No files were selected');
+        await channel.writer.error('No files were selected');
         await channel.close();
         return;
       }
       peer.sending = true;
       peer.selectedIds = [for (final item in selected) item.id];
       peer.totalBytes = selected.fold<int>(0, (sum, item) => sum + item.size);
-      peer.transferred = 0;
+      peer.transferred = selected.fold<int>(
+        0,
+        (sum, item) => sum + (offsets[item.id] ?? 0).clamp(0, item.size),
+      );
       peer.completedFiles = 0;
       peer.currentFile = null;
       peer.status = TransferStatus.active;
@@ -184,7 +248,12 @@ class TransferHost {
       final stopwatch = Stopwatch()..start();
       for (final item in selected) {
         if (peer.aborted || channel.isClosed) break;
-        await _sendFile(channel, item, peer);
+        await _sendFile(
+          channel,
+          item,
+          peer,
+          startOffset: offsets[item.id] ?? 0,
+        );
       }
       stopwatch.stop();
 
@@ -197,7 +266,7 @@ class TransferHost {
       }
 
       final total = selected.fold<int>(0, (sum, item) => sum + item.transferred);
-      channel.writer.json(FrameType.transferEnd, {
+      await channel.writer.json(FrameType.transferEnd, {
         'files': selected.length,
         'bytes': total,
       });
@@ -263,8 +332,9 @@ class TransferHost {
   Future<int> _sendFile(
     FrameChannel channel,
     TransferItem item,
-    _HostPeer peer,
-  ) async {
+    _HostPeer peer, {
+    int startOffset = 0,
+  }) async {
     final path = item.path;
     if (path == null) return 0;
     final file = File(path);
@@ -272,31 +342,72 @@ class TransferHost {
     try {
       handle = await file.open();
     } on FileSystemException {
-      channel.writer.error('Cannot read ${item.name}');
+      await channel.writer.error('Cannot read ${item.name}');
       await channel.writer.flush();
       return 0;
     }
 
-    final hash = Sha256Stream();
-    final relativeSegments = item.relativePath?.split('/') ?? const <String>[];
-    final relativeDir = relativeSegments.length > 1
-        ? relativeSegments.sublist(0, relativeSegments.length - 1).join('/')
-        : null;
-    channel.writer.json(FrameType.fileHeader, {
-      'id': item.id,
-      'name': item.name,
-      'size': item.size,
-      if (relativeDir != null) 'dir': relativeDir,
-    });
-    item.transferred = 0;
-    item.done = false;
-    item.status = TransferStatus.active;
-    peer.currentFile = item.name;
-    peer.status = TransferStatus.active;
-    _emitPeers();
+    final requested = startOffset.clamp(0, item.size);
+    var offset = requested;
+    String? fullDigest;
+    Sha256Stream? hash;
     var sent = 0;
-    var completed = false;
+
     try {
+      final fileLength = await file.length();
+      if (offset >= item.size || offset >= fileLength) {
+        offset = 0;
+      }
+      if (offset != requested) {
+        // The receiver's partial copy is stale; do not count bytes the sender
+        // is about to send again.
+        peer.transferred -= requested - offset;
+      }
+
+      if (offset > 0) {
+        // A resumed file must still end with the digest of the whole file, so
+        // hash the prefix before seeking to the resume point.
+        final prefix = Sha256Stream();
+        await handle.setPosition(0);
+        var remaining = fileLength;
+        while (remaining > 0) {
+          final chunk = await handle.read(
+            remaining < AppConstants.chunkSize
+                ? remaining
+                : AppConstants.chunkSize,
+          );
+          if (chunk.isEmpty) break;
+          prefix.add(chunk);
+          remaining -= chunk.length;
+        }
+        fullDigest = prefix.finish();
+        await handle.setPosition(offset);
+      } else {
+        hash = Sha256Stream();
+      }
+
+      final relativeSegments =
+          item.relativePath?.split('/') ?? const <String>[];
+      final relativeDir = relativeSegments.length > 1
+          ? relativeSegments
+              .sublist(0, relativeSegments.length - 1)
+              .join('/')
+          : null;
+      await channel.writer.json(FrameType.fileHeader, {
+        'id': item.id,
+        'name': item.name,
+        'size': item.size,
+        if (relativeDir != null) 'dir': relativeDir,
+        if (offset > 0) 'offset': offset,
+      });
+      item.transferred = offset;
+      item.done = false;
+      item.status = TransferStatus.active;
+      peer.currentFile = item.name;
+      peer.status = TransferStatus.active;
+      _emitPeers();
+
+      var completed = false;
       while (!peer.aborted && !channel.isClosed) {
         await _waitIfPaused(peer);
         if (peer.aborted || channel.isClosed) break;
@@ -305,9 +416,13 @@ class TransferHost {
           completed = true;
           break;
         }
-        hash.add(chunk);
-        channel.writer.beginDataFrame(chunk.length);
-        channel.writer.data(chunk);
+        hash?.add(chunk);
+        if (channel.writer.isEncrypted) {
+          await channel.writer.frame(FrameType.data, chunk);
+        } else {
+          channel.writer.beginDataFrame(chunk.length);
+          channel.writer.data(chunk);
+        }
         await channel.writer.maybeFlush();
         item.transferred += chunk.length;
         sent += chunk.length;
@@ -315,29 +430,30 @@ class TransferHost {
         _emitPeersThrottled(peer);
         events.onProgress?.call(item, sent);
       }
+
+      if (completed && !channel.isClosed && !peer.aborted) {
+        final digest = hash?.finish() ?? fullDigest;
+        await channel.writer.json(FrameType.fileEnd, {
+          'id': item.id,
+          'sha256': digest,
+        });
+        await channel.writer.flush();
+        item.sha256 = digest;
+        item.done = true;
+        item.status = TransferStatus.done;
+        peer.completedFiles++;
+        peer.currentFile = null;
+        _emitPeers();
+      }
+      return sent;
     } on FileSystemException catch (error) {
       item.status = TransferStatus.failed;
-      channel.writer.error('Read error on ${item.name}: ${error.message}');
+      await channel.writer.error('Read error on ${item.name}: ${error.message}');
       await channel.writer.flush();
+      return sent;
     } finally {
       await handle.close();
     }
-
-    if (completed && !channel.isClosed && !peer.aborted) {
-      final digest = hash.finish();
-      channel.writer.json(FrameType.fileEnd, {
-        'id': item.id,
-        'sha256': digest,
-      });
-      await channel.writer.flush();
-      item.sha256 = digest;
-      item.done = true;
-      item.status = TransferStatus.done;
-      peer.completedFiles++;
-      peer.currentFile = null;
-      _emitPeers();
-    }
-    return sent;
   }
 
   Future<void> _waitIfPaused(_HostPeer peer) async {
@@ -359,7 +475,7 @@ class TransferHost {
     for (final peer in _peers.values) {
       if (peer.finished || peer.channel.isClosed) continue;
       try {
-        peer.channel.writer.json(FrameType.pause, {'reason': reason});
+        await peer.channel.writer.json(FrameType.pause, {'reason': reason});
         await peer.channel.writer.flush();
       } on Object {
         // The peer may already be gone.
@@ -373,7 +489,7 @@ class TransferHost {
     for (final peer in _peers.values) {
       if (peer.finished || peer.channel.isClosed) continue;
       try {
-        peer.channel.writer.json(FrameType.resume, {});
+        await peer.channel.writer.json(FrameType.resume, {});
         await peer.channel.writer.flush();
       } on Object {
         // The peer may already be gone.
@@ -395,7 +511,7 @@ class TransferHost {
       peer.aborted = true;
       peer.status = TransferStatus.failed;
       try {
-        peer.channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
+        await peer.channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
         await peer.channel.writer.flush();
       } on Object {
         // Peer may already be gone.
@@ -450,6 +566,7 @@ class _HostPeer {
   bool aborted = false;
   bool sending = false;
   bool finished = false;
+  bool encrypted = false;
   List<String> selectedIds = const [];
   int transferred = 0;
   int totalBytes = 0;
@@ -470,3 +587,5 @@ class _HostPeer {
         status: status,
       );
 }
+
+const _zeroSalt = <int>[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];

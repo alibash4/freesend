@@ -1,297 +1,195 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:scroll_animator/scroll_animator.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:uicons/uicons.dart';
 
-import 'package:free_send/core/format.dart';
-import 'package:free_send/core/platform_env.dart';
-import 'package:free_send/models/transfer_record.dart';
-import 'package:free_send/state/app_state.dart';
-import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
-import 'package:free_send/ui/shell.dart';
-import 'package:free_send/ui/widgets/brand_mark.dart';
-import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/recent_transfers.dart';
 
-class HomeScreen extends StatefulWidget {
+/// The two ways into a transfer. Send carries the app's muted blue accent, the
+/// same family the bottom navigation uses for its active tab.
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  late final ScrollController _scrollController = AnimatedScrollController(
-    animationFactory: const ChromiumEaseInOut(),
-  );
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final appState = context.watch<AppState>();
-    final recent = appState.history.take(3).toList();
-
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-      children: [
-        Padding(
-          padding: kPagePadding.copyWith(top: AppSpacing.md),
-          child: Row(
-            children: [
-              const BrandMark(),
-              const SizedBox(width: AppSpacing.md),
-              // The title takes what is left; on a narrow page it wraps rather
-              // than pushing past the edge.
-              const Expanded(child: BrandTitle(subtitle: true)),
-            ],
-          ),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.xl,
         ),
-        Padding(
-          padding: kPagePadding.copyWith(top: AppSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Move files over the link, not the internet.',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Free Send pairs two devices on a direct Wi-Fi hotspot and '
-                'streams files between them at link speed. Nothing is uploaded.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: kPagePadding.copyWith(top: AppSpacing.lg),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final cards = [
-                ActionCard(
-                  title: 'Send',
-                  description: PlatformEnv.canCreateHotspot
-                      ? 'Create a hotspot and share the files you pick.'
-                      : 'Share over your current network from this device.',
-                  icon: AppIcons.send,
-                  highlighted: true,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const SendScreen()),
-                  ),
-                  trailing: Icon(
-                    AppIcons.forward,
-                    size: 16,
-                    color: theme.colorScheme.onPrimaryContainer.withValues(
-                      alpha: 0.55,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            Center(
+              child: Image.asset('assets/freesend.png', height: 56),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 600;
+                final gap = compact ? AppSpacing.md : AppSpacing.xl;
+                final available = constraints.maxWidth;
+                // The two actions always sit inline; the cards scale to fit.
+                final width =
+                    ((available - gap) / 2).clamp(compact ? 110.0 : 150.0, 230.0);
+                final tabs = [
+                  _FolderAction(
+                    icon: UIcons.solidRounded.upload,
+                    title: 'Send File',
+                    subtitle: 'Transfer Data',
+                    width: width,
+                    fill: dark
+                        ? AppColors.accentWashDark
+                        : AppColors.accentWash,
+                    ink: dark ? AppColors.accentInkDark : AppColors.accentInk,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SendScreen(),
+                      ),
                     ),
                   ),
-                ),
-                ActionCard(
-                  title: 'Receive',
-                  description: 'Find a nearby session and pull files to disk.',
-                  icon: AppIcons.receive,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const ReceiveScreen(),
+                  _FolderAction(
+                    icon: UIcons.solidRounded.download,
+                    title: 'Receive File',
+                    subtitle: 'Receive Data',
+                    width: width,
+                    fill: dark
+                        ? AppColors.successWashDark
+                        : AppColors.successWash,
+                    ink: dark
+                        ? AppColors.successInkDark
+                        : AppColors.successInk,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ReceiveScreen(),
+                      ),
                     ),
                   ),
-                ),
-              ];
-              if (constraints.maxWidth > 520) {
-                // The cards are height-independent in a Row; stretch only
-                // makes sense when the Row has a bounded height.
-                return IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(child: cards[0]),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(child: cards[1]),
-                    ],
-                  ),
+                ];
+                final rowWidth = width * 2 + gap;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        tabs.first,
+                        SizedBox(width: gap),
+                        tabs.last,
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    SizedBox(
+                      width: rowWidth,
+                      child: const RecentTransfers(),
+                    ),
+                  ],
                 );
-              }
-              return Column(
-                children: [
-                  cards[0],
-                  const SizedBox(height: AppSpacing.md),
-                  cards[1],
-                ],
-              );
-            },
-          ),
-        ),
-        Padding(
-          padding: kPagePadding.copyWith(top: AppSpacing.xl),
-          child: const _HowItWorks(),
-        ),
-        Padding(
-          padding: kPagePadding.copyWith(top: AppSpacing.xl),
-          child: SectionHeader(
-            title: 'Recent activity',
-            action: recent.isEmpty
-                ? null
-                : Text(
-                    formatCount(appState.history.length, 'transfer'),
-                    style: theme.textTheme.bodySmall,
-                  ),
-          ),
-        ),
-        if (recent.isEmpty)
-          const Padding(
-            padding: kPagePadding,
-            child: EmptyState(
-              icon: AppIcons.inbox,
-              title: 'No transfers yet',
-              message:
-                  'Your completed and cancelled transfers will appear here.',
+              },
             ),
-          )
-        else
-          Padding(
-            padding: kPagePadding,
-            child: Column(
-              children: [
-                for (var i = 0; i < recent.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: theme.colorScheme.hairline,
-                    ),
-                  _RecentRow(record: recent[i]),
-                ],
-              ],
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _HowItWorks extends StatelessWidget {
-  const _HowItWorks();
+/// A simple rounded action card with centered content.
+///
+/// The fill is a single neutral token by default; [fill] and [ink] override it
+/// for a muted accent variant.
+class _FolderAction extends StatelessWidget {
+  const _FolderAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.width,
+    required this.onTap,
+    this.fill,
+    this.ink,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    const steps = [
-      (AppIcons.hotspot, 'Connect', 'One side opens a hotspot'),
-      (AppIcons.zap, 'Stream', 'Files cross the local link'),
-      (AppIcons.checkCircle, 'Done', 'Saved straight to disk'),
-    ];
-    final theme = Theme.of(context);
-    // Three steps, set straight on the page: no panel, just an accent glyph
-    // and a hairline between the columns.
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < steps.length; i++) ...[
-          if (i > 0)
-            Container(
-              width: 1,
-              height: 52,
-              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              color: theme.colorScheme.hairline,
-            ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  steps[i].$1,
-                  size: 18,
-                  color: theme.colorScheme.accentText,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  steps[i].$2,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  steps[i].$3,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final double width;
+  final VoidCallback onTap;
 
-class _RecentRow extends StatelessWidget {
-  const _RecentRow({required this.record});
-
-  final TransferRecord record;
+  /// Optional muted fill and content colour; the neutral card is the default.
+  final Color? fill;
+  final Color? ink;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final isSend = record.direction == TransferDirection.send;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
+    final dark = theme.brightness == Brightness.dark;
+    final cardFill =
+        fill ?? (dark ? AppColors.neutral800 : AppColors.neutral100);
+    final cardInk =
+        ink ?? (dark ? AppColors.neutral100 : AppColors.neutral800);
+    final height = width * 0.97;
+
+    return Semantics(
+      button: true,
+      label: title,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: DecoratedBox(
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(9),
+              color: cardFill,
+              borderRadius: BorderRadius.circular(width * 0.08),
             ),
-            child: Icon(
-              isSend ? AppIcons.send : AppIcons.receive,
-              size: 15,
-              color: record.succeeded ? scheme.accentText : scheme.error,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${isSend ? 'Sent to' : 'Received from'} ${record.peerName}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: width * 0.067),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: width * 0.24, color: cardInk),
+                    SizedBox(height: height * 0.055),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: cardInk,
+                        fontSize: (width * 0.11).clamp(15.0, 18.0),
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: cardInk.withValues(alpha: 0.72),
+                        fontSize: (width * 0.08).clamp(11.5, 13.0),
+                        height: 1.3,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${formatCount(record.fileCount, 'file')} · '
-                  '${formatTimestamp(record.timestamp)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            formatBytes(record.bytes),
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

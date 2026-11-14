@@ -25,6 +25,13 @@ abstract final class FrameType {
   static const resume = 13;
   /// Per-file status for UI that is not the active transfer screen.
   static const fileStatus = 14;
+  /// Server's ephemeral key and identity signature for the encrypted handshake.
+  static const helloAck = 15;
+  /// Receiver acknowledges the ephemeral key, so the host can start sending
+  /// encrypted frames only after both sides have switched ciphers.
+  static const helloConfirm = 16;
+  /// Outer envelope for an encrypted frame. The payload is the sealed frame.
+  static const secure = 17;
 }
 
 class Frame {
@@ -64,6 +71,11 @@ abstract final class FrameCodec {
     frame.setRange(5, frame.length, body);
     return frame;
   }
+
+  static int typeOf(Uint8List frame) => frame[0];
+
+  static int lengthOf(Uint8List frame) =>
+      ByteData.sublistView(frame, 1, 5).getUint32(0, Endian.big);
 }
 
 /// Reassembles frames from arbitrary TCP chunk boundaries.
@@ -148,9 +160,37 @@ class FrameWriter {
   final Socket _socket;
   int _pending = 0;
   static const _flushThreshold = 4 * 1024 * 1024;
+  Future<Uint8List> Function(Uint8List)? _encrypt;
 
-  void json(int type, Map<String, Object?> payload) {
-    _socket.add(FrameCodec.json(type, payload));
+  bool get isEncrypted => _encrypt != null;
+
+  void useCipher(Future<Uint8List> Function(Uint8List) encrypt) {
+    _encrypt = encrypt;
+  }
+
+  Future<void> json(int type, Map<String, Object?> payload) =>
+      _write(FrameCodec.json(type, payload));
+
+  Future<void> frame(int type, List<int> payload) {
+    final body = Uint8List.fromList(payload);
+    final frame = Uint8List(5 + body.length);
+    frame[0] = type;
+    ByteData.view(frame.buffer).setUint32(1, body.length, Endian.big);
+    frame.setRange(5, frame.length, body);
+    return _write(frame);
+  }
+
+  Future<void> _write(Uint8List frame) async {
+    final encrypt = _encrypt;
+    if (encrypt == null) {
+      _socket.add(frame);
+      _pending += frame.length;
+      return;
+    }
+    final out = await encrypt(frame);
+    _socket.add(FrameCodec.header(FrameType.secure, out.length));
+    _socket.add(out);
+    _pending += out.length + 5;
   }
 
   void beginDataFrame(int length) {
@@ -175,9 +215,8 @@ class FrameWriter {
     await _socket.flush();
   }
 
-  void error(String message) {
-    json(FrameType.error, {'message': message});
-  }
+  Future<void> error(String message) =>
+      json(FrameType.error, {'message': message});
 }
 
 const u8Empty = <int>[];

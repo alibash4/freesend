@@ -9,5 +9,8 @@ class MainActivity : FlutterActivity() {
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         HotspotBridge(applicationContext, messenger)
         UpdateBridge(applicationContext, messenger)
+        TransferBridge(applicationContext, messenger)
+        AppPackagesBridge(applicationContext, messenger)
+        SafBridge(applicationContext, messenger)
     }
 }

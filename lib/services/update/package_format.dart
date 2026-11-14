@@ -20,13 +20,16 @@ enum PackageFormat {
 
   /// Windows build: a zip of the release folder, which contains the exe.
   windows,
+
+  /// macOS app bundle, shipped inside a disk image.
+  macOS,
 }
 
 /// Reads the format written next to the binary by the packaging scripts.
 ///
 /// The file is named `package-kind` and contains one of `deb`, `rpm`,
-/// `bundle`, `appimage`. AppImage launches also set `APPIMAGE`, which wins
-/// so a bundle packed inside an AppImage is not treated as a raw install.
+/// `bundle`, `appimage`, `dmg`. AppImage launches also set `APPIMAGE`, which
+/// wins so a bundle packed inside an AppImage is not treated as a raw install.
 PackageFormat detectPackageFormat({
   Map<String, String>? environment,
   String? executablePath,
@@ -37,6 +40,7 @@ PackageFormat detectPackageFormat({
 
   if (Platform.isAndroid) return PackageFormat.android;
   if (Platform.isWindows) return PackageFormat.windows;
+  if (Platform.isMacOS) return PackageFormat.macOS;
 
   final marker = (markerText ?? _readMarker(executablePath))?.trim().toLowerCase();
   return switch (marker) {
@@ -44,6 +48,7 @@ PackageFormat detectPackageFormat({
     'rpm' => PackageFormat.rpm,
     'appimage' => PackageFormat.appImage,
     'bundle' => PackageFormat.bundle,
+    'dmg' => PackageFormat.macOS,
     _ => Platform.isLinux ? PackageFormat.bundle : PackageFormat.windows,
   };
 }
@@ -61,6 +66,23 @@ String? _readMarker(String? executablePath) {
   }
 }
 
+/// The format a downloaded file implies from its own name, or null when the
+/// name carries no extension this app recognises.
+PackageFormat? formatForFile(String path) {
+  final name = path.toLowerCase();
+  if (name.endsWith('.appimage')) return PackageFormat.appImage;
+  if (name.endsWith('.deb')) return PackageFormat.deb;
+  if (name.endsWith('.rpm')) return PackageFormat.rpm;
+  if (name.endsWith('.tar.gz') || name.endsWith('.tgz')) {
+    return PackageFormat.bundle;
+  }
+  if (name.endsWith('.dmg')) return PackageFormat.macOS;
+  if (name.endsWith('.zip') || name.endsWith('.exe')) {
+    return PackageFormat.windows;
+  }
+  return null;
+}
+
 /// Substrings the release asset name must contain, in preference order.
 ///
 /// The first list entry is the format this install wants. Later entries are
@@ -72,4 +94,5 @@ List<String> formatMarkers(PackageFormat format) => switch (format) {
       PackageFormat.rpm => const ['(rpm)', 'bundle', 'appimage'],
       PackageFormat.bundle => const ['(bundle)', 'appimage', '(deb)', '(rpm)'],
       PackageFormat.windows => const ['(exe)', 'windows'],
+      PackageFormat.macOS => const ['(dmg)'],
     };

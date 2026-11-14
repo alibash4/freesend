@@ -11,6 +11,7 @@ class TransferRecord {
     required this.timestamp,
     required this.durationMs,
     required this.succeeded,
+    this.fileNames = const [],
     this.peerPlatform,
   });
 
@@ -23,6 +24,10 @@ class TransferRecord {
   final DateTime timestamp;
   final int durationMs;
   final bool succeeded;
+
+  /// A short sample of the transferred file names, kept for the recent list.
+  /// Older records fall back to an empty list.
+  final List<String> fileNames;
 
   double get averageBytesPerSecond {
     if (durationMs <= 0) return 0;
@@ -39,6 +44,7 @@ class TransferRecord {
         'timestamp': timestamp.toIso8601String(),
         'durationMs': durationMs,
         'succeeded': succeeded,
+        if (fileNames.isNotEmpty) 'fileNames': fileNames,
       };
 
   static TransferRecord? fromJson(Map<String, Object?> json) {
@@ -58,6 +64,10 @@ class TransferRecord {
       timestamp: timestamp,
       durationMs: (json['durationMs'] as num?)?.toInt() ?? 0,
       succeeded: json['succeeded'] as bool? ?? true,
+      fileNames: (json['fileNames'] as List<Object?>?)
+              ?.map((name) => name.toString())
+              .toList(growable: false) ??
+          const [],
     );
   }
 }

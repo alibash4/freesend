@@ -21,21 +21,102 @@ jobs:
       - checkout
       - flutter/install_sdk_and_pub:
           channel: stable
-          version: 3.47.5
+          version: 3.50.0
       - run:
           name: Build macOS
           command: flutter build macos --release
       - run:
           name: Package the app
           command: |
-            mkdir -p dist
+            set -euo pipefail
             APP=$(find "build/macos/Build/Products/Release" -maxdepth 1 -name '*.app' -print -quit)
             if [ -z "$APP" ]; then echo "No built .app found" >&2; exit 1; fi
+
+            mkdir -p dist
             ditto -c -k --keepParent "$APP" "dist/freesend-macos.zip"
+
+            # A DMG is what a macOS user expects: mount it, drag the app onto
+            # Applications. hdiutil ships with the OS, so there is nothing to
+            # install on the executor.
+            STAGE="$(mktemp -d)"
+            cp -R "$APP" "$STAGE/"
+            ln -s /Applications "$STAGE/Applications"
+            hdiutil create \
+              -volname "FreeSend" \
+              -srcfolder "$STAGE" \
+              -fs HFS+ \
+              -format UDZO \
+              -ov \
+              -quiet \
+              "dist/freesend-macos.dmg"
+            rm -rf "$STAGE"
+
+            ls -lh dist/
+      - run:
+          name: Attach the macOS build to the GitLab release
+          command: |
+            set -euo pipefail
+            : "${RELEASE_TOKEN:?Set RELEASE_TOKEN to a GitLab project access token with the api scope.}"
+            : "${CIRCLE_TAG:?This job only runs on tags.}"
+
+            GITLAB_API="https://gitlab.com/api/v4/projects/88767048"
+            ASSET_NAME="FreeSend for macOS (dmg)"
+            FILE="dist/freesend-macos.dmg"
+
+            if [ ! -f "$FILE" ]; then
+              echo "$FILE was not produced" >&2
+              exit 1
+            fi
+
+            # Upload to GitLab first: a release asset link points at the
+            # uploaded file.
+            UPLOAD_RESPONSE="$(
+              curl --silent --show-error --fail \
+                --request POST \
+                --header "PRIVATE-TOKEN: ${RELEASE_TOKEN}" \
+                --form "file=@${FILE}" \
+                "${GITLAB_API}/uploads"
+            )"
+            UPLOAD_PATH="$(printf '%s' "$UPLOAD_RESPONSE" | sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+            if [ -z "$UPLOAD_PATH" ]; then
+              echo "Upload failed: $UPLOAD_RESPONSE" >&2
+              exit 1
+            fi
+            UPLOAD_URL="https://gitlab.com${UPLOAD_PATH}"
+            echo "Uploaded ${FILE} to ${UPLOAD_URL}"
+
+            # The release is expected to already exist: create it in GitLab
+            # before pushing the tag, as the README describes.
+            BODY="$(
+              printf '{"name":"%s","url":"%s","direct_asset_url":"%s","link_type":"package"}' \
+                "$ASSET_NAME" "$UPLOAD_URL" "$UPLOAD_URL"
+            )"
+            HTTP_CODE="$(
+              curl --silent --show-error \
+                --request POST \
+                --header "PRIVATE-TOKEN: ${RELEASE_TOKEN}" \
+                --header "Content-Type: application/json" \
+                --data "${BODY}" \
+                --output /dev/null \
+                --write-out '%{http_code}' \
+                "${GITLAB_API}/releases/${CIRCLE_TAG}/assets/links"
+            )"
+            case "$HTTP_CODE" in
+              2*) echo "Attached ${ASSET_NAME} to release ${CIRCLE_TAG}." ;;
+              *)
+                echo "Could not attach ${ASSET_NAME} to release ${CIRCLE_TAG} (HTTP ${HTTP_CODE})." >&2
+                echo "Create the release in GitLab before pushing the tag." >&2
+                exit 1
+                ;;
+            esac
       - store_artifacts:
           path: dist
 
 workflows:
   macos:
+    # CircleCI only builds releases. GitLab CI handles every push to main, and
+    # the trigger filter on the CircleCI side does the same job; this is a
+    # second layer in case another trigger is ever added.
+    when: pipeline.git.tag != ""
     jobs:
       - build-macos

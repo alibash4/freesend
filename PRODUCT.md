@@ -15,7 +15,7 @@ desktops.
 
 ## Product Purpose
 
-Free Send moves files directly between devices over a local link. It exists so
+FreeSend moves files directly between devices over a local link. It exists so
 a transfer does not depend on an account, an upload, a subscription, or a
 content feed. Success is a predictable, resumable transfer that arrives intact
 and works the same way on every supported platform.
@@ -40,24 +40,28 @@ Dock.
 
 Confirmed product facts:
 
-- Android, iOS, Windows, Linux, and macOS. iOS cannot create a hotspot, so it
-  joins the network the sender selects.
+- Android, Windows, Linux, and macOS. The iOS target was dropped; Apple does
+  not allow an app to create a hotspot and the platform was removed from the
+  build.
 - Current baseline is one sender to multiple receivers, files and folders, over a
-  TCP session found by UDP beacons or a pairing code. Protocol v2 adds folder
-  paths, SHA-256 verification, sender-side pause/resume, and a v1 fallback.
-- Hotspot creation is native on Android and Linux; Windows, macOS, and iOS use
-  the network the user selects, with system guidance.
+  TCP session found by UDP beacons or a pairing code. Protocol v3 adds folder
+  paths, SHA-256 verification, sender-side pause/resume, reconnect/resume,
+  per-file retry, X25519 + AES-256-GCM encryption, and pinned device identities.
+  A v1/v2 plaintext fallback remains for older peers.
+- Hotspot creation is native on Android and Linux; Windows and macOS use the
+  network the user selects, with system guidance.
 - History is local-only and capped.
 
-Required for the fully-fledged pass, confirmed by the user:
+Implemented in the fully-fledged pass:
 
-- Core transfer hardening: folder picks, pause/resume, retry, background
-  transfers, per-file status, and integrity verification.
+- Core transfer hardening: folder picks, pause/resume, reconnect/resume with a
+  recovery sidecar, per-file retry, Android foreground-service background
+  transfers, per-file status, and SHA-256 verification.
 - Group sharing: one sender streaming to multiple receivers in one session.
-- Media and file browser: photos, videos, audio, documents, apps, and other
-  files, with search and folder selection.
-- Encryption and trusted devices: authenticated, encrypted local sessions with
-  per-session trust.
+- Media and file browser: photos, videos, audio, documents, installed app
+  bundles, recents, search, and Android Storage Access Framework folders.
+- Encryption and trusted devices: X25519 key exchange, AES-256-GCM frames,
+  Ed25519 device signatures, and trust-on-first-use pinning.
 - App/APK sharing on Android: list installed apps, extract the APK, send it,
   and offer the install flow on the receiver.
 
@@ -67,16 +71,18 @@ Explicitly out of scope:
 - No app cleaner, ads, content feed, games, or remote-control suite.
 - No cloud sync or account system.
 
-Open decisions a builder must not invent:
+Resolved implementation decisions:
 
-- Protocol version 2 migration and backward compatibility.
-- Encryption handshake and library choice.
-- Android folder access and background-service implementation.
-- How group sessions present multiple receivers and per-receiver progress.
+- Protocol v3 is the current wire format; v1/v2 peers fall back to plaintext.
+- Encryption uses `cryptography` (X25519, HKDF-SHA256, AES-256-GCM, Ed25519).
+- Android folders granted through the Storage Access Framework are copied into
+  the app cache by `SafBridge.kt`; a foreground service with a data-sync type
+  keeps transfers alive in the background.
+- Group sessions show each receiver as a peer row with per-receiver progress.
 
 ## Brand Commitments
 
-Name: Free Send. Promise: direct transfer, no cloud. The current restrained
+Name: FreeSend. Promise: direct transfer, no cloud. The current restrained
 accent-and-neutral visual system stays the baseline; the user chose features
 first, so this pass does not replace the visual world.
 
@@ -84,9 +90,11 @@ first, so this pass does not replace the visual world.
 
 Working Flutter app in this repository with send/receive controllers, hotspot
 services, UDP discovery, a framed TCP protocol, local history, settings, and
-tests. Protocol v2 supports multi-receiver sessions, folder-shaped writes,
-SHA-256 checks, and sender-side pause/resume. Encryption/trusted devices and
-Android app/APK sharing are not implemented.
+tests. Protocol v3 supports multi-receiver sessions, folder-shaped writes,
+SHA-256 checks, sender/receiver pause, reconnect/resume, per-file retry,
+encryption, pinned identities, an Android foreground service, a media browser,
+and app/APK sharing. The Android debug APK builds against Flutter 3.50 / Gradle
+9.5 / AGP 9.3.1.
 
 ## Product Principles
 

@@ -13,9 +13,9 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Free Send connects directly to the other device over a local hotspot to transfer your files. Nothing leaves your network.</string>
+	<string>FreeSend connects directly to the other device over a local hotspot to transfer your files. Nothing leaves your network.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Free Send uses the camera only to read the pairing code shown on the other device.</string>
+	<string>FreeSend uses the camera only to read the pairing code shown on the other device.</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>

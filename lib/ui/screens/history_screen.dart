@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
@@ -7,6 +7,7 @@ import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
@@ -71,7 +72,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: Row(
             children: [
               Expanded(
-                child: Text('History', style: theme.textTheme.headlineSmall),
+                child: const AppPageTitle('History'),
               ),
               if (records.isNotEmpty)
                 TextButton(
@@ -93,10 +94,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         const SizedBox(height: AppSpacing.lg),
         if (records.isEmpty)
-          const Padding(
+          Padding(
             padding: kPagePadding,
-            child: EmptyState(
-              icon: AppIcons.history,
+             child: EmptyState(
+               icon: AppIcons.history,
               title: 'No history',
               message:
                   'Completed and cancelled transfers are recorded here, on this '

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:free_send/services/pairing_code.dart';
@@ -44,7 +44,7 @@ class PairingCard extends StatelessWidget {
               dataModuleShape: QrDataModuleShape.square,
               color: AppColors.ink,
             ),
-            semanticsLabel: 'Free Send pairing code',
+            semanticsLabel: 'FreeSend pairing code',
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -57,9 +57,9 @@ class PairingCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(
           code.hasHotspot
-              ? 'On the other device, open Free Send, choose Receive, and scan '
+              ? 'On the other device, open FreeSend, choose Receive, and scan '
                   'this. It joins the hotspot and connects on its own.'
-              : 'On the other device, open Free Send, choose Receive, and scan '
+              : 'On the other device, open FreeSend, choose Receive, and scan '
                   'this to connect without typing an address.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall,
@@ -68,7 +68,7 @@ class PairingCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           TextButton.icon(
             onPressed: onCopy,
-            icon: const Icon(AppIcons.copy, size: 16),
+            icon: Icon(AppIcons.copy, size: 16),
             label: const Text('Copy code'),
           ),
         ],

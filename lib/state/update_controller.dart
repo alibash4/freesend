@@ -2,7 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+
+import 'package:free_send/core/app_constants.dart';
 
 import 'package:free_send/services/update/update_info.dart';
 import 'package:free_send/services/update/update_installer.dart';
@@ -68,13 +69,7 @@ class UpdateController extends ChangeNotifier {
   /// Loads the app version once; safe to call repeatedly.
   Future<void> load() async {
     if (_currentVersion.isNotEmpty) return;
-    try {
-      final info = await PackageInfo.fromPlatform();
-      _currentVersion = info.version;
-    } on Object {
-      // A missing version should not block the app.
-      _currentVersion = '0.0.0';
-    }
+    _currentVersion = AppConstants.appVersion;
     notifyListeners();
   }
 

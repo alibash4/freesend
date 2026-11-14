@@ -1,4 +1,4 @@
-# Free Send
+# FreeSend
 
 A free, open implementation of the SHAREit idea: move files between two devices
 over a **direct Wi-Fi hotspot**, with no cloud, no account, no upload limit and
@@ -36,8 +36,8 @@ OS does not expose hotspot creation to applications, so the app shares over the
 network the device is already on and tells you where to enable a system hotspot
 if you want the fastest link.
 
-The tray icon appears while Free Send is running on Windows and Linux. Right-click
-it for the native menu (**Open Free Send**, **Quit Free Send**); a left click
+The tray icon appears while FreeSend is running on Windows and Linux. Right-click
+it for the native menu (**Open FreeSend**, **Quit FreeSend**); a left click
 restores the window. Windows and Linux have a **Minimize to tray on close**
 toggle in Settings. GNOME needs the AppIndicator extension installed to show the
 icon. macOS uses the Dock: closing the window follows the normal macOS app
@@ -46,12 +46,13 @@ lifecycle and there is no close-to-tray toggle.
 Linux builds need the tray library at build time and run time:
 
 ```bash
-sudo apt install libayatana-appindicator3-dev      # Debian/Ubuntu build
-sudo dnf install libayatana-appindicator-gtk3      # Fedora runtime
+sudo apt install libayatana-appindicator3-dev        # Debian/Ubuntu build
+sudo dnf install libayatana-appindicator-gtk3-devel  # Fedora build
+sudo dnf install libayatana-appindicator-gtk3        # Fedora runtime
 ```
 
-iOS is intentionally not targeted: Apple does not allow an app to create a
-hotspot.
+The iOS target was removed from this repository: Apple does not allow an app to
+create a hotspot, and the platform is no longer built.
 
 ## How it works
 
@@ -108,7 +109,7 @@ No camera (Windows or Linux receivers, or a code sent through a chat app)? Tap
 *Copy code* on the sender and *Enter code* on the receiver, join the hotspot from
 the system Wi-Fi menu, or use *Connect by address*.
 
-Received files go to `Downloads/Free Send` on desktop and to the app's external
+Received files go to `Downloads/FreeSend` on desktop and to the app's external
 files directory on Android (changeable in Settings).
 
 ## Updating
@@ -129,18 +130,18 @@ the app downloads the package that matches how it was installed:
 
 | Asset name | File | Who gets it |
 | --- | --- | --- |
-| `Free Send for Android (32-bit)` | armeabi-v7a APK | 32-bit phones |
-| `Free Send for Android (64-bit)` | arm64-v8a APK | 64-bit phones |
-| `Free Send for Android (universal)` | all ABIs, including emulators | x86_64, or when no split matches |
-| `Free Send for Linux x86_64 (AppImage)` | `.AppImage` for x86_64 | x86_64 AppImage (`APPIMAGE` is set) |
-| `Free Send for Linux x86_64 (deb)` | `.deb` for amd64 | Debian/Ubuntu package (`package-kind` is `deb`) |
-| `Free Send for Linux x86_64 (rpm)` | `.rpm` for x86_64 | Fedora/RHEL package (`package-kind` is `rpm`) |
-| `Free Send for Linux x86_64 (bundle)` | `.tar.gz` of the raw x86_64 build | an unpacked `free_send` bundle |
-| `Free Send for Linux aarch64 (AppImage)` | `.AppImage` for aarch64 | arm64 AppImage (`APPIMAGE` is set) |
-| `Free Send for Linux aarch64 (deb)` | `.deb` for arm64 | Debian/Ubuntu package on arm64 |
-| `Free Send for Linux aarch64 (rpm)` | `.rpm` for aarch64 | Fedora/RHEL package on arm64 |
-| `Free Send for Linux aarch64 (bundle)` | `.tar.gz` of the raw aarch64 build | an unpacked `free_send` bundle on arm64 |
-| `Free Send for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
+| `FreeSend for Android (32-bit)` | armeabi-v7a APK | 32-bit phones |
+| `FreeSend for Android (64-bit)` | arm64-v8a APK | 64-bit phones |
+| `FreeSend for Android (universal)` | all ABIs, including emulators | x86_64, or when no split matches |
+| `FreeSend for Linux x86_64 (AppImage)` | `.AppImage` for x86_64 | x86_64 AppImage (`APPIMAGE` is set) |
+| `FreeSend for Linux x86_64 (deb)` | `.deb` for amd64 | Debian/Ubuntu package (`package-kind` is `deb`) |
+| `FreeSend for Linux x86_64 (rpm)` | `.rpm` for x86_64 | Fedora/RHEL package (`package-kind` is `rpm`) |
+| `FreeSend for Linux x86_64 (bundle)` | `.tar.gz` of the raw x86_64 build | an unpacked `free_send` bundle |
+| `FreeSend for Linux aarch64 (AppImage)` | `.AppImage` for aarch64 | arm64 AppImage (`APPIMAGE` is set) |
+| `FreeSend for Linux aarch64 (deb)` | `.deb` for arm64 | Debian/Ubuntu package on arm64 |
+| `FreeSend for Linux aarch64 (rpm)` | `.rpm` for aarch64 | Fedora/RHEL package on arm64 |
+| `FreeSend for Linux aarch64 (bundle)` | `.tar.gz` of the raw aarch64 build | an unpacked `free_send` bundle on arm64 |
+| `FreeSend for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
 
 The Android ABI is read from the device, so a 64-bit phone downloads the
 smaller split instead of the universal APK. On Linux the architecture is read
@@ -150,7 +151,7 @@ back to the raw bundle, then the AppImage. Installing a deb or rpm asks the
 system for permission (`pkexec`). An AppImage, the raw bundle, and the Windows
 zip replace themselves after the app exits and then relaunch.
 
-Android requires the user to grant *install unknown apps* to Free Send; the
+Android requires the user to grant *install unknown apps* to FreeSend; the
 install bridge checks for it and points at the system page when it is missing.
 Every platform must be signed with the same key as the installed copy or the
 installer refuses the update.
