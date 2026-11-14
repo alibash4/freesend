@@ -2,7 +2,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:uicons/uicons.dart';
 
 import 'package:free_send/theme/app_theme.dart';
-import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/recent_transfers.dart';
@@ -28,17 +27,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             const SizedBox(height: AppSpacing.md),
             Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset('assets/freesend.png', height: 56),
-                  const SizedBox(height: AppSpacing.sm),
-                  const AppPageTitle(
-                    'FreeSend',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
+              child: Image.asset('assets/freesend.png', height: 56),
             ),
             const SizedBox(height: AppSpacing.xl),
             LayoutBuilder(
