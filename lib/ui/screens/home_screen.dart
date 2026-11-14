@@ -1,135 +1,204 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:uicons/uicons.dart';
 
-import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
-import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/widgets/recent_transfers.dart';
 
+/// The two ways into a transfer. Send carries the app's muted blue accent, the
+/// same family the bottom navigation uses for its active tab.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const sendColor = Color(0xFF1EFF7C);
-    const receiveColor = Color(0xFF1E90FF);
-    const sendIconColor = Color(0xFF1C1C1C);
-    const receiveIconColor = Color(0xFFFFFFFF);
-
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return SafeArea(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: kPagePadding,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 600;
-              final gap = compact ? AppSpacing.lg : AppSpacing.xl;
-              final available = constraints.maxWidth - AppSpacing.lg * 2 - gap;
-              final diameter = (available / 2)
-                  .clamp(compact ? 80.0 : 96.0, compact ? 108.0 : 140.0);
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.md,
+          AppSpacing.xl,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _CircleAction(
-                    icon: AppIcons.sendPlane,
-                    label: 'Send',
-                    diameter: diameter,
-                    color: sendColor,
-                    iconColor: sendIconColor,
+                  Image.asset('assets/freesend.png', height: 56),
+                  const SizedBox(height: AppSpacing.sm),
+                  const AppPageTitle(
+                    'FreeSend',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 600;
+                final gap = compact ? AppSpacing.md : AppSpacing.xl;
+                final available = constraints.maxWidth;
+                // The two actions always sit inline; the cards scale to fit.
+                final width =
+                    ((available - gap) / 2).clamp(compact ? 110.0 : 150.0, 230.0);
+                final tabs = [
+                  _FolderAction(
+                    icon: UIcons.solidRounded.upload,
+                    title: 'Send File',
+                    subtitle: 'Transfer Data',
+                    width: width,
+                    fill: dark
+                        ? AppColors.accentWashDark
+                        : AppColors.accentWash,
+                    ink: dark ? AppColors.accentInkDark : AppColors.accentInk,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => const SendScreen(),
                       ),
                     ),
                   ),
-                  SizedBox(width: gap),
-                  _CircleAction(
-                    icon: AppIcons.inbox,
-                    label: 'Receive',
-                    diameter: diameter,
-                    color: receiveColor,
-                    iconColor: receiveIconColor,
+                  _FolderAction(
+                    icon: UIcons.solidRounded.download,
+                    title: 'Receive File',
+                    subtitle: 'Receive Data',
+                    width: width,
+                    fill: dark
+                        ? AppColors.successWashDark
+                        : AppColors.successWash,
+                    ink: dark
+                        ? AppColors.successInkDark
+                        : AppColors.successInk,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => const ReceiveScreen(),
                       ),
                     ),
                   ),
-                ],
-              );
-            },
-          ),
+                ];
+                final rowWidth = width * 2 + gap;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        tabs.first,
+                        SizedBox(width: gap),
+                        tabs.last,
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    SizedBox(
+                      width: rowWidth,
+                      child: const RecentTransfers(),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _CircleAction extends StatefulWidget {
-  const _CircleAction({
+/// A simple rounded action card with centered content.
+///
+/// The fill is a single neutral token by default; [fill] and [ink] override it
+/// for a muted accent variant.
+class _FolderAction extends StatelessWidget {
+  const _FolderAction({
     required this.icon,
-    required this.label,
-    required this.diameter,
-    required this.color,
-    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.width,
     required this.onTap,
+    this.fill,
+    this.ink,
   });
 
   final IconData icon;
-  final String label;
-  final double diameter;
-  final Color color;
-  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final double width;
   final VoidCallback onTap;
 
-  @override
-  State<_CircleAction> createState() => _CircleActionState();
-}
-
-class _CircleActionState extends State<_CircleAction> {
-  bool _hovered = false;
+  /// Optional muted fill and content colour; the neutral card is the default.
+  final Color? fill;
+  final Color? ink;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final circle = _hovered
-        ? Color.lerp(widget.color, const Color(0xFF000000), 0.16)!
-        : widget.color;
+    final dark = theme.brightness == Brightness.dark;
+    final cardFill =
+        fill ?? (dark ? AppColors.neutral800 : AppColors.neutral100);
+    final cardInk =
+        ink ?? (dark ? AppColors.neutral100 : AppColors.neutral800);
+    final height = width * 0.97;
+
     return Semantics(
       button: true,
-      label: widget.label,
+      label: title,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
-          onTap: widget.onTap,
+          onTap: onTap,
           behavior: HitTestBehavior.opaque,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: widget.diameter,
-                height: widget.diameter,
-                decoration: BoxDecoration(
-                  color: circle,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  widget.icon,
-                  size: widget.diameter * 0.38,
-                  color: widget.iconColor,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: cardFill,
+              borderRadius: BorderRadius.circular(width * 0.08),
+            ),
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: width * 0.067),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: width * 0.24, color: cardInk),
+                    SizedBox(height: height * 0.055),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: cardInk,
+                        fontSize: (width * 0.11).clamp(15.0, 18.0),
+                        height: 1.15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: cardInk.withValues(alpha: 0.72),
+                        fontSize: (width * 0.08).clamp(11.5, 13.0),
+                        height: 1.3,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                widget.label,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

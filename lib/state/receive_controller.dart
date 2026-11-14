@@ -639,6 +639,12 @@ class ReceiveController extends ChangeNotifier {
       timestamp: DateTime.now(),
       durationMs: duration.inMilliseconds,
       succeeded: ok,
+      fileNames: manifest?.items
+              .where((item) => item.done || item.transferred > 0)
+              .map((item) => item.name)
+              .take(4)
+              .toList(growable: false) ??
+          const [],
     );
     lastRecord = record;
     await appState.recordTransfer(record);

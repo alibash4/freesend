@@ -445,6 +445,11 @@ class SendController extends ChangeNotifier {
       timestamp: DateTime.now(),
       durationMs: duration.inMilliseconds,
       succeeded: ok,
+      fileNames: items
+          .where((item) => item.done || item.transferred > 0)
+          .map((item) => item.name)
+          .take(4)
+          .toList(growable: false),
     );
     lastRecord = record;
     await appState.recordTransfer(record);
