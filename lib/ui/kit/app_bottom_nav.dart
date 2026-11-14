@@ -46,10 +46,9 @@ class AppBottomNav extends StatelessWidget {
         child: SizedBox(
           height: 56,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               for (var i = 0; i < items.length; i++)
-                Flexible(
+                Expanded(
                   child: _AppNavItemView(
                     item: items[i],
                     selected: i == selectedIndex,
