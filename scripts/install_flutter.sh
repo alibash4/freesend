@@ -12,6 +12,7 @@ ROOT="${FREESEND_FLUTTER_ROOT:-/opt/flutter-$VERSION}"
 ARCHIVE="https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${VERSION}-stable.tar.xz"
 
 if [ -x "$ROOT/bin/flutter" ]; then
+  git config --global --add safe.directory "$ROOT"
   "$ROOT/bin/flutter" --version
   exit 0
 fi
@@ -35,5 +36,11 @@ case "$(uname -m)" in
     exit 1
     ;;
 esac
+
+# The official tarball keeps the ownership of whatever machine packed it, so
+# on the runner the SDK's .git belongs to a different uid and git refuses to
+# touch it. Whitelisting the directory is what git itself suggests, and it also
+# covers the flutter commands that run later in the job.
+git config --global --add safe.directory "$ROOT"
 
 "$ROOT/bin/flutter" --version
