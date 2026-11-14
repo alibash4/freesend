@@ -132,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionHeader(title: l10n.thisDevice),
-              Text(l10n.deviceName, style: theme.textTheme.bodySmall),
+              Text(l10n.deviceName, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               TextField(
                 controller: _nameController,
@@ -141,6 +141,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onSubmitted: (_) => _saveName(),
                 decoration: InputDecoration(
                   hintText: l10n.deviceNameHint,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
+                  constraints: const BoxConstraints(minHeight: 40),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -179,7 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(title: l10n.appearance),
-              Text(l10n.theme, style: theme.textTheme.bodySmall),
+              Text(l10n.theme, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               // Three choices in one soft track, so the control reads as a
               // single object on the page.
@@ -187,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                  borderRadius: BorderRadius.circular(AppRadii.field),
                 ),
                 child: Row(
                   children: [
@@ -208,13 +214,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              Text(l10n.language, style: theme.textTheme.bodySmall),
+              Text(l10n.language, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                  borderRadius: BorderRadius.circular(AppRadii.field),
                 ),
                 child: Row(
                   children: [
@@ -336,7 +342,7 @@ class _ThemeChoice extends StatelessWidget {
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
     return Material(
       color: selected ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.pill),
+      borderRadius: BorderRadius.circular(AppRadii.field),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: selected ? null : onTap,
@@ -386,7 +392,7 @@ class _LanguageChoice extends StatelessWidget {
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
     return Material(
       color: selected ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.pill),
+      borderRadius: BorderRadius.circular(AppRadii.field),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: selected ? null : onTap,
