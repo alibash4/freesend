@@ -10,6 +10,7 @@ import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
@@ -52,7 +53,7 @@ class _TransfersScreenState extends State<TransfersScreen> {
       children: [
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.md),
-          child: Text('Transfers', style: theme.textTheme.displaySmall),
+          child: const AppPageTitle('Transfers'),
         ),
         if (hasActive) ...[
           Padding(
@@ -79,10 +80,10 @@ class _TransfersScreenState extends State<TransfersScreen> {
               child: _ReceiveTransferCard(controller: receive),
             ),
         ] else
-          const Padding(
+          Padding(
             padding: kPagePadding,
-            child: EmptyState(
-              icon: AppIcons.zap,
+             child: EmptyState(
+               icon: AppIcons.zap,
               title: 'Nothing transferring',
               message:
                   'Start a send or receive and the live transfer, its queue, '
@@ -103,10 +104,10 @@ class _TransfersScreenState extends State<TransfersScreen> {
           ),
         ),
         if (records.isEmpty)
-          const Padding(
+          Padding(
             padding: kPagePadding,
-            child: EmptyState(
-              icon: AppIcons.history,
+             child: EmptyState(
+               icon: AppIcons.history,
               title: 'No history yet',
               message:
                   'Finished and cancelled transfers are recorded here, on this '
@@ -223,7 +224,7 @@ class _SendTransferCard extends StatelessWidget {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: controller.resumeTransfer,
-                    icon: const Icon(AppIcons.forward, size: 17),
+                    icon: Icon(AppIcons.forward, size: 17),
                     label: const Text('Resume'),
                   ),
                 )
@@ -233,7 +234,7 @@ class _SendTransferCard extends StatelessWidget {
                     onPressed: controller.canPause
                         ? controller.pauseTransfer
                         : null,
-                    icon: const Icon(AppIcons.stop, size: 17),
+                    icon: Icon(AppIcons.stop, size: 17),
                     label: const Text('Pause'),
                   ),
                 ),
@@ -241,7 +242,7 @@ class _SendTransferCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: controller.cancelSession,
-                  icon: const Icon(AppIcons.close, size: 17),
+                  icon: Icon(AppIcons.close, size: 17),
                   label: const Text('Stop'),
                 ),
               ),
@@ -385,7 +386,7 @@ class _ReceiveTransferCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           OutlinedButton.icon(
             onPressed: controller.cancel,
-            icon: const Icon(AppIcons.stop, size: 17),
+            icon: Icon(AppIcons.stop, size: 17),
             label: const Text('Cancel transfer'),
           ),
         ],

@@ -1,55 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
-/// Pure page backgrounds, one accent, and a neutral grey ramp with no colour
-/// cast. Content sits directly on the page; where a section needs grouping it
-/// gets a soft neutral fill instead of a border or a shadow.
-abstract final class AppColors {
-  /// The single accent. Used for primary fills, selection and focus.
-  static const accent = Color(0xFF1E90FF);
+import 'package:free_send/ui/kit/tokens.dart';
 
-  /// The accent darkened for small text on light surfaces, where #1E90FF is
-  /// too light to read comfortably.
-  static const accentDeep = Color(0xFF0B63C5);
-
-  static const accentWash = Color(0xFFEAF4FF);
-  static const accentInk = Color(0xFF08365C);
-  static const accentWashDark = Color(0xFF102F4C);
-  static const accentInkDark = Color(0xFFA9D4FF);
-
-  /// Page backgrounds: pure white, and near-black for dark mode.
-  static const page = Color(0xFFFFFFFF);
-  static const ink = Color(0xFF1C1C1C);
-
-  static const neutral0 = Color(0xFFFFFFFF);
-  static const neutral50 = Color(0xFFFAFAFA);
-  static const neutral100 = Color(0xFFF5F5F5);
-  static const neutral200 = Color(0xFFE5E5E5);
-  static const neutral300 = Color(0xFFD4D4D4);
-  static const neutral400 = Color(0xFFA3A3A3);
-  static const neutral500 = Color(0xFF737373);
-  static const neutral600 = Color(0xFF525252);
-  static const neutral700 = Color(0xFF404040);
-  static const neutral800 = Color(0xFF262626);
-  static const neutral900 = Color(0xFF171717);
-
-  // One value each, used everywhere: no pale or dark variants.
-  static const success = Color(0xFF16A34A);
-  static const danger = Color(0xFFDC2626);
-}
-
-abstract final class AppRadii {
-  static const card = 18.0;
-  static const field = 12.0;
-  static const pill = 999.0;
-}
-
-abstract final class AppSpacing {
-  static const xs = 4.0;
-  static const sm = 8.0;
-  static const md = 16.0;
-  static const lg = 24.0;
-  static const xl = 32.0;
-}
+export 'package:free_send/ui/kit/tokens.dart';
 
 extension AppSchemeColors on ColorScheme {
   bool get isLight => brightness == Brightness.light;
@@ -107,7 +60,7 @@ abstract final class AppTheme {
       onPrimaryContainer: AppColors.accentInkDark,
       secondary: AppColors.neutral300,
       onSecondary: AppColors.neutral900,
-      secondaryContainer: AppColors.neutral800,
+      secondaryContainer: AppColors.surfaceRaised,
       onSecondaryContainer: AppColors.neutral100,
       tertiary: AppColors.accent,
       onTertiary: AppColors.neutral0,
@@ -115,11 +68,11 @@ abstract final class AppTheme {
       onError: AppColors.neutral0,
       surface: AppColors.ink,
       onSurface: AppColors.neutral100,
-      surfaceContainerLowest: Color(0xFF181818),
-      surfaceContainerLow: Color(0xFF212121),
-      surfaceContainer: Color(0xFF232323),
-      surfaceContainerHigh: Color(0xFF292929),
-      surfaceContainerHighest: Color(0xFF303030),
+      surfaceContainerLowest: AppColors.surfaceRaised,
+      surfaceContainerLow: AppColors.surfaceRaised,
+      surfaceContainer: AppColors.surfaceRaised,
+      surfaceContainerHigh: AppColors.surfaceRaised,
+      surfaceContainerHighest: AppColors.surfaceRaised,
       onSurfaceVariant: AppColors.neutral400,
       outline: Color(0xFF3A3A3A),
       outlineVariant: Color(0xFF2C2C2C),
@@ -136,6 +89,7 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
+      fontFamily: 'Cairo',
       scaffoldBackgroundColor: page,
       canvasColor: page,
       textTheme: textTheme,
@@ -245,32 +199,7 @@ abstract final class AppTheme {
           borderSide: BorderSide(color: scheme.error, width: 1.5),
         ),
       ),
-      // The bar shares the page colour, so navigation sits on the page too.
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: page,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: scheme.primaryContainer,
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.pill),
-        ),
-        height: 66,
-        elevation: 0,
-        labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => textTheme.labelSmall!.copyWith(
-            color: states.contains(WidgetState.selected)
-                ? scheme.accentText
-                : scheme.onSurfaceVariant,
-          ),
-        ),
-        iconTheme: WidgetStateProperty.resolveWith(
-          (states) => IconThemeData(
-            size: 20,
-            color: states.contains(WidgetState.selected)
-                ? scheme.accentText
-                : scheme.onSurfaceVariant,
-          ),
-        ),
-      ),
+
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.inverseSurface,
@@ -317,21 +246,25 @@ abstract final class AppTheme {
     ).textTheme;
     return base.copyWith(
       displaySmall: base.displaySmall?.copyWith(
+        fontFamily: 'Cairo',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.8,
         color: scheme.onSurface,
       ),
       headlineMedium: base.headlineMedium?.copyWith(
+        fontFamily: 'Cairo',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       headlineSmall: base.headlineSmall?.copyWith(
+        fontFamily: 'Cairo',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.3,
         color: scheme.onSurface,
       ),
       titleLarge: base.titleLarge?.copyWith(
+        fontFamily: 'Cairo',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
         fontSize: 19,
