@@ -41,11 +41,13 @@ class RecentTransfers extends StatelessWidget {
         if (days.isEmpty)
           Padding(
             padding: EdgeInsets.only(top: AppSpacing.xs),
-             child: EmptyState(
-               icon: AppIcons.history,
-              title: 'Nothing sent yet',
-              message: 'Files you send will show up here, grouped by day.',
-            ),
+             child: Center(
+               child: EmptyState(
+                 icon: AppIcons.history,
+                 title: 'Nothing sent yet',
+                 message: 'Files you send will show up here, grouped by day.',
+               ),
+             ),
           )
         else
           for (final day in days.take(2)) ...[
