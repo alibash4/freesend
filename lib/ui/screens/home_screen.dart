@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:scroll_animator/scroll_animator.dart';
 import 'package:uicons/uicons.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
@@ -9,8 +10,23 @@ import 'package:free_send/ui/widgets/recent_transfers.dart';
 
 /// The two ways into a transfer. Send carries the app's muted blue accent, the
 /// same family the bottom navigation uses for its active tab.
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final ScrollController _scrollController = AnimatedScrollController(
+    animationFactory: const ChromiumEaseInOut(),
+  );
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +34,7 @@ class HomeScreen extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
           AppSpacing.md,
