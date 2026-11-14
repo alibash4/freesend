@@ -153,58 +153,57 @@ class _FolderAction extends StatelessWidget {
         fill ?? (dark ? AppColors.neutral800 : AppColors.neutral100);
     final cardInk =
         ink ?? (dark ? AppColors.neutral100 : AppColors.neutral800);
-    final height = width * 0.97;
+    final height = width * 0.85;
 
     return Semantics(
       button: true,
       label: title,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
+      child: Material(
+        color: cardFill,
+        borderRadius: BorderRadius.circular(28),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
           onTap: onTap,
-          behavior: HitTestBehavior.opaque,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: cardFill,
-              borderRadius: BorderRadius.circular(width * 0.08),
-            ),
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: width * 0.067),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(icon, size: width * 0.24, color: cardInk),
-                    SizedBox(height: height * 0.055),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: cardInk,
-                        fontSize: (width * 0.11).clamp(15.0, 18.0),
-                        height: 1.15,
-                        fontWeight: FontWeight.w700,
-                      ),
+          borderRadius: BorderRadius.circular(28),
+          splashColor: cardInk.withValues(alpha: 0.08),
+          highlightColor: Colors.transparent,
+          hoverColor: cardInk.withValues(alpha: 0.04),
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: width * 0.067),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: width * 0.24, color: cardInk),
+                  SizedBox(height: height * 0.025),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: cardInk,
+                      fontSize: (width * 0.11).clamp(15.0, 18.0),
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: cardInk.withValues(alpha: 0.72),
-                        fontSize: (width * 0.08).clamp(11.5, 13.0),
-                        height: 1.3,
-                        fontWeight: FontWeight.w400,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: cardInk.withValues(alpha: 0.72),
+                      fontSize: (width * 0.08).clamp(11.5, 13.0),
+                      height: 1.3,
+                      fontWeight: FontWeight.w400,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
