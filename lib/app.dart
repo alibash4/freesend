@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter_localizations/flutter_localizations.dart'
+    show GlobalCupertinoLocalizations, GlobalWidgetsLocalizations;
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/permissions/app_permissions.dart';
 import 'package:free_send/services/tray_controller.dart';
 import 'package:free_send/state/app_state.dart';
@@ -90,6 +93,14 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
         themeMode: state.themeMode,
+        locale: state.locale,
+        localizationsDelegates: [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('ar'), Locale('en')],
         home: state.permissionsPrompted || !AppPermissions.isMobile
             ? const AppShell()
             : const PermissionsScreen(),

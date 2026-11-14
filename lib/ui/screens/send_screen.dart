@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/services/saf_folders.dart';
 import 'package:free_send/state/send_controller.dart';
@@ -184,21 +185,20 @@ class _SendScreenState extends State<SendScreen> {
 
   Future<bool> _confirmLeave(SendController controller) async {
     if (!controller.isBusy) return true;
+    final l10n = AppLocalizations.of(context);
     final leave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Stop sharing?'),
-        content: const Text(
-          'The hotspot will close and the other device will lose the connection.',
-        ),
+        title: Text(l10n.stopSharingTitle),
+        content: Text(l10n.stopSharingBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep sharing'),
+            child: Text(l10n.keepSharing),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Stop'),
+            child: Text(l10n.stop),
           ),
         ],
       ),
@@ -213,6 +213,7 @@ class _SendScreenState extends State<SendScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<SendController>();
+    final l10n = AppLocalizations.of(context);
     return PopScope(
       canPop: !controller.isBusy,
       onPopInvokedWithResult: (didPop, _) async {
@@ -224,7 +225,7 @@ class _SendScreenState extends State<SendScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Send'),
+          title: Text(l10n.sendTitle),
           leading: IconButton(
             icon: Icon(AppIcons.back),
             onPressed: () async {
@@ -253,9 +254,9 @@ class _SendScreenState extends State<SendScreen> {
                         onPick: () => _openSourcePicker(controller),
                         onStart: controller.startSession,
                       ),
-                    SendPhase.preparing => const _BusyView(
-                        key: ValueKey('preparing'),
-                        label: 'Opening the hotspot…',
+                    SendPhase.preparing => _BusyView(
+                        key: const ValueKey('preparing'),
+                        label: l10n.openingHotspot,
                       ),
                     SendPhase.waitingForPeer ||
                     SendPhase.transferring =>
@@ -322,6 +323,7 @@ class _PickView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final needle = query.trim().toLowerCase();
     final visible = controller.items
         .where((item) =>
@@ -331,12 +333,12 @@ class _PickView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Pick what to send',
+          l10n.pickWhatToSend,
           style: theme.textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Everything is streamed straight over the hotspot link.',
+          l10n.everythingStreamed,
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -344,7 +346,7 @@ class _PickView extends StatelessWidget {
           TextField(
             onChanged: onQueryChanged,
             decoration: InputDecoration(
-              hintText: 'Search selected files',
+              hintText: l10n.searchSelectedFiles,
                prefixIcon: Icon(AppIcons.search, size: 18),
               isDense: true,
             ),
@@ -354,10 +356,8 @@ class _PickView extends StatelessWidget {
         if (controller.items.isEmpty)
           EmptyState(
             icon: AppIcons.addCircle,
-            title: 'Nothing selected',
-            message:
-                'Choose files from this device. Folders keep their names when '
-                'they arrive.',
+            title: l10n.nothingSelected,
+            message: l10n.chooseFilesMessage,
             action: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -373,7 +373,7 @@ class _PickView extends StatelessWidget {
                           )
                         : Icon(AppIcons.folderOpen, size: 17),
                     label:
-                        Text(picking ? 'Opening…' : 'Choose files or folder'),
+                        Text(picking ? l10n.opening : l10n.chooseFilesOrFolder),
                   ),
                 ),
               ],
@@ -386,7 +386,7 @@ class _PickView extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                   child: Text(
-                    'No selected file matches “$query”.',
+                    l10n.noSelectedFileMatches(query),
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
@@ -416,7 +416,7 @@ class _PickView extends StatelessWidget {
           ),
         if (controller.items.isEmpty && controller.recents.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.lg),
-          Text('Recent files', style: theme.textTheme.titleSmall),
+          Text(l10n.recentFiles, style: theme.textTheme.titleSmall),
           const SizedBox(height: AppSpacing.xs),
           for (final recent in controller.recents.take(6))
             if (File(recent.path).existsSync())
@@ -427,7 +427,7 @@ class _PickView extends StatelessWidget {
                 child: FileTile(
                   name: recent.name,
                   size: recent.size,
-                  subtitle: 'Tap to add again',
+                  subtitle: l10n.tapToAddAgain,
                 ),
               ),
         ],
@@ -439,7 +439,7 @@ class _PickView extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: picking ? null : onPick,
                   icon: Icon(AppIcons.add, size: 17),
-                  label: const Text('Add more'),
+                  label: Text(l10n.addMore),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -447,7 +447,7 @@ class _PickView extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: () => onStart(),
                   icon: Icon(AppIcons.hotspot, size: 17),
-                  label: const Text('Start sharing'),
+                  label: Text(l10n.startSharing),
                 ),
               ),
             ],
@@ -464,14 +464,16 @@ class _PickView extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '${formatCount(controller.items.length, 'file')} · '
-                  '${formatBytes(controller.totalBytes)} total',
+                  l10n.filesTotal(
+                    controller.items.length,
+                    formatBytes(controller.totalBytes),
+                  ),
                   style: theme.textTheme.bodySmall,
                 ),
               ),
               TextButton(
                 onPressed: controller.clearFiles,
-                child: const Text('Clear'),
+                child: Text(l10n.clear),
               ),
             ],
           ),

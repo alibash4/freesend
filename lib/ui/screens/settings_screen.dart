@@ -5,6 +5,7 @@ import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -57,21 +58,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _chooseFolder() async {
     final appState = context.read<AppState>();
+    final l10n = AppLocalizations.of(context);
     try {
       final path = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Choose where received files go',
+        dialogTitle: l10n.chooseFolderTitle,
       );
       if (path == null || path.isEmpty) return;
       await appState.setDownloadDir(path);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Save location updated')));
+        ..showSnackBar(SnackBar(content: Text(l10n.saveLocationUpdated)));
     } on Object catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Could not change folder: $error')));
+        ..showSnackBar(
+          SnackBar(content: Text(l10n.couldNotChangeFolder(error.toString()))),
+        );
     }
   }
 
@@ -85,19 +89,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _clearHistory(AppState appState) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear history?'),
-        content: const Text('Received files stay on disk.'),
+        title: Text(l10n.clearHistoryQuestion),
+        content: Text(l10n.receivedFilesStay),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n.clear),
           ),
         ],
       ),
@@ -110,6 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = Theme.of(context);
     final appState = context.watch<AppState>();
     final updateState = context.watch<UpdateController>();
+    final l10n = AppLocalizations.of(context);
 
     return ListView(
       controller: _scrollController,
@@ -117,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       children: [
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.md),
-          child: const AppPageTitle('Settings'),
+          child: AppPageTitle(l10n.settings),
         ),
         const SizedBox(height: AppSpacing.lg),
         Padding(
@@ -125,16 +131,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(title: 'This device'),
-              Text('Device name', style: theme.textTheme.bodySmall),
+              SectionHeader(title: l10n.thisDevice),
+              Text(l10n.deviceName, style: theme.textTheme.bodySmall),
               const SizedBox(height: 6),
               TextField(
                 controller: _nameController,
                 focusNode: _focusNode,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _saveName(),
-                decoration: const InputDecoration(
-                  hintText: 'Shown to the other device during a transfer',
+                decoration: InputDecoration(
+                  hintText: l10n.deviceNameHint,
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -143,37 +149,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Expanded(
                     child: Text(
                       PlatformEnv.canCreateHotspot
-                          ? '${PlatformEnv.label} · can create a hotspot'
-                          : '${PlatformEnv.label} · shares over the current network',
+                          ? l10n.platformCanHotspot(PlatformEnv.label)
+                          : l10n.platformSharesNetwork(PlatformEnv.label),
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
                   TextButton(
                     onPressed: _saveName,
-                    child: const Text('Save'),
+                    child: Text(l10n.save),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.xl),
-              const SectionHeader(title: 'Received files'),
+              SectionHeader(title: l10n.receivedFiles),
               Text(
                 appState.downloadDir.isEmpty
-                    ? 'Not set yet'
+                    ? l10n.notSetYet
                     : appState.downloadDir,
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.sm),
               Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: OutlinedButton.icon(
                   onPressed: _chooseFolder,
                   icon: Icon(AppIcons.folderOpen, size: 17),
-                  label: const Text('Change folder'),
+                  label: Text(l10n.changeFolder),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              const SectionHeader(title: 'Appearance'),
-              Text('Theme', style: theme.textTheme.bodySmall),
+              SectionHeader(title: l10n.appearance),
+              Text(l10n.theme, style: theme.textTheme.bodySmall),
               const SizedBox(height: 6),
               // Three choices in one soft track, so the control reads as a
               // single object on the page.
@@ -186,9 +192,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Row(
                   children: [
                     for (final (mode, label, icon) in [
-                      (ThemeMode.light, 'Light', AppIcons.sun),
-                      (ThemeMode.dark, 'Dark', AppIcons.moon),
-                      (ThemeMode.system, 'Auto', AppIcons.auto),
+                      (ThemeMode.light, l10n.light, AppIcons.sun),
+                      (ThemeMode.dark, l10n.dark, AppIcons.moon),
+                      (ThemeMode.system, l10n.auto, AppIcons.auto),
                     ])
                       Expanded(
                         child: _ThemeChoice(
@@ -202,42 +208,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
+              Text(l10n.language, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _LanguageChoice(
+                        label: l10n.arabic,
+                        selected: appState.locale.languageCode == 'ar',
+                        onTap: () => appState.setLocale(const Locale('ar')),
+                      ),
+                    ),
+                    Expanded(
+                      child: _LanguageChoice(
+                        label: l10n.english,
+                        selected: appState.locale.languageCode == 'en',
+                        onTap: () => appState.setLocale(const Locale('en')),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
               if (PlatformEnv.supportsTray) ...[
-                const SectionHeader(title: 'System tray'),
+                SectionHeader(title: l10n.systemTray),
                 _UpdateRow(
-                  label: 'Minimize to tray on close',
-                  subtitle:
-                      'Keep FreeSend running in the tray when the window is '
-                      'closed.',
+                  label: l10n.minimizeToTray,
+                  subtitle: l10n.keepRunningInTray,
                   value: appState.minimizeToTray,
                   onChanged: (value) => appState.setMinimizeToTray(value),
                 ),
                 const SizedBox(height: AppSpacing.xl),
               ],
-              const SectionHeader(title: 'Data'),
+              SectionHeader(title: l10n.data),
               Text(
-                'FreeSend keeps a local list of past transfers and nothing '
-                'else. Files are never uploaded — the two devices talk '
-                'directly over the hotspot link.',
+                l10n.localDataExplanation,
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: AppSpacing.sm),
               Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: OutlinedButton.icon(
                   onPressed: appState.history.isEmpty
                       ? null
                       : () => _clearHistory(appState),
                   icon: Icon(AppIcons.trash, size: 17),
-                  label: const Text('Clear transfer history'),
+                  label: Text(l10n.clearTransferHistory),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              const SectionHeader(title: 'Updates'),
+              SectionHeader(title: l10n.updates),
               _UpdateRow(
-                label: 'Check automatically',
-                subtitle:
-                    'Look for a newer release every time FreeSend starts.',
+                label: l10n.checkAutomatically,
+                subtitle: l10n.lookForNewerRelease,
                 value: appState.autoUpdate,
                 onChanged: (value) async {
                   await appState.setAutoUpdate(value);
@@ -247,11 +276,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: AppSpacing.sm),
               Align(
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
                 child: OutlinedButton.icon(
                   onPressed: _checkNow,
                   icon: Icon(AppIcons.refresh, size: 17),
-                  label: const Text('Check for updates'),
+                  label: Text(l10n.checkForUpdates),
                 ),
               ),
               if (updateState.message != null) ...[
@@ -266,18 +295,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),
-              const SectionHeader(title: 'About'),
+              SectionHeader(title: l10n.about),
               _AboutRow(
-                label: 'App',
+                label: l10n.app,
                 value: '${AppConstants.appName} ${updateState.currentVersion}',
               ),
               Divider(height: AppSpacing.lg, color: theme.colorScheme.hairline),
               _AboutRow(
-                label: 'Protocol',
+                label: l10n.protocol,
                 value: 'v${AppConstants.protocolVersion}',
               ),
               Divider(height: AppSpacing.lg, color: theme.colorScheme.hairline),
-              _AboutRow(label: 'Platform', value: PlatformEnv.label),
+              _AboutRow(label: l10n.platform, value: PlatformEnv.label),
             ],
           ),
         ),
@@ -331,6 +360,47 @@ class _ThemeChoice extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageChoice extends StatelessWidget {
+  const _LanguageChoice({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final foreground =
+        selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
+    return Material(
+      color: selected ? scheme.primaryContainer : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.pill),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: selected ? null : onTap,
+        child: SizedBox(
+          height: 38,
+          child: Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: foreground,
+              ),
+            ),
           ),
         ),
       ),

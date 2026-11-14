@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:uicons/uicons.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
@@ -14,6 +15,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
@@ -41,8 +43,8 @@ class HomeScreen extends StatelessWidget {
                 final tabs = [
                   _FolderAction(
                     icon: UIcons.solidRounded.upload,
-                    title: 'Send File',
-                    subtitle: 'Transfer Data',
+                    title: l10n.sendFile,
+                    subtitle: l10n.transferData,
                     width: width,
                     fill: dark
                         ? AppColors.accentWashDark
@@ -56,8 +58,8 @@ class HomeScreen extends StatelessWidget {
                   ),
                   _FolderAction(
                     icon: UIcons.solidRounded.download,
-                    title: 'Receive File',
-                    subtitle: 'Receive Data',
+                    title: l10n.receiveFile,
+                    subtitle: l10n.receiveData,
                     width: width,
                     fill: dark
                         ? AppColors.successWashDark

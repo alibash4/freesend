@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/kit/app_page_container.dart';
@@ -24,24 +25,25 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final items = [
       AppNavItem(
-        label: 'Home',
+        label: l10n.navHome,
         icon: AppIcons.home,
         activeIcon: AppIcons.homeActive,
       ),
       AppNavItem(
-        label: 'Transfers',
+        label: l10n.navTransfers,
         icon: AppIcons.zap,
         activeIcon: AppIcons.transfersActive,
       ),
       AppNavItem(
-        label: 'History',
+        label: l10n.navHistory,
         icon: AppIcons.history,
         activeIcon: AppIcons.historyActive,
       ),
       AppNavItem(
-        label: 'Settings',
+        label: l10n.navSettings,
         icon: AppIcons.settings,
         activeIcon: AppIcons.settingsActive,
       ),

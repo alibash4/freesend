@@ -22,10 +22,10 @@ class AppSidebar extends StatelessWidget {
     return Container(
       width: 240,
       height: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.ink,
-        border: const Border(
-          right: BorderSide(color: Color(0xFF2C2C2C), width: 1),
+        border: BorderDirectional(
+          end: BorderSide(color: Color(0xFF2C2C2C), width: 1),
         ),
       ),
       child: Column(

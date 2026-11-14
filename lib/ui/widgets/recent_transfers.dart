@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -17,6 +18,7 @@ class RecentTransfers extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final history = context.watch<AppState>().history;
+    final l10n = AppLocalizations.of(context);
     final sent = history
         .where(
           (record) =>
@@ -37,15 +39,15 @@ class RecentTransfers extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const AppSectionHeader(title: 'Recently transferred'),
+        AppSectionHeader(title: l10n.recentlyTransferred),
         if (days.isEmpty)
           Padding(
             padding: EdgeInsets.only(top: AppSpacing.xs),
              child: Center(
                child: EmptyState(
                  icon: AppIcons.history,
-                 title: 'Nothing sent yet',
-                 message: 'Files you send will show up here, grouped by day.',
+                 title: l10n.nothingSentYet,
+                 message: l10n.nothingSentMessage,
                ),
              ),
           )
@@ -94,9 +96,10 @@ class _RecentTransferRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final names = record.fileNames;
     final title = names.isEmpty
-        ? formatCount(record.fileCount, 'file')
+        ? l10n.fileCount(record.fileCount)
         : names.length == 1
             ? names.first
             : '${names.first} +${record.fileCount - 1}';
