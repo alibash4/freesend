@@ -113,7 +113,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       appBar: AppBar(
         title: const Text('Receive'),
         leading: IconButton(
-          icon: const Icon(AppIcons.back),
+          icon: Icon(AppIcons.back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -123,13 +123,13 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
             IconButton(
               tooltip: 'Scan pairing code',
               onPressed: () => _openScanner(controller),
-              icon: const Icon(AppIcons.scan),
+              icon: Icon(AppIcons.scan),
             ),
           if (controller.phase == ReceivePhase.scanning)
             IconButton(
               tooltip: 'Rescan',
               onPressed: controller.startScanning,
-              icon: const Icon(AppIcons.refresh),
+              icon: Icon(AppIcons.refresh),
             ),
         ],
       ),
@@ -306,7 +306,7 @@ class _ScanView extends StatelessWidget {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: onPaste,
-                      icon: const Icon(AppIcons.paste, size: 16),
+                      icon: Icon(AppIcons.paste, size: 16),
                       label: const Text('Enter code'),
                     ),
                   ),
@@ -315,7 +315,7 @@ class _ScanView extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   TextButton.icon(
                     onPressed: onJoin,
-                    icon: const Icon(AppIcons.wifi, size: 16),
+                    icon: Icon(AppIcons.wifi, size: 16),
                     label: const Text('Join a hotspot'),
                   ),
                 ],
@@ -360,7 +360,7 @@ class _ScanView extends StatelessWidget {
         if (PlatformEnv.canJoinHotspot && sessions.isNotEmpty) ...[
           OutlinedButton.icon(
             onPressed: onJoin,
-            icon: const Icon(AppIcons.wifi, size: 17),
+            icon: Icon(AppIcons.wifi, size: 17),
             label: const Text('Join another hotspot'),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -371,17 +371,17 @@ class _ScanView extends StatelessWidget {
             children: [
               TextButton.icon(
                 onPressed: ScanScreen.isSupported ? onScan : null,
-                icon: const Icon(AppIcons.scan, size: 16),
+                icon: Icon(AppIcons.scan, size: 16),
                 label: const Text('Scan code'),
               ),
               TextButton.icon(
                 onPressed: onPaste,
-                icon: const Icon(AppIcons.paste, size: 16),
+                icon: Icon(AppIcons.paste, size: 16),
                 label: const Text('Enter code'),
               ),
               TextButton.icon(
                 onPressed: onManual,
-                icon: const Icon(AppIcons.address, size: 16),
+                icon: Icon(AppIcons.address, size: 16),
                 label: const Text('Connect by address'),
               ),
             ],
@@ -389,7 +389,7 @@ class _ScanView extends StatelessWidget {
         else
           TextButton.icon(
             onPressed: onManual,
-            icon: const Icon(AppIcons.address, size: 16),
+            icon: Icon(AppIcons.address, size: 16),
             label: const Text('Connect by address'),
           ),
       ],
@@ -569,7 +569,7 @@ class _ReviewView extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         FilledButton.icon(
           onPressed: selectedCount == 0 ? null : controller.beginReceive,
-          icon: const Icon(AppIcons.download, size: 17),
+          icon: Icon(AppIcons.download, size: 17),
           label: Text(
             selectedCount == 0
                 ? 'Select files to receive'
@@ -700,7 +700,7 @@ class _ProgressView extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: controller.cancel,
-                icon: const Icon(AppIcons.stop, size: 17),
+                icon: Icon(AppIcons.stop, size: 17),
                 label: const Text('Cancel'),
               ),
             ),
@@ -735,7 +735,7 @@ class _DoneView extends StatelessWidget {
             color: AppColors.success.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
+          child: Icon(
             AppIcons.check,
             size: 30,
             color: AppColors.success,
@@ -859,7 +859,7 @@ class _ErrorView extends StatelessWidget {
         if (failed > 0 && !cancelled) ...[
           FilledButton.icon(
             onPressed: controller.retryFailed,
-            icon: const Icon(AppIcons.refresh, size: 17),
+            icon: Icon(AppIcons.refresh, size: 17),
             label: Text('Retry $failed file${failed == 1 ? '' : 's'}'),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -953,7 +953,7 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
             onPressed: _submit,
-            icon: const Icon(AppIcons.wifi, size: 17),
+            icon: Icon(AppIcons.wifi, size: 17),
             label: const Text('Join and scan'),
           ),
         ],
@@ -1017,7 +1017,7 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
             onPressed: () => Navigator.of(context).pop(_address.text.trim()),
-            icon: const Icon(AppIcons.link, size: 17),
+            icon: Icon(AppIcons.link, size: 17),
             label: const Text('Connect'),
           ),
         ],
@@ -1090,7 +1090,7 @@ class _CodeSheetState extends State<_CodeSheet> {
               suffixIcon: IconButton(
                 tooltip: 'Paste from clipboard',
                 onPressed: _pasteFromClipboard,
-                icon: const Icon(AppIcons.paste, size: 17),
+                icon: Icon(AppIcons.paste, size: 17),
               ),
             ),
             onSubmitted: (_) => _submit(),
@@ -1098,7 +1098,7 @@ class _CodeSheetState extends State<_CodeSheet> {
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
             onPressed: _submit,
-            icon: const Icon(AppIcons.link, size: 17),
+            icon: Icon(AppIcons.link, size: 17),
             label: const Text('Connect'),
           ),
         ],

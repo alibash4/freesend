@@ -170,7 +170,7 @@ class UpdateSheet extends StatelessWidget {
           children: [
             FilledButton.icon(
               onPressed: controller.download,
-              icon: const Icon(AppIcons.download, size: 17),
+              icon: Icon(AppIcons.download, size: 17),
               label: const Text('Download update'),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -188,7 +188,7 @@ class UpdateSheet extends StatelessWidget {
                 await controller.install();
                 if (context.mounted) Navigator.of(context).pop();
               },
-              icon: const Icon(AppIcons.checkCircle, size: 17),
+              icon: Icon(AppIcons.checkCircle, size: 17),
               label: const Text('Install and restart'),
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -219,7 +219,7 @@ class UpdateSheet extends StatelessWidget {
           children: [
             FilledButton.icon(
               onPressed: controller.checkManually,
-              icon: const Icon(AppIcons.refresh, size: 17),
+              icon: Icon(AppIcons.refresh, size: 17),
               label: const Text('Try again'),
             ),
             const SizedBox(height: AppSpacing.sm),

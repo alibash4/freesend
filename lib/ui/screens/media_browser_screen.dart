@@ -199,9 +199,9 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
               ),
               child: TextField(
                 onChanged: (value) => setState(() => _query = value),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search this album',
-                  prefixIcon: Icon(AppIcons.search, size: 18),
+               prefixIcon: Icon(AppIcons.search, size: 18),
                   isDense: true,
                 ),
               ),
@@ -270,7 +270,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(AppIcons.send, size: 17),
+                          : Icon(AppIcons.send, size: 17),
                       label: Text(
                         _sending
                             ? 'Preparing…'
@@ -303,13 +303,13 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
               _load();
             }
           },
-          icon: const Icon(AppIcons.refresh, size: 17),
+          icon: Icon(AppIcons.refresh, size: 17),
           label: const Text('Try again'),
         ),
       );
     }
     if (assets.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: AppIcons.image,
         title: 'No media here',
         message: 'Pick another album or choose files with the system picker.',

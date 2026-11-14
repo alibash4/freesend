@@ -148,7 +148,7 @@ class _ScanScreenState extends State<ScanScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 AppIcons.cameraOff,
                 size: 30,
                 color: AppColors.neutral400,
@@ -178,14 +178,14 @@ class _ScanScreenState extends State<ScanScreen> {
                 const SizedBox(height: AppSpacing.lg),
                 FilledButton.icon(
                   onPressed: openAppSettings,
-                  icon: const Icon(AppIcons.settings, size: 17),
+                  icon: Icon(AppIcons.settings, size: 17),
                   label: const Text('Open settings'),
                 ),
               ],
               const SizedBox(height: AppSpacing.sm),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(AppIcons.address, size: 16),
+                icon: Icon(AppIcons.address, size: 16),
                 label: const Text('Enter the code instead'),
               ),
             ],

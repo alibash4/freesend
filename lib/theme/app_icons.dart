@@ -1,69 +1,75 @@
 import 'package:flutter/widgets.dart';
 
-import 'package:lucide_icons_flutter/lucide_icons_400.dart';
+import 'package:uicons/uicons.dart';
 
-/// Icon set for the whole app: Lucide at weight 400, which is the 2px-stroke
-/// build of the family. Screens never reach into the package directly, so the
-/// stroke weight is decided in exactly one place.
+/// Icon set for the whole app: UIcons Regular Rounded. Screens never reach
+/// into the package directly, so the style is decided in exactly one place.
 abstract final class AppIcons {
   // Transfer.
-  static const IconData send = LucideIcons400.arrowUpRight;
-  static const IconData receive = LucideIcons400.arrowDownLeft;
-  static const IconData hotspot = LucideIcons400.radioTower;
-  static const IconData wifi = LucideIcons400.wifi;
-  static const IconData link = LucideIcons400.link;
-  static const IconData unlink = LucideIcons400.unlink;
-  static const IconData zap = LucideIcons400.zap;
-  static const IconData device = LucideIcons400.monitorSmartphone;
-  static const IconData phone = LucideIcons400.smartphone;
+  static final IconData send = UIcons.regularRounded.arrow_up_right;
+  static final IconData sendPlane = UIcons.regularRounded.paper_plane;
+  static final IconData receive = UIcons.regularRounded.arrow_down;
+  static final IconData hotspot = UIcons.regularRounded.signal_alt;
+  static final IconData wifi = UIcons.regularRounded.wifi_alt;
+  static final IconData link = UIcons.regularRounded.link;
+  static final IconData unlink = UIcons.regularRounded.link_slash;
+  static final IconData zap = UIcons.regularRounded.bolt;
+  static final IconData device = UIcons.regularRounded.screen;
+  static final IconData phone = UIcons.regularRounded.smartphone;
 
   // Pairing.
-  static const IconData scan = LucideIcons400.scanQrCode;
-  static const IconData qr = LucideIcons400.qrCode;
-  static const IconData copy = LucideIcons400.copy;
-  static const IconData paste = LucideIcons400.clipboardPaste;
-  static const IconData address = LucideIcons400.keyboard;
+  static final IconData scan = UIcons.regularRounded.barcode_scan;
+  static final IconData qr = UIcons.regularRounded.qrcode;
+  static final IconData copy = UIcons.regularRounded.copy;
+  static final IconData paste = UIcons.regularRounded.clipboard_list;
+  static final IconData address = UIcons.regularRounded.keyboard;
 
   // Files.
-  static const IconData folder = LucideIcons400.folder;
-  static const IconData folderOpen = LucideIcons400.folderOpen;
-  static const IconData add = LucideIcons400.plus;
-  static const IconData addCircle = LucideIcons400.circlePlus;
-  static const IconData download = LucideIcons400.download;
-  static const IconData inbox = LucideIcons400.inbox;
-  static const IconData trash = LucideIcons400.trash2;
-  static const IconData image = LucideIcons400.image;
-  static const IconData video = LucideIcons400.video;
-  static const IconData music = LucideIcons400.music;
-  static const IconData fileText = LucideIcons400.fileText;
+  static final IconData folder = UIcons.regularRounded.folder;
+  static final IconData folderOpen = UIcons.regularRounded.folder;
+  static final IconData add = UIcons.regularRounded.plus;
+  static final IconData addCircle = UIcons.regularRounded.plus;
+  static final IconData download = UIcons.regularRounded.download;
+  static final IconData inbox = UIcons.regularRounded.inbox;
+  static final IconData trash = UIcons.regularRounded.trash;
+  static final IconData image = UIcons.regularRounded.picture;
+  static final IconData video = UIcons.regularRounded.video_camera;
+  static final IconData music = UIcons.regularRounded.music;
+  static final IconData fileText = UIcons.regularRounded.document;
 
   // Navigation and chrome.
-  static const IconData home = LucideIcons400.house;
-  static const IconData history = LucideIcons400.history;
-  static const IconData settings = LucideIcons400.settings;
-  static const IconData back = LucideIcons400.arrowLeft;
-  static const IconData forward = LucideIcons400.arrowRight;
-  static const IconData chevronRight = LucideIcons400.chevronRight;
-  static const IconData close = LucideIcons400.x;
-  static const IconData refresh = LucideIcons400.refreshCw;
+  static final IconData home = UIcons.regularRounded.home;
+  static final IconData history = UIcons.regularRounded.time_past;
+  static final IconData settings = UIcons.regularRounded.settings;
+  static final IconData back = UIcons.regularRounded.arrow_left;
+  static final IconData forward = UIcons.regularRounded.arrow_right;
+  static final IconData chevronRight = UIcons.regularRounded.angle_right;
+  static final IconData close = UIcons.regularRounded.x;
+  static final IconData refresh = UIcons.regularRounded.refresh;
 
   // State.
-  static const IconData check = LucideIcons400.check;
-  static const IconData checkCircle = LucideIcons400.circleCheck;
-  static const IconData circle = LucideIcons400.circle;
-  static const IconData package = LucideIcons400.package;
-  static const IconData lock = LucideIcons400.lock;
-  static const IconData stop = LucideIcons400.square;
-  static const IconData pause = LucideIcons400.pause;
-  static const IconData play = LucideIcons400.play;
-  static const IconData alert = LucideIcons400.triangleAlert;
-  static const IconData info = LucideIcons400.info;
-  static const IconData radar = LucideIcons400.radar;
-  static const IconData search = LucideIcons400.search;
-  static const IconData cameraOff = LucideIcons400.cameraOff;
+  static final IconData check = UIcons.regularRounded.check;
+  static final IconData checkCircle = UIcons.regularRounded.checkbox;
+  static final IconData circle = UIcons.regularRounded.circle;
+  static final IconData package = UIcons.regularRounded.package;
+  static final IconData lock = UIcons.regularRounded.lock;
+  static final IconData stop = UIcons.regularRounded.stop;
+  static final IconData pause = UIcons.regularRounded.pause;
+  static final IconData play = UIcons.regularRounded.play;
+  static final IconData alert = UIcons.regularRounded.exclamation;
+  static final IconData info = UIcons.regularRounded.info;
+  static final IconData radar = UIcons.regularRounded.signal_alt;
+  static final IconData search = UIcons.regularRounded.search;
+  static final IconData cameraOff = UIcons.regularRounded.video_slash;
 
   // Appearance.
-  static const IconData sun = LucideIcons400.sun;
-  static const IconData moon = LucideIcons400.moon;
-  static const IconData auto = LucideIcons400.sunMoon;
+  static final IconData sun = UIcons.regularRounded.sun;
+  static final IconData moon = UIcons.regularRounded.moon;
+  static final IconData auto = UIcons.regularRounded.sun;
+
+  // Bottom navigation: regular when idle, solid when active.
+  static final IconData homeActive = UIcons.solidRounded.home;
+  static final IconData transfersActive = UIcons.solidRounded.bolt;
+  static final IconData historyActive = UIcons.solidRounded.time_past;
+  static final IconData settingsActive = UIcons.solidRounded.settings;
 }

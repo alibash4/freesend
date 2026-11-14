@@ -68,7 +68,7 @@ class PairingCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           TextButton.icon(
             onPressed: onCopy,
-            icon: const Icon(AppIcons.copy, size: 16),
+            icon: Icon(AppIcons.copy, size: 16),
             label: const Text('Copy code'),
           ),
         ],

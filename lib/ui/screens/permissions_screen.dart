@@ -167,7 +167,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       AppIcons.checkCircle,
                       size: 18,
                       color: AppColors.success,
@@ -200,7 +200,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(AppIcons.check, size: 17),
+                  : Icon(AppIcons.check, size: 17),
               label: Text(
                 _requesting
                     ? 'Requesting…'
@@ -213,7 +213,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               const SizedBox(height: AppSpacing.sm),
               OutlinedButton.icon(
                 onPressed: _openSettings,
-                icon: const Icon(AppIcons.settings, size: 17),
+                icon: Icon(AppIcons.settings, size: 17),
                 label: const Text('Open system settings'),
               ),
             ],

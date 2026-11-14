@@ -226,7 +226,7 @@ class _SendScreenState extends State<SendScreen> {
         appBar: AppBar(
           title: const Text('Send'),
           leading: IconButton(
-            icon: const Icon(AppIcons.back),
+            icon: Icon(AppIcons.back),
             onPressed: () async {
               final leave = await _confirmLeave(controller);
               if (leave && context.mounted) Navigator.of(context).pop();
@@ -343,9 +343,9 @@ class _PickView extends StatelessWidget {
         if (controller.items.isNotEmpty) ...[
           TextField(
             onChanged: onQueryChanged,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Search selected files',
-              prefixIcon: Icon(AppIcons.search, size: 18),
+               prefixIcon: Icon(AppIcons.search, size: 18),
               isDense: true,
             ),
           ),
@@ -371,7 +371,7 @@ class _PickView extends StatelessWidget {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(AppIcons.folderOpen, size: 17),
+                        : Icon(AppIcons.folderOpen, size: 17),
                     label:
                         Text(picking ? 'Opening…' : 'Choose files or folder'),
                   ),
@@ -438,7 +438,7 @@ class _PickView extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: picking ? null : onPick,
-                  icon: const Icon(AppIcons.add, size: 17),
+                  icon: Icon(AppIcons.add, size: 17),
                   label: const Text('Add more'),
                 ),
               ),
@@ -446,7 +446,7 @@ class _PickView extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () => onStart(),
-                  icon: const Icon(AppIcons.hotspot, size: 17),
+                  icon: Icon(AppIcons.hotspot, size: 17),
                   label: const Text('Start sharing'),
                 ),
               ),
@@ -690,14 +690,14 @@ class _SessionView extends StatelessWidget {
                 child: paused
                     ? FilledButton.icon(
                         onPressed: controller.resumeTransfer,
-                        icon: const Icon(AppIcons.forward, size: 17),
+                        icon: Icon(AppIcons.forward, size: 17),
                         label: const Text('Resume'),
                       )
                     : OutlinedButton.icon(
                         onPressed: controller.canPause
                             ? controller.pauseTransfer
                             : null,
-                        icon: const Icon(AppIcons.stop, size: 17),
+                        icon: Icon(AppIcons.stop, size: 17),
                         label: const Text('Pause'),
                       ),
               ),
@@ -706,7 +706,7 @@ class _SessionView extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: controller.cancelSession,
-                icon: const Icon(AppIcons.stop, size: 17),
+                icon: Icon(AppIcons.stop, size: 17),
                 label: Text(transferring ? 'Cancel transfer' : 'Stop sharing'),
               ),
             ),
@@ -770,7 +770,7 @@ class _CompletedView extends StatelessWidget {
               color: AppColors.success.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               AppIcons.check,
               size: 30,
               color: AppColors.success,
@@ -910,7 +910,7 @@ class _AppsSheet extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final app = apps[index];
                   return ListTile(
-                    leading: const Icon(AppIcons.package),
+                    leading: Icon(AppIcons.package),
                     title: Text(app.name),
                     subtitle: Text(
                       app.version.isEmpty
@@ -955,43 +955,43 @@ class _SourceSheet extends StatelessWidget {
               ),
             ),
             ListTile(
-              leading: const Icon(AppIcons.folderOpen),
+              leading: Icon(AppIcons.folderOpen),
               title: const Text('Files'),
               subtitle: const Text('Any file type'),
               onTap: () => Navigator.of(context).pop(_SourceKind.any),
             ),
             if (Platform.isAndroid || Platform.isMacOS)
               ListTile(
-                leading: const Icon(AppIcons.image),
+                leading: Icon(AppIcons.image),
                 title: const Text('Media library'),
                 subtitle:
                     const Text('Photos, videos, and audio with thumbnails'),
                 onTap: () => Navigator.of(context).pop(_SourceKind.media),
               ),
             ListTile(
-              leading: const Icon(AppIcons.video),
+              leading: Icon(AppIcons.video),
               title: const Text('Videos'),
               onTap: () => Navigator.of(context).pop(_SourceKind.videos),
             ),
             ListTile(
-              leading: const Icon(AppIcons.music),
+              leading: Icon(AppIcons.music),
               title: const Text('Audio'),
               onTap: () => Navigator.of(context).pop(_SourceKind.audio),
             ),
             ListTile(
-              leading: const Icon(AppIcons.fileText),
+              leading: Icon(AppIcons.fileText),
               title: const Text('Documents'),
               subtitle: const Text('PDF, Office, text, CSV'),
               onTap: () => Navigator.of(context).pop(_SourceKind.docs),
             ),
             ListTile(
-              leading: const Icon(AppIcons.package),
+              leading: Icon(AppIcons.package),
               title: const Text('Apps'),
               subtitle: const Text('Installable app bundles on this device'),
               onTap: () => Navigator.of(context).pop(_SourceKind.apps),
             ),
             ListTile(
-              leading: const Icon(AppIcons.folder),
+              leading: Icon(AppIcons.folder),
               title: const Text('Folder'),
               subtitle: const Text('Send a whole folder tree'),
               onTap: () => Navigator.of(context).pop(_SourceKind.folder),
