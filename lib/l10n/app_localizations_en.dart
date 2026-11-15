@@ -259,6 +259,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get files => 'Files';
 
   @override
+  String get folders => 'Folders';
+
+  @override
+  String get music => 'Music';
+
+  @override
+  String get documents => 'Documents';
+
+  @override
+  String get videos => 'Videos';
+
+  @override
+  String get apk => 'APK';
+
+  @override
+  String get largeFiles => 'Large files';
+
+  @override
+  String get select => 'Select';
+
+  @override
+  String get addFiles => 'Add files';
+
+  @override
+  String get addFolder => 'Add folder';
+
+  @override
+  String get emptyCategory => 'Nothing here yet';
+
+  @override
+  String selectedCount(Object count) {
+    return '$count selected';
+  }
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get gridView => 'Grid';
+
+  @override
+  String get listView => 'List';
+
+  @override
+  String get loading => 'Loading…';
+
+  @override
   String get resume => 'Resume';
 
   @override

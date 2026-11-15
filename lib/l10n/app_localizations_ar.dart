@@ -262,6 +262,53 @@ class AppLocalizationsAr extends AppLocalizations {
   String get files => 'الملفات';
 
   @override
+  String get folders => 'المجلدات';
+
+  @override
+  String get music => 'الموسيقى';
+
+  @override
+  String get documents => 'المستندات';
+
+  @override
+  String get videos => 'الفيديو';
+
+  @override
+  String get apk => 'APK';
+
+  @override
+  String get largeFiles => 'الملفات الكبيرة';
+
+  @override
+  String get select => 'تحديد';
+
+  @override
+  String get addFiles => 'إضافة ملفات';
+
+  @override
+  String get addFolder => 'إضافة مجلد';
+
+  @override
+  String get emptyCategory => 'لا يوجد شيء هنا بعد';
+
+  @override
+  String selectedCount(Object count) {
+    return '$count محدد';
+  }
+
+  @override
+  String get done => 'تم';
+
+  @override
+  String get gridView => 'شبكة';
+
+  @override
+  String get listView => 'قائمة';
+
+  @override
+  String get loading => 'جارٍ التحميل…';
+
+  @override
   String get resume => 'استئناف';
 
   @override

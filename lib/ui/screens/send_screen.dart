@@ -14,6 +14,7 @@ import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
+import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
@@ -244,14 +245,9 @@ class _SendScreenState extends State<SendScreen> {
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   child: switch (controller.phase) {
-                    SendPhase.idle => _PickView(
-                        key: const ValueKey('pick'),
+                    SendPhase.idle => SendSelectView(
+                        key: const ValueKey('select'),
                         controller: controller,
-                        picking: _picking,
-                        query: _query,
-                        onQueryChanged: (value) =>
-                            setState(() => _query = value),
-                        onPick: () => _openSourcePicker(controller),
                         onStart: controller.startSession,
                       ),
                     SendPhase.preparing => _BusyView(
