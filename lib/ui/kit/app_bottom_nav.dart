@@ -77,36 +77,39 @@ class _AppNavItemView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = selected ? scheme.accentText : scheme.onSurfaceVariant;
+    final color = selected ? AppColors.accent : scheme.onSurfaceVariant;
     final labelColor = selected ? scheme.onSurface : scheme.onSurfaceVariant;
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              selected ? item.activeIcon : item.icon,
-              size: 25,
-              color: color,
-            ),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                item.label,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.visible,
-                style: AppTypography.navLabel.copyWith(color: labelColor),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                selected ? item.activeIcon : item.icon,
+                size: 25,
+                color: color,
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  style: AppTypography.navLabel.copyWith(color: labelColor),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

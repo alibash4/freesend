@@ -177,10 +177,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: _chooseFolder,
-                  icon: Icon(AppIcons.folderOpen, size: 17),
-                  label: Text(l10n.changeFolder),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: _chooseFolder,
+                    icon: Icon(AppIcons.folderOpen, size: 17),
+                    label: Text(l10n.changeFolder),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -260,12 +268,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: appState.history.isEmpty
-                      ? null
-                      : () => _clearHistory(appState),
-                  icon: Icon(AppIcons.trash, size: 17),
-                  label: Text(l10n.clearTransferHistory),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: appState.history.isEmpty
+                        ? null
+                        : () => _clearHistory(appState),
+                    icon: Icon(AppIcons.trash, size: 17),
+                    label: Text(l10n.clearTransferHistory),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -283,10 +299,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: _checkNow,
-                  icon: Icon(AppIcons.refresh, size: 17),
-                  label: Text(l10n.checkForUpdates),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: _checkNow,
+                    icon: Icon(AppIcons.refresh, size: 17),
+                    label: Text(l10n.checkForUpdates),
+                  ),
                 ),
               ),
               if (updateState.message != null) ...[
@@ -340,32 +364,36 @@ class _ThemeChoice extends StatelessWidget {
     final scheme = theme.colorScheme;
     final foreground =
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    return Material(
-      color: selected ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.field),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: selected ? null : onTap,
-        child: SizedBox(
-          height: 38,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 15, color: foreground),
-              const SizedBox(width: 6),
-              // A choice slot is a third of a narrow page wide, so the label
-              // ellipsises instead of spilling over the next choice.
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: foreground,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Material(
+        color: selected ? scheme.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.field),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          onTap: selected ? null : onTap,
+          child: SizedBox(
+            height: 38,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 15, color: foreground),
+                const SizedBox(width: 6),
+                // A choice slot is a third of a narrow page wide, so the label
+                // ellipsises instead of spilling over the next choice.
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -390,21 +418,25 @@ class _LanguageChoice extends StatelessWidget {
     final scheme = theme.colorScheme;
     final foreground =
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    return Material(
-      color: selected ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.field),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: selected ? null : onTap,
-        child: SizedBox(
-          height: 38,
-          child: Center(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: foreground,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Material(
+        color: selected ? scheme.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.field),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          onTap: selected ? null : onTap,
+          child: SizedBox(
+            height: 38,
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                ),
               ),
             ),
           ),
@@ -444,7 +476,10 @@ class _UpdateRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Switch(value: value, onChanged: onChanged),
+          ),
         ],
       ),
     );

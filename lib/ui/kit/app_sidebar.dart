@@ -19,13 +19,18 @@ class AppSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 240,
       height: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.ink,
+      decoration: BoxDecoration(
+        color: scheme.surface,
         border: BorderDirectional(
-          end: BorderSide(color: Color(0xFF2C2C2C), width: 1),
+          end: BorderSide(
+            color: dark ? const Color(0xFF2C2C2C) : scheme.hairline,
+            width: 1,
+          ),
         ),
       ),
       child: Column(
@@ -46,7 +51,7 @@ class AppSidebar extends StatelessWidget {
                   child: Text(
                     'FreeSend',
                     style: AppTypography.pageTitle.copyWith(
-                      color: AppColors.neutral100,
+                      color: dark ? AppColors.neutral100 : AppColors.neutral800,
                     ),
                   ),
                 ),
@@ -90,50 +95,62 @@ class _SidebarItemView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.accent : AppColors.neutral400;
-    final labelColor = selected ? AppColors.neutral100 : AppColors.neutral400;
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final color = selected ? AppColors.accent : scheme.onSurfaceVariant;
+    final labelColor = selected ? scheme.onSurface : scheme.onSurfaceVariant;
+    final hoverColor =
+        dark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04);
+    final highlightColor =
+        dark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04);
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
-      child: Material(
-        color: selected
-            ? Colors.white.withValues(alpha: 0.08)
-            : AppColors.ink,
-        borderRadius: BorderRadius.circular(AppRadii.field),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Material(
+          color: selected
+              ? (dark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppColors.neutral100)
+              : scheme.surface,
           borderRadius: BorderRadius.circular(AppRadii.field),
-          hoverColor: Colors.white.withValues(alpha: 0.06),
-          splashColor: AppColors.accent.withValues(alpha: 0.12),
-          highlightColor: Colors.white.withValues(alpha: 0.06),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 10,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  selected ? item.activeIcon : item.icon,
-                  size: 21,
-                  color: color,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.navLabel.copyWith(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: labelColor,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: SystemMouseCursors.click,
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadii.field),
+            hoverColor: hoverColor,
+            splashColor: scheme.accentText.withValues(alpha: 0.12),
+            highlightColor: highlightColor,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 10,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    selected ? item.activeIcon : item.icon,
+                    size: 21,
+                    color: color,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.navLabel.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: labelColor,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

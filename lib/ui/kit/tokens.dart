@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 abstract final class AppColors {
   static const accent = Color(0xFF1E90FF);
   static const accentDeep = Color(0xFF0B63C5);
-  static const accentWash = Color(0xFFEAF4FF);
+  static const accentWash = Color(0xFFCCE5FF);
   static const accentInk = Color(0xFF08365C);
   static const accentWashDark = Color(0xFF102F4C);
   static const accentInkDark = Color(0xFFA9D4FF);
