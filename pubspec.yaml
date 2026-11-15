@@ -2,6 +2,7 @@ name: free_send
 description: "FreeSend — direct, hotspot-only file transfer. No cloud, no accounts, no limits."
 publish_to: "none"
 version: 1.0.0+1
+license: AGPL-3.0-only
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -22,6 +23,7 @@ dependencies:
   scroll_animator: ^0.3.0
   mobile_scanner: ">=5.2.3 <6.0.0"
   uicons: ^1.0.1
+  uicons_brands: ^1.0.0
   http: ^1.6.0
   tray_manager: ^0.5.3
   window_manager: ^0.5.2
