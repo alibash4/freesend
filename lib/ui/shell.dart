@@ -5,6 +5,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/kit/app_page_container.dart';
 import 'package:free_send/ui/kit/app_sidebar.dart';
+import 'package:free_send/ui/kit/fade_on_change.dart';
 import 'package:free_send/ui/screens/history_screen.dart';
 import 'package:free_send/ui/screens/home_screen.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
@@ -87,29 +88,46 @@ class _AppShellState extends State<AppShell> {
             children: [
               Offstage(
                 offstage: _index >= 4,
-                child: PageView(
-                  controller: _pageController,
-                  physics: MediaQuery.sizeOf(context).width >= 840
-                      ? const NeverScrollableScrollPhysics()
-                      : const _HeavyPageScrollPhysics(),
-                  onPageChanged: (value) {
-                    if (_index < 4 && value != _index) {
-                      setState(() => _index = value);
-                    }
-                  },
-                  children: [
-                    HomeScreen(
-                      onOpenSend: () => _setIndex(4),
-                      onOpenReceive: () => _setIndex(5),
-                    ),
-                    const TransfersScreen(),
-                    const HistoryScreen(),
-                    const SettingsScreen(),
-                  ],
+                child: FadeOnChange(
+                  index: _index,
+                  animate: wide,
+                  child: PageView(
+                    controller: _pageController,
+                    physics: MediaQuery.sizeOf(context).width >= 840
+                        ? const NeverScrollableScrollPhysics()
+                        : const _HeavyPageScrollPhysics(),
+                    onPageChanged: (value) {
+                      if (_index < 4 && value != _index) {
+                        setState(() => _index = value);
+                      }
+                    },
+                    children: [
+                      HomeScreen(
+                        onOpenSend: () => _setIndex(4),
+                        onOpenReceive: () => _setIndex(5),
+                      ),
+                      const TransfersScreen(),
+                      const HistoryScreen(),
+                      const SettingsScreen(),
+                    ],
+                  ),
                 ),
               ),
-              if (_index == 4) SendScreen(onBack: () => _setIndex(0)),
-              if (_index == 5) ReceiveScreen(onBack: () => _setIndex(0)),
+              Positioned.fill(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  transitionBuilder: (child, animation) =>
+                      FadeTransition(opacity: animation, child: child),
+                  child: KeyedSubtree(
+                    key: ValueKey(_index),
+                    child: _index == 4
+                        ? SendScreen(onBack: () => _setIndex(0))
+                        : _index == 5
+                            ? ReceiveScreen(onBack: () => _setIndex(0))
+                            : const SizedBox.shrink(),
+                  ),
+                ),
+              ),
             ],
           ),
         );
