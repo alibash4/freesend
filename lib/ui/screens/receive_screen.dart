@@ -19,7 +19,9 @@ import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
 class ReceiveScreen extends StatefulWidget {
-  const ReceiveScreen({super.key});
+  const ReceiveScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<ReceiveScreen> createState() => _ReceiveScreenState();
@@ -111,13 +113,18 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<ReceiveController>();
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.receiveTitle),
-        leading: IconButton(
-          icon: Icon(AppIcons.back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) widget.onBack?.call();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.receiveTitle),
+          leading: IconButton(
+            icon: Icon(AppIcons.back),
+            onPressed: () => widget.onBack?.call(),
+          ),
         actions: [
           if (ScanScreen.isSupported &&
               (controller.phase == ReceivePhase.idle ||
@@ -186,7 +193,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

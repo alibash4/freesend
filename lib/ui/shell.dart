@@ -5,9 +5,10 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/kit/app_page_container.dart';
 import 'package:free_send/ui/kit/app_sidebar.dart';
-import 'package:free_send/ui/kit/content_navigator_scope.dart';
 import 'package:free_send/ui/screens/history_screen.dart';
 import 'package:free_send/ui/screens/home_screen.dart';
+import 'package:free_send/ui/screens/receive_screen.dart';
+import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/screens/transfers_screen.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -24,23 +25,27 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final PageController _pageController = PageController();
-  final GlobalKey<NavigatorState> _contentNavigatorKey =
-      GlobalKey<NavigatorState>();
 
-  void _selectAnimated(int index) {
-    if (index == _index) return;
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 420),
-      curve: const Cubic(0.22, 1, 0.36, 1),
-    );
-  }
-
-  void _selectImmediate(int index) {
-    if (index == _index) return;
+  void _setIndex(int index, {bool animate = false}) {
+    if (index < 0 || index > 5) return;
+    if (index < 4) {
+      if (animate && _index < 4) {
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 420),
+          curve: const Cubic(0.22, 1, 0.36, 1),
+        );
+      } else {
+        _pageController.jumpToPage(index);
+        setState(() => _index = index);
+      }
+      return;
+    }
     setState(() => _index = index);
-    _pageController.jumpToPage(index);
   }
+
+  void _selectAnimated(int index) => _setIndex(index, animate: true);
+  void _selectImmediate(int index) => _setIndex(index);
 
   @override
   void dispose() {
@@ -78,32 +83,34 @@ class _AppShellState extends State<AppShell> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 840;
         final content = AppPageContainer(
-          child: ContentNavigatorScope(
-            navigatorKey: _contentNavigatorKey,
-            child: Navigator(
-              key: _contentNavigatorKey,
-              onGenerateRoute: (settings) => MaterialPageRoute(
-                settings: settings,
-                builder: (context) {
-                  final pageWide = MediaQuery.sizeOf(context).width >= 840;
-                  return PageView(
-                    controller: _pageController,
-                    physics: pageWide
-                        ? const NeverScrollableScrollPhysics()
-                        : const _HeavyPageScrollPhysics(),
-                    onPageChanged: (value) {
-                      if (value != _index) setState(() => _index = value);
-                    },
-                    children: const [
-                      HomeScreen(),
-                      TransfersScreen(),
-                      HistoryScreen(),
-                      SettingsScreen(),
-                    ],
-                  );
-                },
+          child: Stack(
+            children: [
+              Offstage(
+                offstage: _index >= 4,
+                child: PageView(
+                  controller: _pageController,
+                  physics: MediaQuery.sizeOf(context).width >= 840
+                      ? const NeverScrollableScrollPhysics()
+                      : const _HeavyPageScrollPhysics(),
+                  onPageChanged: (value) {
+                    if (_index < 4 && value != _index) {
+                      setState(() => _index = value);
+                    }
+                  },
+                  children: [
+                    HomeScreen(
+                      onOpenSend: () => _setIndex(4),
+                      onOpenReceive: () => _setIndex(5),
+                    ),
+                    const TransfersScreen(),
+                    const HistoryScreen(),
+                    const SettingsScreen(),
+                  ],
+                ),
               ),
-            ),
+              if (_index == 4) SendScreen(onBack: () => _setIndex(0)),
+              if (_index == 5) ReceiveScreen(onBack: () => _setIndex(0)),
+            ],
           ),
         );
 
@@ -116,7 +123,7 @@ class _AppShellState extends State<AppShell> {
                     children: [
                       AppSidebar(
                         items: items,
-                        selectedIndex: _index,
+                        selectedIndex: _index < 4 ? _index : -1,
                         onSelected: _selectImmediate,
                       ),
                       Expanded(child: content),
@@ -127,7 +134,7 @@ class _AppShellState extends State<AppShell> {
           bottomNavigationBar: wide
               ? null
               : AppBottomNav(
-                  selectedIndex: _index,
+                  selectedIndex: _index < 4 ? _index : -1,
                   onSelected: _selectAnimated,
                   items: items,
                 ),

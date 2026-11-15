@@ -4,7 +4,6 @@ import 'package:uicons/uicons.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_theme.dart';
-import 'package:free_send/ui/kit/content_navigator_scope.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/recent_transfers.dart';
@@ -12,7 +11,10 @@ import 'package:free_send/ui/widgets/recent_transfers.dart';
 /// The two ways into a transfer. Send carries the app's muted blue accent, the
 /// same family the bottom navigation uses for its active tab.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onOpenSend, this.onOpenReceive});
+
+  final VoidCallback? onOpenSend;
+  final VoidCallback? onOpenReceive;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,10 +31,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _openContent(Widget page) {
-    final navigator = ContentNavigatorScope.maybeOf(context)?.currentState;
-    if (navigator != null) {
-      navigator.push(MaterialPageRoute<void>(builder: (_) => page));
+  void _open(VoidCallback? callback, Widget page) {
+    if (callback != null) {
+      callback();
       return;
     }
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
@@ -77,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? AppColors.accentWashDark
                         : AppColors.accentWash,
                     ink: dark ? AppColors.accentInkDark : AppColors.accentInk,
-                    onTap: () => _openContent(const SendScreen()),
+                    onTap: () => _open(widget.onOpenSend, const SendScreen()),
                   ),
                   _FolderAction(
                     icon: UIcons.solidRounded.download,
@@ -90,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ink: dark
                         ? AppColors.successInkDark
                         : AppColors.successInk,
-                    onTap: () => _openContent(const ReceiveScreen()),
+                    onTap: () => _open(widget.onOpenReceive, const ReceiveScreen()),
                   ),
                 ];
                 final rowWidth = width * 2 + gap;
