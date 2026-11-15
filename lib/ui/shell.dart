@@ -114,18 +114,13 @@ class _AppShellState extends State<AppShell> {
                 ),
               ),
               Positioned.fill(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 260),
-                  transitionBuilder: (child, animation) =>
-                      FadeTransition(opacity: animation, child: child),
-                  child: KeyedSubtree(
-                    key: ValueKey(_index),
-                    child: _index == 4
-                        ? SendScreen(onBack: () => _setIndex(0))
-                        : _index == 5
-                            ? ReceiveScreen(onBack: () => _setIndex(0))
-                            : const SizedBox.shrink(),
-                  ),
+                child: FadeOnChange(
+                  index: _index,
+                  child: _index == 4
+                      ? SendScreen(onBack: () => _setIndex(0))
+                      : _index == 5
+                          ? ReceiveScreen(onBack: () => _setIndex(0))
+                          : const SizedBox.shrink(),
                 ),
               ),
             ],
