@@ -4,6 +4,7 @@ import 'package:uicons/uicons.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/content_navigator_scope.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/recent_transfers.dart';
@@ -26,6 +27,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _openContent(Widget page) {
+    final navigator = ContentNavigatorScope.maybeOf(context)?.currentState;
+    if (navigator != null) {
+      navigator.push(MaterialPageRoute<void>(builder: (_) => page));
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   @override
@@ -67,11 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? AppColors.accentWashDark
                         : AppColors.accentWash,
                     ink: dark ? AppColors.accentInkDark : AppColors.accentInk,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const SendScreen(),
-                      ),
-                    ),
+                    onTap: () => _openContent(const SendScreen()),
                   ),
                   _FolderAction(
                     icon: UIcons.solidRounded.download,
@@ -84,11 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ink: dark
                         ? AppColors.successInkDark
                         : AppColors.successInk,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const ReceiveScreen(),
-                      ),
-                    ),
+                    onTap: () => _openContent(const ReceiveScreen()),
                   ),
                 ];
                 final rowWidth = width * 2 + gap;

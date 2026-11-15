@@ -5,6 +5,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/kit/app_page_container.dart';
 import 'package:free_send/ui/kit/app_sidebar.dart';
+import 'package:free_send/ui/kit/content_navigator_scope.dart';
 import 'package:free_send/ui/screens/history_screen.dart';
 import 'package:free_send/ui/screens/home_screen.dart';
 import 'package:free_send/ui/screens/transfers_screen.dart';
@@ -23,14 +24,22 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final PageController _pageController = PageController();
+  final GlobalKey<NavigatorState> _contentNavigatorKey =
+      GlobalKey<NavigatorState>();
 
-  void _select(int index) {
+  void _selectAnimated(int index) {
     if (index == _index) return;
     _pageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 420),
       curve: const Cubic(0.22, 1, 0.36, 1),
     );
+  }
+
+  void _selectImmediate(int index) {
+    if (index == _index) return;
+    setState(() => _index = index);
+    _pageController.jumpToPage(index);
   }
 
   @override
@@ -69,18 +78,32 @@ class _AppShellState extends State<AppShell> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 840;
         final content = AppPageContainer(
-          child: PageView(
-            controller: _pageController,
-            physics: const _HeavyPageScrollPhysics(),
-            onPageChanged: (value) {
-              if (value != _index) setState(() => _index = value);
-            },
-            children: const [
-              HomeScreen(),
-              TransfersScreen(),
-              HistoryScreen(),
-              SettingsScreen(),
-            ],
+          child: ContentNavigatorScope(
+            navigatorKey: _contentNavigatorKey,
+            child: Navigator(
+              key: _contentNavigatorKey,
+              onGenerateRoute: (settings) => MaterialPageRoute(
+                settings: settings,
+                builder: (context) {
+                  final pageWide = MediaQuery.sizeOf(context).width >= 840;
+                  return PageView(
+                    controller: _pageController,
+                    physics: pageWide
+                        ? const NeverScrollableScrollPhysics()
+                        : const _HeavyPageScrollPhysics(),
+                    onPageChanged: (value) {
+                      if (value != _index) setState(() => _index = value);
+                    },
+                    children: const [
+                      HomeScreen(),
+                      TransfersScreen(),
+                      HistoryScreen(),
+                      SettingsScreen(),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
         );
 
@@ -94,7 +117,7 @@ class _AppShellState extends State<AppShell> {
                       AppSidebar(
                         items: items,
                         selectedIndex: _index,
-                        onSelected: _select,
+                        onSelected: _selectImmediate,
                       ),
                       Expanded(child: content),
                     ],
@@ -105,7 +128,7 @@ class _AppShellState extends State<AppShell> {
               ? null
               : AppBottomNav(
                   selectedIndex: _index,
-                  onSelected: _select,
+                  onSelected: _selectAnimated,
                   items: items,
                 ),
         );
