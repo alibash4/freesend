@@ -116,7 +116,7 @@ class _SidebarItemView extends StatelessWidget {
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: AnimatedContainer(
-                  duration: AppMotion.fast,
+                  duration: AppMotion.base,
                   curve: AppMotion.standard,
                   width: 3,
                   height: selected ? 20 : 0,
