@@ -25,6 +25,7 @@ class LocalStore {
   static const _kAutoUpdate = 'auto_update';
   static const _kMinimizeToTray = 'minimize_to_tray';
   static const _kPermissionsPrompted = 'permissions_prompted';
+  static const _kHaptics = 'haptics';
 
   late SharedPreferences _prefs;
 
@@ -76,6 +77,13 @@ class LocalStore {
 
   Future<void> setMinimizeToTray(bool value) async {
     await _prefs.setBool(_kMinimizeToTray, value);
+  }
+
+  /// Whether taps produce a light haptic tick on devices that support it.
+  bool get haptics => _prefs.getBool(_kHaptics) ?? true;
+
+  Future<void> setHaptics(bool value) async {
+    await _prefs.setBool(_kHaptics, value);
   }
 
   /// Whether the mobile permission gate has been shown at least once.

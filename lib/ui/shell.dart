@@ -1,6 +1,9 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:provider/provider.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/kit/app_page_container.dart';
@@ -139,7 +142,12 @@ class _AppShellState extends State<AppShell> {
               ? null
               : AppBottomNav(
                   selectedIndex: _index < 4 ? _index : -1,
-                  onSelected: _selectImmediate,
+                  onSelected: (index) {
+                    if (context.read<AppState>().haptics) {
+                      HapticFeedback.selectionClick();
+                    }
+                    _selectImmediate(index);
+                  },
                   items: items,
                 ),
         );

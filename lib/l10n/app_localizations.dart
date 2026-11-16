@@ -836,6 +836,18 @@ abstract class AppLocalizations {
   /// **'Keep FreeSend running in the tray when the window is closed.'**
   String get keepRunningInTray;
 
+  /// No description provided for @hapticFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap feedback'**
+  String get hapticFeedback;
+
+  /// No description provided for @hapticFeedbackSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Feel a light tap when you switch sections.'**
+  String get hapticFeedbackSubtitle;
+
   /// No description provided for @data.
   ///
   /// In en, this message translates to:
@@ -931,6 +943,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Received files stay on disk.'**
   String get receivedFilesStay;
+
+  /// No description provided for @linkLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get linkLabel;
+
+  /// No description provided for @linkWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi'**
+  String get linkWifi;
+
+  /// No description provided for @linkEthernet.
+  ///
+  /// In en, this message translates to:
+  /// **'Ethernet'**
+  String get linkEthernet;
+
+  /// No description provided for @setupBeforeSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you send'**
+  String get setupBeforeSend;
+
+  /// No description provided for @setupBeforeReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you receive'**
+  String get setupBeforeReceive;
+
+  /// No description provided for @setupIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn these on in order. FreeSend stays on the local link, and it cannot start until the required ones are on.'**
+  String get setupIntro;
+
+  /// No description provided for @setupNearbyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby devices'**
+  String get setupNearbyTitle;
+
+  /// No description provided for @setupNearbyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets FreeSend open or join the hotspot the transfer uses.'**
+  String get setupNearbyBody;
+
+  /// No description provided for @setupNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get setupNotificationsTitle;
+
+  /// No description provided for @setupNotificationsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps the transfer running when you leave the app.'**
+  String get setupNotificationsBody;
+
+  /// No description provided for @setupCameraTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get setupCameraTitle;
+
+  /// No description provided for @setupCameraBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Reads the pairing code shown on the other device. You can paste a code instead.'**
+  String get setupCameraBody;
+
+  /// No description provided for @setupOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get setupOptional;
+
+  /// No description provided for @setupEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get setupEnable;
+
+  /// No description provided for @setupSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get setupSettings;
 }
 
 class _AppLocalizationsDelegate

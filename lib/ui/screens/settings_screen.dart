@@ -166,6 +166,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              if (PlatformEnv.kind == PlatformKind.android ||
+                  PlatformEnv.kind == PlatformKind.ios) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _UpdateRow(
+                  label: l10n.hapticFeedback,
+                  subtitle: l10n.hapticFeedbackSubtitle,
+                  value: appState.haptics,
+                  onChanged: (value) => appState.setHaptics(value),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(title: l10n.receivedFiles, icon: AppIcons.inbox),
               Text(
