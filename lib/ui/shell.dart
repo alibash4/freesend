@@ -27,25 +27,16 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final PageController _pageController = PageController();
 
-  void _setIndex(int index, {bool animate = false}) {
+  void _setIndex(int index) {
     if (index < 0 || index > 5) return;
     if (index < 4) {
-      if (animate && _index < 4) {
-        _pageController.animateToPage(
-          index,
-          duration: const Duration(milliseconds: 420),
-          curve: const Cubic(0.22, 1, 0.36, 1),
-        );
-      } else {
-        _pageController.jumpToPage(index);
-        setState(() => _index = index);
-      }
+      _pageController.jumpToPage(index);
+      setState(() => _index = index);
       return;
     }
     setState(() => _index = index);
   }
 
-  void _selectAnimated(int index) => _setIndex(index, animate: true);
   void _selectImmediate(int index) => _setIndex(index);
 
   @override
@@ -148,7 +139,7 @@ class _AppShellState extends State<AppShell> {
               ? null
               : AppBottomNav(
                   selectedIndex: _index < 4 ? _index : -1,
-                  onSelected: _selectAnimated,
+                  onSelected: _selectImmediate,
                   items: items,
                 ),
         );
