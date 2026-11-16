@@ -71,6 +71,13 @@ abstract final class AppIcons {
   static final IconData moon = UIcons.regularRounded.moon;
   static final IconData auto = UIcons.regularRounded.sun;
 
+  // Settings sections.
+  static final IconData deviceMobile = UIcons.regularRounded.smartphone;
+  static final IconData palette = UIcons.regularRounded.palette;
+  static final IconData compress = UIcons.regularRounded.compress;
+  static final IconData database = UIcons.regularRounded.database;
+  static final IconData update = UIcons.regularRounded.arrow_circle_up;
+
   // Bottom navigation: regular when idle, solid when active.
   static final IconData homeActive = UIcons.solidRounded.home;
   static final IconData transfersActive = UIcons.solidRounded.bolt;
