@@ -52,7 +52,8 @@ abstract final class AppTypography {
   /// Main page title, used on every screen. Colour is applied by the widget so
   /// the same style can serve both brightnesses.
   static const TextStyle pageTitle = TextStyle(
-    fontFamily: 'Cairo',
+    fontFamily: 'Public Sans',
+    fontFamilyFallback: ['Cairo'],
     fontSize: 20,
     height: 1.2,
     fontWeight: FontWeight.w500,
@@ -60,7 +61,8 @@ abstract final class AppTypography {
   );
 
   static const TextStyle sectionTitle = TextStyle(
-    fontFamily: 'Cairo',
+    fontFamily: 'Public Sans',
+    fontFamilyFallback: ['Cairo'],
     fontSize: 16,
     height: 1.3,
     fontWeight: FontWeight.w500,
