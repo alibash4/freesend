@@ -89,7 +89,8 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      fontFamily: 'Cairo',
+      fontFamily: 'Public Sans',
+      fontFamilyFallback: const ['Cairo'],
       scaffoldBackgroundColor: page,
       canvasColor: page,
       textTheme: textTheme,
@@ -246,25 +247,25 @@ abstract final class AppTheme {
     ).textTheme;
     return base.copyWith(
       displaySmall: base.displaySmall?.copyWith(
-        fontFamily: 'Cairo',
+        fontFamily: 'Public Sans',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.8,
         color: scheme.onSurface,
       ),
       headlineMedium: base.headlineMedium?.copyWith(
-        fontFamily: 'Cairo',
+        fontFamily: 'Public Sans',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
         color: scheme.onSurface,
       ),
       headlineSmall: base.headlineSmall?.copyWith(
-        fontFamily: 'Cairo',
+        fontFamily: 'Public Sans',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.3,
         color: scheme.onSurface,
       ),
       titleLarge: base.titleLarge?.copyWith(
-        fontFamily: 'Cairo',
+        fontFamily: 'Public Sans',
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
         fontSize: 19,

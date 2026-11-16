@@ -259,6 +259,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get files => 'Files';
 
   @override
+  String get folders => 'Folders';
+
+  @override
+  String get music => 'Music';
+
+  @override
+  String get documents => 'Documents';
+
+  @override
+  String get videos => 'Videos';
+
+  @override
+  String get apk => 'APK';
+
+  @override
+  String get largeFiles => 'Large files';
+
+  @override
+  String get select => 'Select';
+
+  @override
+  String get addFiles => 'Add files';
+
+  @override
+  String get addFolder => 'Add folder';
+
+  @override
+  String get emptyCategory => 'Nothing here yet';
+
+  @override
+  String selectedCount(Object count) {
+    return '$count selected';
+  }
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get gridView => 'Grid';
+
+  @override
+  String get listView => 'List';
+
+  @override
+  String get loading => 'Loading…';
+
+  @override
   String get resume => 'Resume';
 
   @override
@@ -407,6 +454,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Keep FreeSend running in the tray when the window is closed.';
 
   @override
+  String get hapticFeedback => 'Tap feedback';
+
+  @override
+  String get hapticFeedbackSubtitle =>
+      'Feel a light tap when you switch sections.';
+
+  @override
   String get data => 'Data';
 
   @override
@@ -457,4 +511,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get receivedFilesStay => 'Received files stay on disk.';
+
+  @override
+  String get linkLabel => 'Network';
+
+  @override
+  String get linkWifi => 'Wi-Fi';
+
+  @override
+  String get linkEthernet => 'Ethernet';
+
+  @override
+  String get setupBeforeSend => 'Before you send';
+
+  @override
+  String get setupBeforeReceive => 'Before you receive';
+
+  @override
+  String get setupIntro =>
+      'Turn these on in order. FreeSend stays on the local link, and it cannot start until the required ones are on.';
+
+  @override
+  String get setupNearbyTitle => 'Nearby devices';
+
+  @override
+  String get setupNearbyBody =>
+      'Lets FreeSend open or join the hotspot the transfer uses.';
+
+  @override
+  String get setupNotificationsTitle => 'Notifications';
+
+  @override
+  String get setupNotificationsBody =>
+      'Keeps the transfer running when you leave the app.';
+
+  @override
+  String get setupCameraTitle => 'Camera';
+
+  @override
+  String get setupCameraBody =>
+      'Reads the pairing code shown on the other device. You can paste a code instead.';
+
+  @override
+  String get setupOptional => 'Optional';
+
+  @override
+  String get setupEnable => 'Enable';
+
+  @override
+  String get setupSettings => 'Settings';
 }

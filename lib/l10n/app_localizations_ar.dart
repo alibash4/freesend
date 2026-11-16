@@ -262,6 +262,53 @@ class AppLocalizationsAr extends AppLocalizations {
   String get files => 'الملفات';
 
   @override
+  String get folders => 'المجلدات';
+
+  @override
+  String get music => 'الموسيقى';
+
+  @override
+  String get documents => 'المستندات';
+
+  @override
+  String get videos => 'الفيديو';
+
+  @override
+  String get apk => 'APK';
+
+  @override
+  String get largeFiles => 'الملفات الكبيرة';
+
+  @override
+  String get select => 'تحديد';
+
+  @override
+  String get addFiles => 'إضافة ملفات';
+
+  @override
+  String get addFolder => 'إضافة مجلد';
+
+  @override
+  String get emptyCategory => 'لا يوجد شيء هنا بعد';
+
+  @override
+  String selectedCount(Object count) {
+    return '$count محدد';
+  }
+
+  @override
+  String get done => 'تم';
+
+  @override
+  String get gridView => 'شبكة';
+
+  @override
+  String get listView => 'قائمة';
+
+  @override
+  String get loading => 'جارٍ التحميل…';
+
+  @override
   String get resume => 'استئناف';
 
   @override
@@ -419,6 +466,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'إبقاء FreeSend يعمل في منطقة النظام عند إغلاق النافذة.';
 
   @override
+  String get hapticFeedback => 'الاستجابة عند اللمس';
+
+  @override
+  String get hapticFeedbackSubtitle =>
+      'شعور بنقرة خفيفة عند التنقل بين الأقسام.';
+
+  @override
   String get data => 'البيانات';
 
   @override
@@ -469,4 +523,53 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get receivedFilesStay => 'الملفات المستلمة تبقى على القرص.';
+
+  @override
+  String get linkLabel => 'الشبكة';
+
+  @override
+  String get linkWifi => 'واي فاي';
+
+  @override
+  String get linkEthernet => 'إيثرنت';
+
+  @override
+  String get setupBeforeSend => 'قبل الإرسال';
+
+  @override
+  String get setupBeforeReceive => 'قبل الاستلام';
+
+  @override
+  String get setupIntro =>
+      'فعّل هذه بالترتيب. يبقى FreeSend على الرابط المحلي، ولا يمكنه البدء حتى يتم تفعيل ما هو مطلوب.';
+
+  @override
+  String get setupNearbyTitle => 'الأجهزة القريبة';
+
+  @override
+  String get setupNearbyBody =>
+      'يتيح لـ FreeSend فتح نقطة الاتصال التي يستخدمها النقل أو الانضمام إليها.';
+
+  @override
+  String get setupNotificationsTitle => 'الإشعارات';
+
+  @override
+  String get setupNotificationsBody =>
+      'يبقي عملية النقل تعمل عند مغادرة التطبيق.';
+
+  @override
+  String get setupCameraTitle => 'الكاميرا';
+
+  @override
+  String get setupCameraBody =>
+      'تقرأ رمز الإقران المعروض على الجهاز الآخر. يمكنك لصق الرمز بدلًا من ذلك.';
+
+  @override
+  String get setupOptional => 'اختياري';
+
+  @override
+  String get setupEnable => 'تفعيل';
+
+  @override
+  String get setupSettings => 'الإعدادات';
 }

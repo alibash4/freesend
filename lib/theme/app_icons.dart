@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'package:uicons/uicons.dart';
+import 'package:uicons_brands/uicons_brands.dart';
 
 /// Icon set for the whole app: UIcons Regular Rounded. Screens never reach
 /// into the package directly, so the style is decided in exactly one place.
@@ -35,7 +36,9 @@ abstract final class AppIcons {
   static final IconData image = UIcons.regularRounded.picture;
   static final IconData video = UIcons.regularRounded.video_camera;
   static final IconData music = UIcons.regularRounded.music;
+  static final IconData file = UIcons.regularRounded.file;
   static final IconData fileText = UIcons.regularRounded.document;
+  static final IconData pdf = UIcons.regularRounded.file_invoice;
 
   // Navigation and chrome.
   static final IconData home = UIcons.regularRounded.home;
@@ -52,6 +55,7 @@ abstract final class AppIcons {
   static final IconData checkCircle = UIcons.regularRounded.checkbox;
   static final IconData circle = UIcons.regularRounded.circle;
   static final IconData package = UIcons.regularRounded.package;
+  static final IconData android = const UIconsBrands().android;
   static final IconData lock = UIcons.regularRounded.lock;
   static final IconData stop = UIcons.regularRounded.stop;
   static final IconData pause = UIcons.regularRounded.pause;
@@ -66,6 +70,13 @@ abstract final class AppIcons {
   static final IconData sun = UIcons.regularRounded.sun;
   static final IconData moon = UIcons.regularRounded.moon;
   static final IconData auto = UIcons.regularRounded.sun;
+
+  // Settings sections.
+  static final IconData deviceMobile = UIcons.regularRounded.smartphone;
+  static final IconData palette = UIcons.regularRounded.palette;
+  static final IconData compress = UIcons.regularRounded.compress;
+  static final IconData database = UIcons.regularRounded.database;
+  static final IconData update = UIcons.regularRounded.arrow_circle_up;
 
   // Bottom navigation: regular when idle, solid when active.
   static final IconData homeActive = UIcons.solidRounded.home;

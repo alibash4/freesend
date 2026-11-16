@@ -14,13 +14,16 @@ import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
+import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({super.key});
+  const SendScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<SendScreen> createState() => _SendScreenState();
@@ -215,13 +218,11 @@ class _SendScreenState extends State<SendScreen> {
     final controller = context.watch<SendController>();
     final l10n = AppLocalizations.of(context);
     return PopScope(
-      canPop: !controller.isBusy,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final leave = await _confirmLeave(controller);
-        if (leave && context.mounted) {
-          Navigator.of(context).pop();
-        }
+        if (leave && context.mounted) widget.onBack?.call();
       },
       child: Scaffold(
         appBar: AppBar(
@@ -230,7 +231,7 @@ class _SendScreenState extends State<SendScreen> {
             icon: Icon(AppIcons.back),
             onPressed: () async {
               final leave = await _confirmLeave(controller);
-              if (leave && context.mounted) Navigator.of(context).pop();
+              if (leave && context.mounted) widget.onBack?.call();
             },
           ),
         ),
@@ -244,14 +245,9 @@ class _SendScreenState extends State<SendScreen> {
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   child: switch (controller.phase) {
-                    SendPhase.idle => _PickView(
-                        key: const ValueKey('pick'),
+                    SendPhase.idle => SendSelectView(
+                        key: const ValueKey('select'),
                         controller: controller,
-                        picking: _picking,
-                        query: _query,
-                        onQueryChanged: (value) =>
-                            setState(() => _query = value),
-                        onPick: () => _openSourcePicker(controller),
                         onStart: controller.startSession,
                       ),
                     SendPhase.preparing => _BusyView(

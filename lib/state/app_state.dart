@@ -28,6 +28,9 @@ class AppState extends ChangeNotifier {
   /// Whether the mobile permission gate has already been shown.
   bool permissionsPrompted = false;
 
+  /// Whether taps produce a light haptic tick on devices that support it.
+  bool haptics = true;
+
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
 
@@ -54,6 +57,7 @@ class AppState extends ChangeNotifier {
     autoUpdate = store.autoUpdate;
     minimizeToTray = store.minimizeToTray;
     permissionsPrompted = store.permissionsPrompted;
+    haptics = store.haptics;
     _ready = true;
     notifyListeners();
   }
@@ -68,6 +72,12 @@ class AppState extends ChangeNotifier {
     minimizeToTray = value;
     notifyListeners();
     await store.setMinimizeToTray(value);
+  }
+
+  Future<void> setHaptics(bool value) async {
+    haptics = value;
+    notifyListeners();
+    await store.setHaptics(value);
   }
 
   Future<void> setPermissionsPrompted(bool value) async {

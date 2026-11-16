@@ -77,36 +77,85 @@ class _AppNavItemView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = selected ? scheme.accentText : scheme.onSurfaceVariant;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final color = selected ? AppColors.accent : scheme.onSurfaceVariant;
     final labelColor = selected ? scheme.onSurface : scheme.onSurfaceVariant;
     return Semantics(
       button: true,
       selected: selected,
       label: item.label,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              selected ? item.activeIcon : item.icon,
-              size: 25,
-              color: color,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(
+                    end: selected
+                        ? (dark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : AppColors.neutral100)
+                        : Colors.transparent,
+                  ),
+                  duration: AppMotion.base,
+                  curve: AppMotion.standard,
+                  builder: (context, background, _) => SizedBox(
+                    width: 67,
+                    height: 45,
+                    child: Material(
+                      color: background,
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.field),
+                      ),
+                      child: InkWell(
+                        onTap: onTap,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              selected ? item.activeIcon : item.icon,
+                              size: 23,
+                              color: color,
+                            ),
+                            const SizedBox(height: 2),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                item.label,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.visible,
+                                style: AppTypography.navLabel.copyWith(
+                                  color: labelColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                AnimatedContainer(
+                  duration: AppMotion.base,
+                  curve: AppMotion.standard,
+                  width: selected ? 20 : 0,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(AppRadii.pill),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                item.label,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.visible,
-                style: AppTypography.navLabel.copyWith(color: labelColor),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

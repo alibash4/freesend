@@ -1,12 +1,18 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:provider/provider.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/kit/app_page_container.dart';
 import 'package:free_send/ui/kit/app_sidebar.dart';
+import 'package:free_send/ui/kit/fade_on_change.dart';
 import 'package:free_send/ui/screens/history_screen.dart';
 import 'package:free_send/ui/screens/home_screen.dart';
+import 'package:free_send/ui/screens/receive_screen.dart';
+import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/screens/transfers_screen.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -22,6 +28,25 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _index = 0;
+  late final PageController _pageController = PageController();
+
+  void _setIndex(int index) {
+    if (index < 0 || index > 5) return;
+    if (index < 4) {
+      _pageController.jumpToPage(index);
+      setState(() => _index = index);
+      return;
+    }
+    setState(() => _index = index);
+  }
+
+  void _selectImmediate(int index) => _setIndex(index);
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,13 +78,45 @@ class _AppShellState extends State<AppShell> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 840;
         final content = AppPageContainer(
-          child: IndexedStack(
-            index: _index,
-            children: const [
-              HomeScreen(),
-              TransfersScreen(),
-              HistoryScreen(),
-              SettingsScreen(),
+          child: Stack(
+            children: [
+              Offstage(
+                offstage: _index >= 4,
+                child: FadeOnChange(
+                  index: _index,
+                  animate: wide,
+                  child: PageView(
+                    controller: _pageController,
+                    physics: MediaQuery.sizeOf(context).width >= 840
+                        ? const NeverScrollableScrollPhysics()
+                        : const _HeavyPageScrollPhysics(),
+                    onPageChanged: (value) {
+                      if (_index < 4 && value != _index) {
+                        setState(() => _index = value);
+                      }
+                    },
+                    children: [
+                      HomeScreen(
+                        onOpenSend: () => _setIndex(4),
+                        onOpenReceive: () => _setIndex(5),
+                      ),
+                      const TransfersScreen(),
+                      const HistoryScreen(),
+                      const SettingsScreen(),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: FadeOnChange(
+                  index: _index,
+                  child: _index == 4
+                      ? SendScreen(onBack: () => _setIndex(0))
+                      : _index == 5
+                          ? ReceiveScreen(onBack: () => _setIndex(0))
+                          : const SizedBox.shrink(),
+                ),
+              ),
             ],
           ),
         );
@@ -73,9 +130,8 @@ class _AppShellState extends State<AppShell> {
                     children: [
                       AppSidebar(
                         items: items,
-                        selectedIndex: _index,
-                        onSelected: (value) =>
-                            setState(() => _index = value),
+                        selectedIndex: _index < 4 ? _index : -1,
+                        onSelected: _selectImmediate,
                       ),
                       Expanded(child: content),
                     ],
@@ -85,8 +141,13 @@ class _AppShellState extends State<AppShell> {
           bottomNavigationBar: wide
               ? null
               : AppBottomNav(
-                  selectedIndex: _index,
-                  onSelected: (value) => setState(() => _index = value),
+                  selectedIndex: _index < 4 ? _index : -1,
+                  onSelected: (index) {
+                    if (context.read<AppState>().haptics) {
+                      HapticFeedback.selectionClick();
+                    }
+                    _selectImmediate(index);
+                  },
                   items: items,
                 ),
         );
@@ -97,3 +158,16 @@ class _AppShellState extends State<AppShell> {
 
 /// Shared horizontal page padding.
 const kPagePadding = EdgeInsets.symmetric(horizontal: AppSpacing.md);
+
+/// A heavier, slower spring for tab swipes: more mass and damping than the
+/// default bounce, so the page settles with weight instead of snapping.
+class _HeavyPageScrollPhysics extends PageScrollPhysics {
+  const _HeavyPageScrollPhysics();
+
+  @override
+  SpringDescription get spring => const SpringDescription(
+        mass: 1.4,
+        stiffness: 90,
+        damping: 18,
+      );
+}

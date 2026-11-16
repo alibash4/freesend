@@ -131,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SectionHeader(title: l10n.thisDevice),
+              SectionHeader(title: l10n.thisDevice, icon: AppIcons.deviceMobile),
               Text(l10n.deviceName, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               TextField(
@@ -166,8 +166,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              if (PlatformEnv.kind == PlatformKind.android ||
+                  PlatformEnv.kind == PlatformKind.ios) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _UpdateRow(
+                  label: l10n.hapticFeedback,
+                  subtitle: l10n.hapticFeedbackSubtitle,
+                  value: appState.haptics,
+                  onChanged: (value) => appState.setHaptics(value),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.receivedFiles),
+              SectionHeader(title: l10n.receivedFiles, icon: AppIcons.inbox),
               Text(
                 appState.downloadDir.isEmpty
                     ? l10n.notSetYet
@@ -177,14 +187,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: _chooseFolder,
-                  icon: Icon(AppIcons.folderOpen, size: 17),
-                  label: Text(l10n.changeFolder),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: _chooseFolder,
+                    icon: Icon(AppIcons.folderOpen, size: 17),
+                    label: Text(l10n.changeFolder),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.appearance),
+              SectionHeader(title: l10n.appearance, icon: AppIcons.palette),
               Text(l10n.theme, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               // Three choices in one soft track, so the control reads as a
@@ -243,7 +261,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: AppSpacing.xl),
               if (PlatformEnv.supportsTray) ...[
-                SectionHeader(title: l10n.systemTray),
+                SectionHeader(title: l10n.systemTray, icon: AppIcons.compress),
                 _UpdateRow(
                   label: l10n.minimizeToTray,
                   subtitle: l10n.keepRunningInTray,
@@ -252,7 +270,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
               ],
-              SectionHeader(title: l10n.data),
+              SectionHeader(title: l10n.data, icon: AppIcons.database),
               Text(
                 l10n.localDataExplanation,
                 style: theme.textTheme.bodySmall,
@@ -260,16 +278,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: appState.history.isEmpty
-                      ? null
-                      : () => _clearHistory(appState),
-                  icon: Icon(AppIcons.trash, size: 17),
-                  label: Text(l10n.clearTransferHistory),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: appState.history.isEmpty
+                        ? null
+                        : () => _clearHistory(appState),
+                    icon: Icon(AppIcons.trash, size: 17),
+                    label: Text(l10n.clearTransferHistory),
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.updates),
+              SectionHeader(title: l10n.updates, icon: AppIcons.update),
               _UpdateRow(
                 label: l10n.checkAutomatically,
                 subtitle: l10n.lookForNewerRelease,
@@ -283,10 +309,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: _checkNow,
-                  icon: Icon(AppIcons.refresh, size: 17),
-                  label: Text(l10n.checkForUpdates),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: _checkNow,
+                    icon: Icon(AppIcons.refresh, size: 17),
+                    label: Text(l10n.checkForUpdates),
+                  ),
                 ),
               ),
               if (updateState.message != null) ...[
@@ -301,7 +335,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.about),
+              SectionHeader(title: l10n.about, icon: AppIcons.info),
               _AboutRow(
                 label: l10n.app,
                 value: '${AppConstants.appName} ${updateState.currentVersion}',
@@ -340,32 +374,36 @@ class _ThemeChoice extends StatelessWidget {
     final scheme = theme.colorScheme;
     final foreground =
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    return Material(
-      color: selected ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.field),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: selected ? null : onTap,
-        child: SizedBox(
-          height: 38,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 15, color: foreground),
-              const SizedBox(width: 6),
-              // A choice slot is a third of a narrow page wide, so the label
-              // ellipsises instead of spilling over the next choice.
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: foreground,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Material(
+        color: selected ? scheme.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.field),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          onTap: selected ? null : onTap,
+          child: SizedBox(
+            height: 38,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 15, color: foreground),
+                const SizedBox(width: 6),
+                // A choice slot is a third of a narrow page wide, so the label
+                // ellipsises instead of spilling over the next choice.
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: foreground,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -390,21 +428,25 @@ class _LanguageChoice extends StatelessWidget {
     final scheme = theme.colorScheme;
     final foreground =
         selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    return Material(
-      color: selected ? scheme.primaryContainer : Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.field),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: selected ? null : onTap,
-        child: SizedBox(
-          height: 38,
-          child: Center(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: foreground,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Material(
+        color: selected ? scheme.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.field),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          onTap: selected ? null : onTap,
+          child: SizedBox(
+            height: 38,
+            child: Center(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: foreground,
+                ),
               ),
             ),
           ),
@@ -444,7 +486,10 @@ class _UpdateRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Switch(value: value, onChanged: onChanged),
+          ),
         ],
       ),
     );

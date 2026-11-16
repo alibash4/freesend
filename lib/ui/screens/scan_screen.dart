@@ -71,7 +71,7 @@ class _ScanScreenState extends State<ScanScreen> {
             onDetect: _onDetect,
             fit: BoxFit.cover,
             errorBuilder: _buildError,
-            placeholderBuilder: (context, _) => const ColoredBox(
+            placeholderBuilder: (context) => const ColoredBox(
               color: AppColors.ink,
               child: Center(
                 child: SizedBox(
@@ -136,7 +136,6 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget _buildError(
     BuildContext context,
     MobileScannerException error,
-    Widget? _,
   ) {
     final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
     final detail = error.errorDetails?.message;
