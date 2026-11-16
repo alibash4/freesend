@@ -109,50 +109,72 @@ class _SidebarItemView extends StatelessWidget {
       label: item.label,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: Material(
-          color: selected
-              ? (dark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : AppColors.neutral100)
-              : scheme.surface,
-          borderRadius: BorderRadius.circular(AppRadii.field),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            mouseCursor: SystemMouseCursors.click,
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(AppRadii.field),
-            hoverColor: hoverColor,
-            splashColor: scheme.accentText.withValues(alpha: 0.12),
-            highlightColor: highlightColor,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: 10,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    selected ? item.activeIcon : item.icon,
-                    size: 21,
-                    color: color,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 12,
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: AnimatedContainer(
+                  duration: AppMotion.fast,
+                  curve: AppMotion.standard,
+                  width: 3,
+                  height: selected ? 20 : 0,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(AppRadii.pill),
                   ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.navLabel.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: labelColor,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+            Expanded(
+              child: Material(
+                color: selected
+                    ? (dark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : AppColors.neutral100)
+                    : scheme.surface,
+                borderRadius: BorderRadius.circular(AppRadii.field),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  mouseCursor: SystemMouseCursors.click,
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(AppRadii.field),
+                  hoverColor: hoverColor,
+                  splashColor: scheme.accentText.withValues(alpha: 0.12),
+                  highlightColor: highlightColor,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected ? item.activeIcon : item.icon,
+                          size: 21,
+                          color: color,
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.navLabel.copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: labelColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
