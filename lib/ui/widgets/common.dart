@@ -5,23 +5,27 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 
 class SectionHeader extends StatelessWidget {
-  const SectionHeader({super.key, required this.title, this.action});
+  const SectionHeader({super.key, required this.title, this.icon, this.action});
 
   final String title;
+  final IconData? icon;
   final Widget? action;
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.accentText;
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: AppSpacing.sm),
+          ],
           Expanded(
             child: Text(
               title,
-              style: AppTypography.sectionTitle.copyWith(
-                color: Theme.of(context).colorScheme.accentText,
-              ),
+              style: AppTypography.sectionTitle.copyWith(color: color),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
