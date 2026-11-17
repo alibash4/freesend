@@ -237,6 +237,16 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
       ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        shadowColor: scheme.shadow.withValues(alpha: 0.18),
+        textStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,

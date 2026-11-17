@@ -65,6 +65,87 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<String?> _pickLocaleDesktop(
+    BuildContext context,
+    BuildContext buttonContext,
+    AppLocalizations l10n,
+  ) async {
+    final overlayBox =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final buttonBox =
+        buttonContext.findRenderObject()! as RenderBox;
+    final position = RelativeRect.fromRect(
+      buttonBox.localToGlobal(Offset.zero, ancestor: overlayBox) &
+          buttonBox.size,
+      Offset.zero & overlayBox.size,
+    );
+    // Each item is padded by AppSpacing.sm on both sides inside the menu, so
+    // the inner tile is narrower than the trigger by that amount.
+    final tileWidth = buttonBox.size.width - AppSpacing.sm * 2;
+    final current = context.read<AppState>().locale.languageCode;
+    final choices = [
+      ('ar', l10n.arabic),
+      ('en', l10n.english),
+    ]..sort(
+        (a, b) => (a.$1 == current ? 0 : 1).compareTo(b.$1 == current ? 0 : 1),
+      );
+    return showMenu<String>(
+      context: context,
+      position: position,
+      items: [
+        for (final (code, label) in choices)
+          _MenuItem(
+            value: code,
+            label: label,
+            selected: current == code,
+            width: tileWidth,
+          ),
+      ],
+    );
+  }
+
+  /// Last path segment of a directory path, tolerating both separators and a
+  /// trailing slash. Returns the input unchanged when it has no segments.
+  String _dirName(String path) {
+    final parts = path
+        .split(RegExp(r'[\\/]'))
+        .where((part) => part.isNotEmpty);
+    return parts.isEmpty ? path : parts.last;
+  }
+
+  Future<String?> _pickLocaleSheet(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
+    final current = context.read<AppState>().locale.languageCode;
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (code, label) in [
+              ('ar', l10n.arabic),
+              ('en', l10n.english),
+            ])
+              ListTile(
+                leading: current == code
+                    ? Icon(
+                        AppIcons.check,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : const SizedBox(width: 18),
+                title: Text(label),
+                onTap: () => Navigator.of(sheetContext).pop(code),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _renameDevice() async {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
@@ -222,109 +303,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionHeader(title: l10n.thisDevice),
-              Text(l10n.deviceName, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Material(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppRadii.field),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                mouseCursor: SystemMouseCursors.click,
-                onTap: _renameDevice,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 40),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.deviceName,
+                      style: theme.textTheme.bodyMedium,
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          appState.deviceName,
-                          style: theme.textTheme.bodyMedium,
+                  SizedBox(
+                    width: 168,
+                    child: OutlinedButton(
+                      style: ButtonStyle(
+                        mouseCursor: WidgetStatePropertyAll(
+                          SystemMouseCursors.click,
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 16,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            l10n.edit,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                      onPressed: _renameDevice,
+                      child: Text(
+                        appState.deviceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xxl),
               SectionHeader(title: l10n.receivedFiles),
-              Text(l10n.saveLocation, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Material(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppRadii.field),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  mouseCursor: SystemMouseCursors.click,
-                  onTap: _chooseFolder,
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 40),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            appState.downloadDir.isEmpty
-                                ? l10n.notSetYet
-                                : appState.downloadDir,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              AppIcons.folderOpen,
-                              size: 16,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              l10n.change,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.saveLocation,
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ),
-                ),
+                  SizedBox(
+                    width: 168,
+                    child: OutlinedButton(
+                      style: ButtonStyle(
+                        mouseCursor: WidgetStatePropertyAll(
+                          SystemMouseCursors.click,
+                        ),
+                      ),
+                      onPressed: _chooseFolder,
+                      child: Text(
+                        appState.downloadDir.isEmpty
+                            ? l10n.notSetYet
+                            : _dirName(appState.downloadDir),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xxl),
               SectionHeader(
                 title: PlatformEnv.isDesktop
                     ? l10n.appearance
                     : l10n.lookAndFeel,
               ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.language,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 168,
+                    child: Builder(
+                      builder: (buttonContext) => OutlinedButton(
+                        style: ButtonStyle(
+                          mouseCursor: WidgetStatePropertyAll(
+                            SystemMouseCursors.click,
+                          ),
+                        ),
+                        onPressed: () async {
+                          final value = PlatformEnv.isDesktop
+                              ? await _pickLocaleDesktop(
+                                  context,
+                                  buttonContext,
+                                  l10n,
+                                )
+                              : await _pickLocaleSheet(context, l10n);
+                          if (value != null) {
+                            // Let the popup/sheet finish its dismiss
+                            // animation before flipping directionality,
+                            // otherwise the exiting menu jumps position.
+                            await Future<void>.delayed(
+                              const Duration(milliseconds: 300),
+                            );
+                            if (!mounted) return;
+                            appState.setLocale(Locale(value));
+                          }
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                appState.locale.languageCode == 'ar'
+                                    ? l10n.arabic
+                                    : l10n.english,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 17,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
               Text(l10n.theme, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               // Three choices in one soft track, so the control reads as a
@@ -366,39 +476,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(l10n.language, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Container(
-                height: 45,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppRadii.field),
-                ),
-                child: Row(
-                  spacing: 4,
-                  children: [
-                    Expanded(
-                      child: _LanguageChoice(
-                        label: l10n.arabic,
-                        selected: appState.locale.languageCode == 'ar',
-                        onTap: () => appState.setLocale(const Locale('ar')),
-                      ),
-                    ),
-                    Expanded(
-                      child: _LanguageChoice(
-                        label: l10n.english,
-                        selected: appState.locale.languageCode == 'en',
-                        onTap: () => appState.setLocale(const Locale('en')),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               if (PlatformEnv.kind == PlatformKind.android ||
                   PlatformEnv.kind == PlatformKind.ios) ...[
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.xl),
                 _UpdateRow(
                   label: l10n.hapticFeedback,
                   subtitle: l10n.hapticFeedbackSubtitle,
@@ -406,7 +486,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (value) => appState.setHaptics(value),
                 ),
               ],
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xxl),
               if (PlatformEnv.supportsTray) ...[
                 SectionHeader(title: l10n.systemTray),
                 _UpdateRow(
@@ -415,7 +495,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: appState.minimizeToTray,
                   onChanged: (value) => appState.setMinimizeToTray(value),
                 ),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpacing.xxl),
               ],
               SectionHeader(title: l10n.updates),
               _UpdateRow(
@@ -464,7 +544,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xxl),
               SectionHeader(title: l10n.data),
               Text(l10n.history, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
@@ -491,7 +571,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.xxl),
               SectionHeader(title: l10n.about),
               _AboutRow(
                 label: l10n.app,
@@ -579,50 +659,6 @@ class _ThemeChoice extends StatelessWidget {
   }
 }
 
-class _LanguageChoice extends StatelessWidget {
-  const _LanguageChoice({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final foreground =
-        selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Material(
-        color: selected ? scheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.field - 3),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          mouseCursor: SystemMouseCursors.click,
-          onTap: selected ? null : onTap,
-          child: SizedBox(
-            height: 37,
-            child: Center(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: foreground,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _UpdateRow extends StatelessWidget {
   const _UpdateRow({
@@ -769,6 +805,79 @@ class _SpinnerIconState extends State<_SpinnerIcon>
     return RotationTransition(
       turns: _controller,
       child: Icon(AppIcons.loading, size: widget.size),
+    );
+  }
+}
+
+/// A popup-menu entry rendered as its own rounded, padded tile so the menu
+/// reads like the rest of the app's surfaces instead of a flat list.
+class _MenuItem extends PopupMenuEntry<String> {
+  const _MenuItem({
+    required this.value,
+    required this.label,
+    required this.selected,
+    required this.width,
+  });
+
+  final String value;
+  final String label;
+  final bool selected;
+  final double width;
+
+  @override
+  double get height => 44;
+
+  @override
+  bool represents(String? value) => value == this.value;
+
+  @override
+  State<PopupMenuEntry<String>> createState() => _MenuItemState();
+}
+
+class _MenuItemState extends State<_MenuItem> {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.field),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: BorderRadius.circular(AppRadii.field),
+          onTap: () => Navigator.pop(context, widget.value),
+          child: SizedBox(
+            width: widget.width,
+            height: 40,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.label,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  if (widget.selected)
+                    Icon(
+                      AppIcons.check,
+                      size: 15,
+                      color: theme.colorScheme.primary,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
