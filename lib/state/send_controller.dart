@@ -44,6 +44,10 @@ class SendController extends ChangeNotifier {
 
   SendPhase phase = SendPhase.idle;
   HotspotInfo? hotspot;
+
+  /// The transport the next session will use.
+  ShareLink link = ShareLink.wifi;
+  String? _sessionAddress;
   String? errorMessage;
   String? peerName;
   String? peerPlatform;
@@ -68,20 +72,32 @@ class SendController extends ChangeNotifier {
 
   bool get canCreateHotspot => _hotspotService.canCreate;
 
+  /// The address a receiver should connect to for the running session.
+  String? get sessionAddress => _sessionAddress;
+
+  /// Picks the transport before a session starts. Ethernet skips the hotspot
+  /// and advertises the wired interface instead.
+  void setLink(ShareLink value) {
+    if (link == value) return;
+    link = value;
+    notifyListeners();
+  }
+
   /// The invitation the other device can scan. It only exists once the
   /// listener is up, and only carries a hotspot when this app created one:
   /// on Windows and macOS the session runs over a network the user picked, so
   /// the code just points at the address.
   PairingCode? get pairingCode {
-    final info = hotspot;
-    if (info == null || port <= 0) return null;
+    final address = sessionAddress;
+    if (address == null || port <= 0) return null;
     if (phase != SendPhase.waitingForPeer && phase != SendPhase.transferring) {
       return null;
     }
+    final info = hotspot;
     final code = PairingCode(
-      ssid: info.created ? info.ssid : null,
-      password: info.created ? info.password : null,
-      host: info.ip,
+      ssid: info != null && info.created ? info.ssid : null,
+      password: info != null && info.created ? info.password : null,
+      host: address,
       port: port,
       senderName: appState.deviceName,
       senderPlatform: PlatformEnv.label,
@@ -213,15 +229,28 @@ class SendController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await ensureHotspotPermissions();
+      late final String? bindAddress;
+      if (link == ShareLink.ethernet) {
+        // A cable needs no hotspot: the wired address is the one to advertise.
+        final wired = await wiredIpv4();
+        if (wired == null) {
+          _fail('No wired network was found. Connect an Ethernet cable, or '
+              'switch back to Wi-Fi.');
+          return;
+        }
+        bindAddress = wired;
+      } else {
+        await ensureHotspotPermissions();
 
-      hotspot = await _hotspotService.start(deviceName: appState.deviceName);
-      if (hotspot!.note != null) {
-        // Surfaced in the connection panel, not as an error.
-        debugPrint('FreeSend: ${hotspot!.note}');
+        hotspot = await _hotspotService.start(deviceName: appState.deviceName);
+        if (hotspot!.note != null) {
+          // Surfaced in the connection panel, not as an error.
+          debugPrint('FreeSend: ${hotspot!.note}');
+        }
+
+        bindAddress = hotspot?.ip ?? await localIpv4();
       }
-
-      final bindAddress = hotspot?.ip ?? await localIpv4();
+      _sessionAddress = bindAddress;
       final host = TransferHost(
         items: items,
         deviceName: appState.deviceName,
@@ -467,6 +496,7 @@ class SendController extends ChangeNotifier {
   Future<void> reset() async {
     await _teardown();
     hotspot = null;
+    _sessionAddress = null;
     peerName = null;
     peerPlatform = null;
     peerCount = 0;

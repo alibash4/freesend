@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
@@ -11,6 +12,7 @@ import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/widgets/common.dart';
 
 enum _SendCategory { files, folders, music, docs, videos, apk, large }
 
@@ -195,6 +197,13 @@ class _SendSelectViewState extends State<SendSelectView> {
           _appsContent(l10n, wide)
         else
           _recentsContent(l10n, recents, wide),
+        if (PlatformEnv.isDesktop) ...[
+          const SizedBox(height: AppSpacing.md),
+          LinkPicker(
+            link: controller.link,
+            onChanged: controller.setLink,
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         Row(
           children: [

@@ -1,8 +1,43 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+
+/// Lets the user pick the transport a session uses: the app's normal Wi-Fi
+/// path, or a cable between the two devices.
+class LinkPicker extends StatelessWidget {
+  const LinkPicker({super.key, required this.link, required this.onChanged});
+
+  final ShareLink link;
+  final ValueChanged<ShareLink> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(l10n.linkLabel, style: theme.textTheme.bodySmall),
+        ChoiceChip(
+          label: Text(l10n.linkWifi),
+          selected: link == ShareLink.wifi,
+          onSelected: (_) => onChanged(ShareLink.wifi),
+        ),
+        ChoiceChip(
+          label: Text(l10n.linkEthernet),
+          selected: link == ShareLink.ethernet,
+          onSelected: (_) => onChanged(ShareLink.ethernet),
+        ),
+      ],
+    );
+  }
+}
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, this.icon, this.action});

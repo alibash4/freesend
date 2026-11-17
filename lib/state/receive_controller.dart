@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
+import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
@@ -89,6 +90,22 @@ class ReceiveController extends ChangeNotifier {
   bool get canJoinHotspot => _hotspotService.canJoin;
   bool get isScanning => _scanner.isScanning;
 
+  /// The transport the receiver listens on.
+  ShareLink link = ShareLink.wifi;
+
+  /// Switches the transport and re-scans, so the listener follows the link the
+  /// user picked.
+  Future<void> setLink(ShareLink value) async {
+    if (link == value) return;
+    link = value;
+    if (_scanner.isScanning) {
+      await _scanner.stop();
+      await startScanning();
+    } else {
+      notifyListeners();
+    }
+  }
+
   int get selectedBytes => manifest == null
       ? 0
       : manifest!.items
@@ -103,7 +120,21 @@ class ReceiveController extends ChangeNotifier {
 
   Future<void> startScanning() async {
     if (_scanner.isScanning) return;
-    final ok = await _scanner.start(ownInstanceId: appState.instanceId);
+    String? bindAddress;
+    if (link == ShareLink.ethernet) {
+      bindAddress = await wiredIpv4();
+      if (bindAddress == null) {
+        errorMessage = 'No wired network was found. Connect an Ethernet cable, '
+            'then try again.';
+        phase = ReceivePhase.failed;
+        notifyListeners();
+        return;
+      }
+    }
+    final ok = await _scanner.start(
+      ownInstanceId: appState.instanceId,
+      bindAddress: bindAddress,
+    );
     _scanSubscription ??= _scanner.sessions.listen((list) {
       sessions = list;
       notifyListeners();
@@ -112,6 +143,27 @@ class ReceiveController extends ChangeNotifier {
       errorMessage =
           'Discovery could not start. You can still connect by IP address.';
     }
+    phase = ReceivePhase.scanning;
+    notifyListeners();
+  }
+
+  /// Test hook: replaces the live session list without opening a real
+  /// listener, so the radar can be rendered with a known set of blips.
+  @visibleForTesting
+  void debugSeedSessions(List<(String, String, int, int)> seeds) {
+    sessions = [
+      for (final (name, ip, files, bytes) in seeds)
+        DiscoveredSession(
+          instanceId: 'seed-$name',
+          deviceName: name,
+          platform: 'test',
+          ip: ip,
+          port: 47811,
+          fileCount: files,
+          totalBytes: bytes,
+          lastSeen: DateTime.now(),
+        ),
+    ];
     phase = ReceivePhase.scanning;
     notifyListeners();
   }

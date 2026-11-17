@@ -113,11 +113,19 @@ class SessionScanner {
   List<DiscoveredSession> get current => _sessions.values.toList();
   bool get isScanning => _socket != null;
 
-  Future<bool> start({required String ownInstanceId}) async {
+  Future<bool> start({
+    required String ownInstanceId,
+    String? bindAddress,
+  }) async {
     if (_socket != null) return true;
+    // Binding to a specific interface keeps the listener on the link the user
+    // picked; anyIPv4 hears every interface.
+    final address = bindAddress == null
+        ? InternetAddress.anyIPv4
+        : InternetAddress.tryParse(bindAddress) ?? InternetAddress.anyIPv4;
     try {
       _socket = await RawDatagramSocket.bind(
-        InternetAddress.anyIPv4,
+        address,
         AppConstants.discoveryPort,
         reuseAddress: true,
         reusePort: true,
@@ -126,7 +134,7 @@ class SessionScanner {
       try {
         // reusePort is not supported everywhere; retry without it.
         _socket = await RawDatagramSocket.bind(
-          InternetAddress.anyIPv4,
+          address,
           AppConstants.discoveryPort,
           reuseAddress: true,
         );

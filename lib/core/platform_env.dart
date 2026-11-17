@@ -41,6 +41,13 @@ abstract final class PlatformEnv {
       kind == PlatformKind.linux ||
       kind == PlatformKind.macOS;
 
+  /// Whether the app runs on a desktop platform, where a wired interface is a
+  /// plausible transport the user can pick.
+  static bool get isDesktop =>
+      kind == PlatformKind.windows ||
+      kind == PlatformKind.linux ||
+      kind == PlatformKind.macOS;
+
   /// The architecture word release assets are named with: `x86_64` or
   /// `aarch64`.
   ///
@@ -57,30 +64,111 @@ abstract final class PlatformEnv {
   }
 }
 
+/// How a session reaches the other device.
+enum ShareLink {
+  /// The normal path: a hotspot this app creates where the platform allows
+  /// one, otherwise whatever network the device is already on.
+  wifi,
+
+  /// A cable between the two devices, or the wired LAN. No hotspot is brought
+  /// up, and the wired interface's address is the one advertised.
+  ethernet,
+}
+
+/// The IPv4 address of the wired interface, or null when there is none.
+///
+/// Link-local counts: two devices on a cable with no DHCP hand out 169.254.x.x
+/// to each other, and that is a perfectly good way to reach the peer.
+Future<String?> wiredIpv4() async {
+  final wired = <_InterfaceAddress>[];
+  for (final entry in await _ipv4Interfaces()) {
+    if (await _isWiredInterface(entry.name)) wired.add(entry);
+  }
+  if (wired.isEmpty) return null;
+  for (final prefix in const ['192.168.', '10.', '172.']) {
+    for (final entry in wired) {
+      if (entry.address.startsWith(prefix)) return entry.address;
+    }
+  }
+  return wired.first.address;
+}
+
 /// Best-effort primary IPv4 address of a non-loopback interface.
 Future<String?> localIpv4() async {
+  final candidates = <String>[];
+  for (final entry in await _ipv4Interfaces()) {
+    if (entry.address.startsWith('169.254.')) continue;
+    candidates.add(entry.address);
+  }
+  if (candidates.isEmpty) return null;
+  // Prefer the private ranges a hotspot actually uses.
+  for (final prefix in const ['192.168.', '10.', '172.']) {
+    for (final ip in candidates) {
+      if (ip.startsWith(prefix)) return ip;
+    }
+  }
+  return candidates.first;
+}
+
+typedef _InterfaceAddress = ({String name, String address});
+
+Future<List<_InterfaceAddress>> _ipv4Interfaces() async {
   try {
     final interfaces = await NetworkInterface.list(
       type: InternetAddressType.IPv4,
       includeLoopback: false,
-      includeLinkLocal: false,
+      includeLinkLocal: true,
     );
-    final candidates = <String>[];
+    final result = <_InterfaceAddress>[];
     for (final interface in interfaces) {
       for (final address in interface.addresses) {
-        final ip = address.address;
-        if (ip.startsWith('169.254.')) continue;
-        candidates.add(ip);
+        result.add((name: interface.name, address: address.address));
       }
     }
-    if (candidates.isEmpty) return null;
-    // Prefer the private ranges a hotspot actually uses.
-    for (final prefix in const ['192.168.', '10.', '172.']) {
-      for (final ip in candidates) {
-        if (ip.startsWith(prefix)) return ip;
-      }
+    return result;
+  } on Object {
+    return const [];
+  }
+}
+
+/// Whether [name] is a wired interface.
+///
+/// Dart does not expose the link type, so this is platform specific: sysfs on
+/// Linux, the hardware port list on macOS, and the adapter name elsewhere.
+Future<bool> _isWiredInterface(String name) async {
+  if (Platform.isLinux) {
+    // Linux publishes a wireless interface as a directory in sysfs.
+    return !Directory('/sys/class/net/$name/wireless').existsSync();
+  }
+  if (Platform.isMacOS) {
+    final wifi = await _macosWifiDevice();
+    return wifi == null || wifi != name;
+  }
+  if (Platform.isWindows) {
+    final lower = name.toLowerCase();
+    return !lower.contains('wi-fi') &&
+        !lower.contains('wireless') &&
+        !lower.contains('wlan');
+  }
+  return false;
+}
+
+Future<String?> _macosWifiDevice() async {
+  try {
+    final result = await Process.run(
+      'networksetup',
+      const ['-listallhardwareports'],
+      runInShell: false,
+    ).timeout(const Duration(seconds: 5));
+    if (result.exitCode != 0) return null;
+    final lines = '${result.stdout}'.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      if (!lines[i].toLowerCase().contains('wi-fi')) continue;
+      if (i + 1 >= lines.length) break;
+      final match = RegExp(r'Device:\s*(\S+)').firstMatch(lines[i + 1]);
+      if (match != null) return match.group(1);
     }
-    return candidates.first;
+    return null;
   } on Object {
     return null;
   }
