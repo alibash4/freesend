@@ -184,6 +184,8 @@ class UpdateController extends ChangeNotifier {
     // pulling the asset again.
     if (phase != UpdatePhase.downloading && phase != UpdatePhase.installing) {
       phase = UpdatePhase.idle;
+      message = null;
+      messageKey = '';
       notifyListeners();
     }
   }
