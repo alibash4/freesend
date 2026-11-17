@@ -208,12 +208,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Three choices in one soft track, so the control reads as a
               // single object on the page.
               Container(
+                height: 48,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(AppRadii.field),
                 ),
                 child: Row(
+                  spacing: 4,
                   children: [
                     for (final (mode, label, icon) in [
                       (ThemeMode.light, l10n.light, AppIcons.sun),
@@ -235,12 +237,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(l10n.language, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               Container(
+                height: 48,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(AppRadii.field),
                 ),
                 child: Row(
+                  spacing: 4,
                   children: [
                     Expanded(
                       child: _LanguageChoice(
@@ -384,7 +388,7 @@ class _ThemeChoice extends StatelessWidget {
           mouseCursor: SystemMouseCursors.click,
           onTap: selected ? null : onTap,
           child: SizedBox(
-            height: 38,
+            height: 40,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -438,7 +442,7 @@ class _LanguageChoice extends StatelessWidget {
           mouseCursor: SystemMouseCursors.click,
           onTap: selected ? null : onTap,
           child: SizedBox(
-            height: 38,
+            height: 40,
             child: Center(
               child: Text(
                 label,
