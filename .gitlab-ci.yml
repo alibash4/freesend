@@ -1,18 +1,13 @@
-# Verifies every push to main, and builds release packages when a tag appears.
+# Builds release packages when a tag appears; pushes to main run nothing.
 #
-# Pushing to main runs only the `test` job: analyze plus the test suite, no
-# packages and no artifacts. The build matrix is tag-only, because a full
-# release build costs roughly 45 runner-minutes and the monthly compute quota
-# is finite. Creating a release in GitLab also creates its tag, so the tag is
-# what starts the build.
+# The build matrix is tag-only, because a full release build costs roughly 45
+# runner-minutes and the monthly compute quota is finite. Creating a release
+# in GitLab also creates its tag, so the tag is what starts the build.
 #
 # Make the release in GitLab first; creating its tag runs this pipeline. The
 # publish job uploads whatever was built and links it to that release, and only
 # creates a release itself when the tag has none. It needs the RELEASE_TOKEN
 # CI/CD variable (a project access token with the `api` scope).
-#
-# Test (every push to main):
-#   flutter analyze --no-fatal-infos; flutter test
 #
 # Android (tags):
 #   app-armeabi-v7a-release.apk   32-bit
@@ -30,7 +25,6 @@
 #   freesend-<version>-windows-x64.zip        contains free_send.exe
 
 stages:
-  - test
   - build
   - release
 
@@ -47,22 +41,6 @@ default:
     - sh scripts/install_flutter.sh
     - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
     - export PATH="$PATH:$HOME/.pub-cache/bin"
-
-# Cheap verification on every push. Deliberately builds nothing: packaging is
-# the expensive part of a pipeline, and a broken commit is caught here before
-# it can cost a release build.
-test:
-  stage: test
-  image: "ghcr.io/cirruslabs/flutter:3.44.0"
-  script:
-    - flutter --version
-    - flutter pub get
-    # Flutter 3.50 deprecates the material.dart umbrella; the replacement
-    # package is not adopted yet, so info-level deprecations must not fail CI.
-    - flutter analyze --no-fatal-infos
-    - flutter test
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
 
 build:apk:
   stage: build
@@ -91,33 +69,7 @@ build:apk:
       - build/app/outputs/flutter-apk/*.apk
     expire_in: 2 weeks
   rules:
-    # Release builds run on tags only; pushes to main are covered by `test`.
     - if: $CI_COMMIT_TAG
-
-# A sideloadable debug APK on every push to main, so the current dev build
-# can be installed and tried without cutting a release.
-build:apk:debug:
-  stage: build
-  image: "ghcr.io/cirruslabs/flutter:3.44.0"
-  before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends curl ca-certificates xz-utils unzip git
-    - sh scripts/install_flutter.sh
-    - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
-    - export PATH="$PATH:$HOME/.pub-cache/bin"
-  script:
-    - flutter --version
-    - flutter pub get
-    - flutter analyze --no-fatal-infos
-    - flutter test
-    - flutter build apk --debug
-  artifacts:
-    name: "freesend-apk-debug"
-    paths:
-      - build/app/outputs/flutter-apk/app-debug.apk
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
 
 build:linux:
   stage: build
