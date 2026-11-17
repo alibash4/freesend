@@ -63,7 +63,7 @@ abstract final class AppTypography {
   static const TextStyle sectionTitle = TextStyle(
     fontFamily: 'Public Sans',
     fontFamilyFallback: ['Cairo'],
-    fontSize: 16,
+    fontSize: 13,
     height: 1.3,
     fontWeight: FontWeight.w500,
     letterSpacing: -0.1,

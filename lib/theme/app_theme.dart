@@ -285,10 +285,12 @@ abstract final class AppTheme {
         color: scheme.onSurface,
       ),
       bodyMedium: base.bodyMedium?.copyWith(
+        fontSize: 16,
         height: 1.45,
         color: scheme.onSurface,
       ),
       bodySmall: base.bodySmall?.copyWith(
+        fontSize: 14,
         height: 1.45,
         color: scheme.onSurfaceVariant,
       ),
