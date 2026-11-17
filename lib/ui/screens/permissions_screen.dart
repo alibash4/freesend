@@ -140,7 +140,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ],
             if (showApi33)
               _PermissionRow(
-                icon: AppIcons.info,
+                icon: AppIcons.bell,
                 title: l10n.permNotificationsTitle,
                 body: l10n.permNotificationsBody,
                 status: _statusFor(Permission.notification),
@@ -155,7 +155,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               ),
             const SizedBox(height: AppSpacing.md),
             _PermissionRow(
-              icon: AppIcons.scan,
+              icon: AppIcons.camera,
               title: l10n.permCameraTitle,
               body: l10n.permCameraBody,
               status: _statusFor(Permission.camera),
@@ -254,15 +254,7 @@ class _PermissionRow extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: tint.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: tint),
-          ),
+          child: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
@@ -286,29 +278,17 @@ class _PermissionRow extends StatelessWidget {
         const SizedBox(width: AppSpacing.md),
         Padding(
           padding: const EdgeInsets.only(top: 3),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                granted
-                    ? AppIcons.checkCircle
-                    : denied
-                        ? AppIcons.close
-                        : AppIcons.circle,
-                size: 14,
-                color: tint,
-              ),
-              const SizedBox(width: 4),
-              Text(
+          child: Text(
                 granted
                     ? l10n.permAllowed
                     : denied
                         ? l10n.permBlocked
                         : l10n.permNotAsked,
-                style: theme.textTheme.labelSmall?.copyWith(color: tint),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 12,
+                  color: tint,
+                ),
               ),
-            ],
-          ),
         ),
       ],
     );

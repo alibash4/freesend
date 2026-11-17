@@ -65,6 +65,8 @@ abstract final class AppIcons {
   static final IconData radar = UIcons.regularRounded.signal_alt;
   static final IconData search = UIcons.regularRounded.search;
   static final IconData cameraOff = UIcons.regularRounded.video_slash;
+  static final IconData camera = UIcons.regularRounded.camera;
+  static final IconData bell = UIcons.regularRounded.bell;
 
   // Appearance.
   static final IconData sun = UIcons.regularRounded.sun;
