@@ -31,14 +31,20 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final PageController _pageController = PageController();
 
+  /// True only for the frame a tap-driven [_setIndex] runs, so the page
+  /// content fades on nav taps while physical swipes stay unanimated.
+  bool _animatePageSwap = false;
+
   void _setIndex(int index) {
     if (index < 0 || index > 6) return;
+    _animatePageSwap = true;
     if (index < 5) {
       _pageController.jumpToPage(index);
-      setState(() => _index = index);
-      return;
     }
     setState(() => _index = index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animatePageSwap = false;
+    });
   }
 
   void _selectImmediate(int index) => _setIndex(index);
@@ -91,7 +97,7 @@ class _AppShellState extends State<AppShell> {
                 offstage: _index >= 5,
                 child: FadeOnChange(
                   index: _index,
-                  animate: wide,
+                  animate: wide || _animatePageSwap,
                   child: PageView(
                     controller: _pageController,
                     physics: MediaQuery.sizeOf(context).width >= 840
