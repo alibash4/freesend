@@ -16,6 +16,7 @@ import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/app_toast.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -58,11 +59,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     await appState.setDeviceName(value);
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).deviceNameUpdated)),
-      );
+    AppToast.show(
+      context,
+      AppLocalizations.of(context).deviceNameUpdated,
+    );
   }
 
   Future<void> _renameDevice() async {
@@ -101,7 +101,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SystemMouseCursors.click,
                 ),
               ),
-              onPressed: _saveNameAndClose,
+              onPressed: () {
+                if (context.read<AppState>().haptics) {
+                  HapticFeedback.selectionClick();
+                }
+                _saveNameAndClose();
+              },
               child: Text(l10n.save),
             ),
           ),
