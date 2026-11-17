@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/update/update_info.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -27,6 +28,7 @@ class UpdateSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final controller = context.watch<UpdateController>();
     final update = controller.update;
 
@@ -85,7 +87,7 @@ class UpdateSheet extends StatelessWidget {
       if (controller.message != null) ...[
         const SizedBox(height: AppSpacing.md),
         Text(
-          controller.message!,
+          controller.localizedMessage(l10n),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.error,
           ),
