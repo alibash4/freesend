@@ -1,280 +1,388 @@
-# FreeSend data flow — full design
+# FreeSend data flow — full plan
 
-Status: proposal for review. No code has been written against it.
-Scope: Android, Windows, Linux, macOS. iOS is a future delta (F1) and is not
-designed for here.
+Status: proposal for review. No code written against it.
+Platforms in scope: Android, Windows, Linux, macOS. iOS is a future delta.
+Last revision: adds hotspot vs local-Wi-Fi modes, the Windows branch, the
+receiver doorbell, sender-driven discovery, and hotspot naming.
 
 --------------------------------------------------------------------------------
 1. Frozen rules
 --------------------------------------------------------------------------------
 
-R1  The sender owns the radar and hunts.
-R2  The receiver is the target.
-R3  Phone -> phone: the receiver displays the QR, the sender scans it.
-R4  Mixed phone/desktop: the desktop displays the QR, the mobile scans it.
-    This holds in both directions, including desktop -> phone.
-R5  Desktop -> desktop: no camera anywhere, so no QR. Radar only.
-R6  Displaying a QR needs only a screen. Scanning needs a camera
-    (Android, macOS only).
-R7  A radar tap and a QR scan produce the identical authorization request on
-    the receiver.
-R8  Every device authorizes individually. No bytes move until that device
-    accepts.
-R9  The send control is a bottom sheet on mobile and a centered modal on
-    desktop. Entries: Share to nearby / Scan a QR code / Send to a group.
-R10 "Scan a QR code" is hidden on every desktop, including macOS, because the
-    desktop shell never offers camera scanning. Desktops show two entries.
+R1   The sender owns the radar and hunts.
+R2   The receiver is the target.
+R3   Phone <-> phone: the receiving phone hosts its hotspot, displays the QR,
+     and the sending phone scans it.
+R4   Phone <-> desktop (any desktop, including Linux): the phone hosts its
+     hotspot. The desktop joins it from inside the app where the OS allows.
+     No QR exists in this mode, because a desktop has no camera.
+R5   Desktop <-> desktop: no host-capable phone present, so the default is an
+     existing shared network (Wi-Fi or cable). No QR (no camera).
+R6   Showing a QR needs only a screen. Scanning needs a camera.
+     In-app camera scanning exists on Android and macOS only, and is hidden on
+     every desktop by R10.
+R7   A radar tap and a QR scan produce the identical authorization request on
+     the receiver.
+R8   Every device authorizes individually. No bytes move before that device
+     accepts.
+R9   Send control = bottom sheet on mobile, centered modal on desktop.
+     Entries: Share to nearby / Scan a QR code (mobile only) / Send to a group.
+R10  "Scan a QR code" is hidden on ALL desktops, including macOS. Desktops show
+     two entries.
+R11  On desktops, both the hunting view and the waiting view carry a link:
+     "Unable to connect? Use local Wi-Fi network". Tapping it shows the
+     desktop's own QR code; when the phone scans it, the whole session switches
+     from hotspot mode to local-Wi-Fi mode.
+R12  Hotspots are local-only (Android `startLocalOnlyHotspot`, no internet).
+     Nothing on the system can reach the internet through them.
 
 Derived invariants:
 
-I1  The device displaying the QR hosts the link. A QR carries the host's
-    credentials, so hosting and displaying are the same act.
-    phone->phone      receiver displays -> receiver hosts
-    phone<->desktop   desktop displays   -> desktop hosts (both directions)
-    desktop->desktop  no QR             -> existing network, sender dials
-I2  Whoever scans, dials. The mobile always scans, so the mobile always opens
-    the TCP connection; in desktop->phone the receiver initiates and the sender
-    waits.
-I3  A device advertises on the radar only while its Receive screen is open.
-    Radar contents = devices currently waiting in Receive. Nothing else appears.
+I1   A QR describes how to reach the device that shows it: in hotspot mode it
+     carries that device's hotspot name, password and address; in local-Wi-Fi
+     mode it carries only the address, because there is no hotspot.
+I2   Whoever scans, dials.
+I3   Discovery is sender-driven. The sender broadcasts "I'm looking to send";
+     every device sitting in Receive answers with its name and consent address.
+     Those answers fill the sender's radar. Devices outside Receive never
+     appear, and nothing is advertised in the background.
+I4   In every phone<->desktop pair the credential handoff is the in-app
+     "Connect to <hotspot name>?" prompt, never a scan.
+I5   Opening order follows direction: the host comes up first. Sender-first
+     when the sender hosts (phone -> desktop), receiver-first when the receiver
+     hosts (desktop -> phone).
 
 --------------------------------------------------------------------------------
-2. Platform capability table
+2. Modes
 --------------------------------------------------------------------------------
 
-                 host hotspot   join hotspot   camera scanner
-Android          yes            yes           yes
-Linux            yes            yes           no
-macOS            no             yes           yes (scanner only, see R10)
-Windows          no             no            no
+HOTSPOT (HS)
+  One device creates a local-only hotspot. Others join it. Default whenever a
+  phone is involved with a desktop, and between Linux machines.
+    phone <-> phone      receiving phone hosts (R3)
+    phone -> desktop     phone (sender) hosts
+    desktop -> phone     phone (receiver) hosts
+    Linux <-> Linux      either Linux box hosts
+    Linux <-> macOS      Linux hosts
 
-Consequences used throughout:
+  Naming: where the OS lets us choose, hotspots are named
+  `FreeSend-<DeviceName>-<4 hex>` (e.g. `FreeSend-Pixel-8-A3F1`). Linux already
+  uses a `FreeSend-` prefix. Android's local-only hotspot name is generated by
+  the OS and cannot be chosen, so on Android the app reads the name from the
+  reservation instead of pattern-matching it on the other side.
 
-C1  Windows can neither create nor join a hotspot programmatically. Its only
-    transport is an existing network. If another device hosts a hotspot, the
-    Windows user joins it from the OS Wi-Fi menu.
-C2  On desktop->desktop there is no QR (R5), so both devices must already share
-    a network. The app cannot manufacture a link for them.
-C3  A desktop never gets the camera entry (R10), even macOS.
-C4  Linux has no camera, so a Linux sender cannot scan; Linux receivers display
-    QR codes for phones to scan.
-
---------------------------------------------------------------------------------
-3. Chain scenarios
---------------------------------------------------------------------------------
-
-Notation: S = sender, R = receiver, H = who hosts, D = who dials, QR = who
-displays it.
-
-A. Android phone -> Android phone
-   H = R (receiver). QR = R. Sender scans. D = S.
-   Both on the sender's or receiver's hotspot depending on I1: receiver hosts,
-   so receiver's hotspot name/password/address go in the QR.
-   Permissions: nearby devices on the sender; receive-side grants on R.
-
-B. Android phone -> Windows desktop
-   H = R (desktop). QR = R (desktop shows it). Sender scans. D = S.
-   Windows cannot host a hotspot (C1), so the desktop uses its current network
-   and says so. The phone connects over that network; if the network isolates
-   clients, this fails and the copy says why.
-   Note: the desktop is hosting here in the sense of I1 (it displays and
-   listens), but the link is a pre-existing network, not a created hotspot.
-
-C. Android phone -> macOS desktop
-   Same as B, except macOS is a valid hotspot host when it matters; in mixed
-   pairs the desktop displays regardless.
-
-D. Windows desktop -> Android phone
-   H = S (desktop, because it displays). QR = S (desktop shows it). Receiver
-   scans. D = R.
-   The phone scans the desktop's QR, joins/dials, and the receiver is the one
-   who initiates. Sender sits in "waiting". Accepted per A3 discussion:
-   acceptable until a real problem appears.
-
-E. macOS desktop -> Android phone
-   Identical to D. The desktop displays and hosts.
-
-F. Android phone -> Linux desktop
-   Same as B. Linux can host a hotspot, so if the desktop is the host the phone
-   joins it; the desktop still only displays.
-
-G. Linux desktop -> Android phone
-   Same as D/E.
-
-H. Desktop -> desktop (any combination)
-   No QR (R5). Both on the same existing network, or one hosts a hotspot the
-   other joins via OS settings (only possible when a Linux host is involved).
-   Radar only, plus typed pairing code as the fallback.
-
-I. Any -> any, group variant
-   Sender opens "Send to a group". Radar multi-select. Per-device consent, per-
-   device state. No QR at all (C1 of group decisions).
-
-J. iOS (future)
-   Deferred. iOS cannot create a hotspot, so it is always a receiver-displayer
-   or an existing-network peer. Not designed now.
+LOCAL WI-FI (WF)
+  Both devices already share a Wi-Fi network or a cable. No hotspot.
+  Reached three ways:
+    - Fallback link R11 on a desktop (desktop shows QR, phone scans).
+    - Default for desktop pairs with no host-capable device
+      (macOS/macOS, macOS/Windows, Windows/Windows).
+    - Windows default when a shared Wi-Fi already exists and the phone does not
+      need to be the host.
 
 --------------------------------------------------------------------------------
-4. Screen-by-screen
+3. Platform capabilities
 --------------------------------------------------------------------------------
 
-4.1 Home (sender)
-    Send button opens the drawer/modal with three entries (two on desktop):
-      Share to nearby / Scan a QR code (mobile only) / Send to a group.
-    Container: bottom sheet, opens at medium detent, drag to expand (mobile);
-    centered modal, single column ~400px wide, Close + Escape (desktop).
-    Choosing an entry does not start anything by itself; it enters the matching
-    send mode described below.
+                 create hotspot   join hotspot   in-app camera   keeps hotspot alive
+Android          yes              yes            yes              yes (foreground svc)
+Linux            yes              yes            no               yes
+macOS            no (app)         yes            scanner only     n/a
+Windows          no               no             no               n/a
 
-4.2 Sender, hunting view
-    - Status line: "Looking for a device to receive these."
-    - Radar sweeping; blips appear for every device advertising (I3).
-    - Empty radar copy: "Nobody is ready yet — on the other device, open
-      FreeSend and tap Receive." (F2 consequence.)
-    - Blip tap -> authorization request to that device. Blip becomes pending.
-    - Under the radar, the link "Connect by scanning a QR code instead"
-      (mobile only; hidden on desktop per R10).
-    - Per-target state shown after the request: pending / accepted /
-      declined / offline.
-    - Declined -> inline "Declined" with Try again (B2).
-    - Sender drops or receiver drops -> small modal "Sender has gone offline"
-      on the remaining side (B3), on all platforms.
-    - Pending never expires (B1). It stays until accept, decline, cancel, or
-      the peer disappearing.
+Consequences:
 
-4.3 Sender, scanning view
-    Camera full screen, reticle, caption. Reads a QR, extracts host/port/
-    instance id/name, then behaves exactly like a radar tap (R7): same
-    authorization request, same receiver modal.
-    Error copy for a non-FreeSend code: "That code is not from FreeSend."
-    Error copy for an unreachable address: "That device isn't reachable on this
-    link. Make sure both devices are on the same network."
+C1  Windows can neither create nor join a hotspot programmatically. It needs
+    one guided manual step to join a phone hotspot.
+C2  Windows is the only platform where HS requires an out-of-app action.
+C3  macOS cannot create a hotspot from the app (Internet Sharing is manual).
+    macOS can join in-app.
+C4  Linux can do everything except scan a QR.
+C5  Desktop -> desktop has no camera anywhere, so WF only.
 
-4.4 Receiver, presenting view
-    On open, permissions gate (Android), then automatically: bring up the link
-    and advertise (E1). Then render one of two states:
-      (a) QR panel — shown when the counterpart could have a camera, i.e.
-          whenever this device is the one that should display under I1/R3/R4.
+Reading the nearby Wi-Fi list (needed by C1/C3 and by the desktop join prompt):
+  Android  yes, needs location (already requested)
+  Linux     yes, via NetworkManager
+  macOS     best-effort, needs location services
+  Windows   no clean API. Skip detection: show the hotspot name and password
+            next to an "Open Wi-Fi settings" button.
+
+--------------------------------------------------------------------------------
+4. Scenario matrix
+--------------------------------------------------------------------------------
+
+Pair            Mode   Host           Join method                         QR
+A  -> A         HS     R phone        sender scans receiver's QR          R shows
+A  -> L         HS     S phone        L joins in-app                      none
+A  -> M         HS     S phone        M joins in-app                      none
+A  -> W         HS*    S phone        W joins manually (guided)           none
+L  -> A         HS     R phone        L joins in-app                      none
+M  -> A         HS     R phone        M joins in-app                      none
+W  -> A         WF     n/a            A scans W's QR, dials W             W shows
+L  -> L         HS     either Linux   other joins in-app                  none
+L  -> M         HS     L              M joins in-app                      none
+L  -> W         HS*    L              W joins manually (guided)           none
+M  -> M         WF     n/a            radar or typed code                 none
+M  -> W         WF     n/a            radar or typed code                 none
+W  -> W         WF     n/a            radar or typed code                 none
+
+*A -> W and L -> W: if a shared Wi-Fi already exists, use WF instead of HS.
+ That flips who shows the QR: Windows shows it and the phone scans.
+
+Group with a phone present: phone hosts, all desktops join in-app, sender
+ multi-selects, per-device consent. No QR.
+Group without a phone: WF. Radar or typed code. Per-device consent.
+
+--------------------------------------------------------------------------------
+5. Detailed chains
+--------------------------------------------------------------------------------
+
+5.1  Android phone -> Android phone (HS)
+     1. Receiver opens Receive -> hotspot up, doorbell listening, QR shown.
+     2. Sender opens send drawer -> Share to nearby -> radar.
+     3. Sender taps Scan a QR code, reads the receiver's QR.
+     4. Sender joins the receiver's hotspot in-app, knocks on the doorbell.
+     5. Receiver gets "Accept N files (size) from <sender>?" -> Accept.
+     6. Receiver dials back the sender and pulls the files (protocol unchanged).
+     No camera: paste the pairing code instead.
+
+5.2  Android phone -> Linux desktop (HS, sender hosts)
+     Order matters: the sender starts first.
+     1. Sender taps Share to nearby -> phone hotspot comes up, sender starts
+        broadcasting "I'm looking to send".
+     2. Desktop opens Receive -> offers "Connect to freesend-Pixel-8?".
+        It learns the name from the nearby Wi-Fi list, not from an app
+        broadcast, because it is not on the hotspot yet.
+     3. Desktop taps it -> Linux joins in-app, starts its doorbell.
+     4. The sender's signal reaches the desktop -> it answers -> it appears on
+        the phone's radar -> phone taps it.
+     5. Desktop gets the accept modal -> Accept.
+     6. Desktop dials back the phone and pulls the files.
+
+5.3  Android phone -> macOS desktop (HS, sender hosts)
+     Same as 5.2. macOS joins in-app.
+
+5.4  Android phone -> Windows desktop (HS with manual join, or WF)
+     If a shared Wi-Fi already exists: WF. Windows shows its QR, phone scans,
+     done - simplest and fully automatic.
+     Otherwise HS:
+     1. Sender taps Share to nearby -> phone hotspot comes up; the app shows
+        the hotspot name and password.
+     2. Desktop opens Receive -> sees "Connect to freesend-Pixel-8?".
+     3. Windows cannot join programmatically. The app shows name, password,
+        Copy, and "Open Wi-Fi settings", then waits.
+     4. User joins from the Windows Wi-Fi flyout. The app detects the join and
+        continues on its own.
+     5-6. As 5.2 steps 4-6.
+     If the join does not happen, offer WF as the way out.
+
+5.5  Linux desktop -> Android phone (HS, receiver hosts)
+     Order matters, opposite of 5.2: receiver first.
+     1. Receiver opens Receive -> hotspot up, doorbell listening, QR shown
+        (unused here, since the sender has no camera).
+     2. Sender opens Share to nearby -> finds the phone's hotspot in the Wi-Fi
+        list -> taps -> Linux joins in-app, starts broadcasting.
+     3. The signal reaches the phone -> it answers -> it appears on the
+        sender's radar -> sender taps it.
+     4. Phone gets the accept modal -> Accept.
+     5. Phone dials back the sender and pulls the files.
+
+5.6  macOS -> Android phone
+     Same as 5.5; macOS joins in-app.
+
+5.7  Windows -> Android phone (WF)
+     1. Windows sender opens Share to nearby -> it cannot join a hotspot, so it
+        shows its own QR (its address on the current network).
+     2. Phone taps Scan a QR code, reads it, knocks on Windows' doorbell.
+     3. Phone gets the accept modal -> Accept.
+     4. Phone pulls the files from Windows over the connection just established.
+     Requires a shared Wi-Fi. Without one, Windows cannot reach the phone;
+     the only path is a one-time manual join of the phone's hotspot from the
+     Windows Wi-Fi menu, then continue in-app.
+
+5.8  Desktop -> desktop (all combinations)
+     WF. Shared network required. Radar discovers peers; the typed pairing code
+     is the fallback. No QR anywhere.
+
+5.9  Group (phone present)
+     Phone hosts. Every desktop joins in-app (Windows guided). Sender opens
+     "Send to a group", multi-selects blips, each device consents separately,
+     each shows pending / accepted / sending / failed independently.
+     No QR.
+
+5.10 Group (no phone)
+     WF. Multi-select, per-device consent, no QR.
+
+--------------------------------------------------------------------------------
+6. Screens
+--------------------------------------------------------------------------------
+
+6.1 Home / send control
+    Mobile: bottom sheet, opens at medium detent, drag to expand.
+    Desktop: centered modal, single column ~400px, Close + Escape.
+    Entries: Share to nearby / Scan a QR code (hidden on desktop) /
+    Send to a group.
+
+6.2 Sender, hunting view
+    Status line: "Looking for a device to receive these."
+    Radar sweeping; blips are receivers that answered the sender's signal (I3).
+    Empty copy: "Nobody is ready yet - on the other device, open FreeSend and
+    tap Receive."
+    Blip tap -> authorization request; blip shows pending.
+    Per-target state: pending / accepted / declined / offline.
+    Link under the radar: "Connect by scanning a QR code instead" (mobile only).
+    R11 link (desktop only): "Unable to connect? Use local Wi-Fi network".
+
+6.3 Sender, scanning view
+    Full-screen camera, reticle, caption.
+    Non-FreeSend code: "That code is not from FreeSend."
+    Unreachable: "That device isn't reachable on this link. Make sure both
+    devices are on the same network."
+
+6.4 Receiver, waiting view
+    On open: permission gate (Android), then bring up the link automatically
+    (no "I'm ready" tap), start the doorbell, and listen for the sender signal.
+    States:
+      (a) QR panel - host showing credentials. Used in phone<->phone HS, and in
+          WF when this device is the desktop.
           Contents: device name, large QR, "Scan this from the other device",
-          Copy code text button.
-      (b) No-camera panel — desktop->desktop, or any case where no camera exists
-          on the other side. Inline copy, no modal, no dead QR frame:
-          "This device has no camera to scan a code, so there's nothing to
-          scan. The other device will find this one by name — keep both on the
-          same network."
-    Leaving Receive stops advertising and tears down the link.
-    Receivers do not need a "ready" toggle; being in this screen is the state.
+          Copy code.
+      (b) No-camera panel - desktop<->desktop, or any case where no camera can
+          be used. Inline copy, no dead QR frame:
+          "There's nothing to scan here. The other device will find this one
+          by name - keep both on the same network."
+      (c) Join-prompt panel - this desktop is joining a phone's hotspot
+          (5.2-5.5): "Connect to freesend-Pixel-8?", the password, and on
+          Windows an "Open Wi-Fi settings" button.
+    Leaving Receive stops listening and tears down the link.
 
-4.5 Receiver, authorization modal
+6.5 Receiver, authorization modal
     Title: "Accept files from <name>?"
-    Body: "<count> files · <size>".
-    Actions: Decline / Accept. Optional unchecked "Remember this device" (B4).
-    No timeout on the request (B1); the modal stays until answered or the
-    sender disappears (B3).
-    Accept -> transfer starts. Decline -> sender sees declined.
+    Body: "<count> files · <size>"
+    Actions: Decline / Accept, plus unchecked "Remember this device".
+    Never expires. Stays until answered, cancelled, or the peer goes offline.
 
-4.6 Sender, group view
-    Radar list with checkboxes. "Send to N devices". Each target shows
-    pending / accepted / sending / failed independently; one holdout does not
-    block the others. No QR in group mode.
-    Same protocol consent path, once per device.
+6.6 Sender, group view
+    Multi-select on the radar. "Send to N devices". Per-person states.
 
-4.7 Transfer views
-    Unchanged in substance: progress ring, per-file rows, speed/ETA, pause,
-    resume, cancel, per-receiver progress in group mode.
+6.7 Transfer views
+    Progress ring, per-file rows, speed/ETA, pause, resume, cancel, and
+    per-receiver progress in group mode. Unchanged in substance.
 
 --------------------------------------------------------------------------------
-5. Protocol mapping
+7. Protocol mapping
 --------------------------------------------------------------------------------
 
 Existing frames: hello, session, accept, fileHeader, data, fileEnd,
 transferEnd, ackFile, ackAll, error, cancel, pause, resume, fileStatus,
 helloAck, helloConfirm, secure.
 
-Changes:
-P1  A sender's authorization request is explicit and precedes `session`.
-    It carries sender name, file count, total size, and a request id.
-P2  The receiver's accept is its own frame (the existing `accept` type),
-    made mandatory: no fileHeader/data is sent before it arrives.
-P3  Decline, cancel, and peer-offline are distinct outcomes the UI renders
-    differently (B2/B3).
-P4  Group = N independent request/accept exchanges on N channels; one
-    failure does not abort the others.
-P5  Trust-on-first-use: an accepted device with "Remember" stores the pinned
-    identity (existing store) and skips the modal next time.
-No new wire format beyond P1's request payload; the rest is sequencing.
+New component: the receiver's doorbell listener.
+  - Listens on its own port, separate from the sender's file server.
+  - Receives the knock: sender name, file count, total size, request id, and
+    the sender's file-server address and port.
+  - Shows the authorization modal.
+  - On Accept, dials the sender's file server and pulls, using the existing
+    hello/session/accept/fileHeader/data sequence unchanged.
+  - On Decline, answers and closes.
 
-QR payload (unchanged format, semantics now fixed):
+P1  The knock precedes everything. It carries sender name, file count, total
+    size, request id, and the sender's host address + port (so the receiver can
+    dial back).
+P2  The existing `accept` frame becomes mandatory. No fileHeader/data is sent
+    before it arrives.
+P3  Decline, cancel, and peer-offline are distinct outcomes rendered
+    differently.
+P4  Group = N independent knock/accept exchanges; one failure does not abort
+    the others.
+P5  "Remember this device" stores the pinned identity (existing store) and
+    skips the modal next time.
+P6  Discovery is sender-driven: the sender broadcasts an intent packet, a
+    receiver in Receive answers once with name + consent address + port.
+
+QR payload (format unchanged):
   freesend://pair?v=1&ssid=<host>&pw=<password>&host=<ip>&port=<port>
-          &name=<sender/receiver name>&pf=<platform>
-The displayer's own credentials go in, because the displayer is the host (I1).
-Non-literal IPs stay rejected for safety.
-Direct-connect first (IP:port from the QR); on failure fall back to discovery
-filtered by the instance id. No NAT traversal work is needed because every
-scenario is on one local link.
+          &name=<name>&pf=<platform>
+In HS mode this is the showing device's own hotspot name, password and address
+(I1). In WF mode ssid/pw are omitted and only the address is present.
+Non-literal IPs stay rejected. Direct connect first; on failure fall back to
+the sender's signal filtered by instance id. No NAT traversal, no relay.
+
+Hotspot lifecycle:
+  - Android holds the LocalOnlyHotspot reservation for the whole session and
+    keeps a foreground service, or the hotspot dies mid-transfer.
+  - Leaving the Receive screen stops the doorbell and releases the hotspot.
+  - Linux/macOS release their join cleanly on leave.
 
 --------------------------------------------------------------------------------
-6. Failure and edge states
+8. Failure and edge states
 --------------------------------------------------------------------------------
 
-E1  No camera (desktop)           entry hidden, not disabled (R10/D1).
-E2  No hotspot capability          use existing network; say so; never offer
-                                   "my hotspot".
-E3  Windows joining a hotspot     app cannot do it; guide to OS Wi-Fi, then
-                                   rely on discovery.
-E4  Client isolation on the AP    discovery and direct connect both fail;
-                                   copy: "This network blocks device-to-device
-                                   traffic. Try a hotspot instead."
-E5  Sender vanishes                receiver modal closes with
-                                   "Sender has gone offline" (B3).
-E6  Receiver never answers         pending stays; sender may cancel (B1).
-E7  Receiver declines              inline declined + Try again (B2).
-E8  Backgrounded / locked          Android foreground service keeps the
-                                   transfer alive; consent already granted.
-E9  QR stale / wrong interface     fall back to discovery by instance id;
-                                   if still unreachable, E4-style copy.
-E10 Resume after accept           partial files resume; unchanged behavior.
+E1  Windows cannot join a hotspot (C1)   guided manual join, then wait;
+                                        WF offered as the alternative.
+E2  Windows has no shared Wi-Fi either   the only path is a manual join of the
+                                        phone's hotspot; say so plainly.
+E3  Client isolation on the AP          discovery and direct connect fail;
+                                        "This network blocks device-to-device
+                                        traffic. Try a hotspot instead."
+E4  Peer leaves while pending           modal closes; "Sender has gone offline"
+                                        on all platforms.
+E5  Peer never answers                  pending stays; sender may cancel.
+E6  Peer declines                       inline "Declined" + Try again.
+E7  Hotspot dies mid-transfer           specific copy: "The hotspot stopped.
+                                        Reopen Receive and try again."
+                                        Pause/resume covers brief drops.
+E8  Backgrounded / locked (Android)     foreground service keeps the transfer
+                                        and the hotspot alive.
+E9  QR stale / wrong interface          fall back to the sender's signal filtered
+                                        by instance id; otherwise E3-style copy.
+E10 No camera                           scan entry hidden; paste-code path.
+E11 Resume after accept                 partial files resume, unchanged.
+E12 Receiver never sees the signal      not on the sender's hotspot/network, or
+                                        Receive is closed; "Nobody is ready yet
+                                        - keep Receive open on the other device."
 
 --------------------------------------------------------------------------------
-7. Phases
+9. Phases
 --------------------------------------------------------------------------------
 
-Phase 0  This document. Reviewed and approved before any code. Alone it ships
-         nothing.
+Phase 0  This document. Ships nothing alone.
 
-Phase 1  Foundation types: host/scanner/qr roles, per-peer auth state
-         (pending/accepted/declined/offline), capability model.
-         Pure Dart. Behavior unchanged. Analyze clean + tests green.
+Phase 1  Foundation types: roles (host/scanner/displayer), mode (HS/WF),
+         per-peer auth state (pending/accepted/declined/offline), capability
+         model. Pure Dart. Behavior unchanged.
+         Exit: analyze clean, tests green.
 
-Phase 2  Protocol consent: P1-P5. Explicit request, mandatory accept, distinct
-         decline/offline, N-way group consent, remember-device.
+Phase 2  Protocol and discovery: the doorbell listener, P1-P6, sender-driven
+         discovery, hotspot naming, lifecycle hooks.
          Exit: tested; single-receiver verified on this machine.
 
-Phase 3  Receiver screen: automatic link-up, QR vs no-camera state, inbound
-         authorization modal. Sender untouched.
-         Exit: receiver correct on all four platforms in tests.
+Phase 3  Receiver screen: automatic link-up, QR / no-camera / join-prompt
+         states, inbound authorization modal. Sender untouched.
+         Exit: correct on all four platforms in tests.
 
-Phase 4  Sender screen + radar ownership swap: radar to sender, blip tap issues
-         request, scanning view, per-target states, receiver radar removed.
-         Exit: real-device pass phone->phone and desktop->phone.
+Phase 4  Sender screen and radar ownership swap: radar to sender, blip tap
+         issues the request, scanning view, per-target states, desktop fallback
+         link. Receiver's old radar removed.
+         Exit: real-device pass phone->phone and phone->desktop.
 
-Phase 5  Drawer/modal container with entries, mobile sheet + desktop modal,
-         desktop scan entry omitted. Group multi-select.
+Phase 5  Drawer/modal container, desktop entry set, group multi-select.
          Exit: all entries reachable; group works with mixed peers.
 
-Phase 6  Platform gates, error copy, background/lock, QR staleness, resume
-         after accept, desktop window 900x625 on launch. Manual QA checklist.
+Phase 6  Platform gates and resilience: Windows guided join, hotspot keep-alive,
+         error copy E1-E12, background/lock, QR staleness, window 900x625 on
+         launch. Manual QA checklist.
          Exit: failure paths tested per platform.
 
 Phase 7  Ship: full suite, real-device matrix, artifacts for visual review.
          No commit without explicit approval at each phase boundary.
 
 --------------------------------------------------------------------------------
-8. Deliberately out of scope
+10. Out of scope
 --------------------------------------------------------------------------------
 
-- Background advertising so idle devices appear on the radar (would need an
-  always-on service; rejected with F2 as answered).
-- Cross-network / relay / hole punching. All scenarios are one local link.
+- Background advertising so idle devices appear on the radar.
+- Cross-network, relay, hole punching. One local link only.
+- Internet over the hotspot. Local-only by design (R12).
 - iOS implementation.
 - Rooms / shared-space group model. Chosen model is multi-recipient select.
