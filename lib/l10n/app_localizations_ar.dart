@@ -168,6 +168,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get save => 'حفظ';
 
   @override
+  String get edit => 'تعديل';
+
+  @override
+  String get change => 'تغيير';
+
+  @override
   String get clearHistoryTitle => 'مسح السجل؟';
 
   @override
@@ -436,6 +442,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get appearance => 'المظهر';
+
+  @override
+  String get lookAndFeel => 'المظهر والإحساس';
 
   @override
   String get language => 'اللغة';

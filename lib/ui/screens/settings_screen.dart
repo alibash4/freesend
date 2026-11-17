@@ -245,26 +245,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                      Icon(
-                        Icons.edit_outlined,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            l10n.edit,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
                 ),
               ),
-              if (PlatformEnv.kind == PlatformKind.android ||
-                  PlatformEnv.kind == PlatformKind.ios) ...[
-                const SizedBox(height: AppSpacing.sm),
-                _UpdateRow(
-                  label: l10n.hapticFeedback,
-                  subtitle: l10n.hapticFeedbackSubtitle,
-                  value: appState.haptics,
-                  onChanged: (value) => appState.setHaptics(value),
-                ),
-              ],
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(title: l10n.receivedFiles),
               Text(l10n.saveLocation, style: theme.textTheme.bodyMedium),
@@ -295,10 +297,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        Icon(
-                          Icons.edit_outlined,
-                          size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              AppIcons.folderOpen,
+                              size: 16,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.change,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -306,7 +320,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.appearance),
+              SectionHeader(
+                title: PlatformEnv.isDesktop
+                    ? l10n.appearance
+                    : l10n.lookAndFeel,
+              ),
               Text(l10n.theme, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               // Three choices in one soft track, so the control reads as a
@@ -378,6 +396,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
+              if (PlatformEnv.kind == PlatformKind.android ||
+                  PlatformEnv.kind == PlatformKind.ios) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _UpdateRow(
+                  label: l10n.hapticFeedback,
+                  subtitle: l10n.hapticFeedbackSubtitle,
+                  value: appState.haptics,
+                  onChanged: (value) => appState.setHaptics(value),
+                ),
+              ],
               const SizedBox(height: AppSpacing.xl),
               if (PlatformEnv.supportsTray) ...[
                 SectionHeader(title: l10n.systemTray),
@@ -389,33 +417,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
               ],
-              SectionHeader(title: l10n.data),
-              Text(l10n.history, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Text(
-                l10n.localDataExplanation,
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: OutlinedButton.icon(
-                    style: ButtonStyle(
-                      mouseCursor: WidgetStatePropertyAll(
-                        SystemMouseCursors.click,
-                      ),
-                    ),
-                    onPressed: appState.history.isEmpty
-                        ? null
-                        : () => _clearHistory(appState),
-                    icon: Icon(AppIcons.trash, size: 17),
-                    label: Text(l10n.clearTransferHistory),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
               SectionHeader(title: l10n.updates),
               _UpdateRow(
                 label: l10n.checkAutomatically,
@@ -463,6 +464,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ],
+              const SizedBox(height: AppSpacing.xl),
+              SectionHeader(title: l10n.data),
+              Text(l10n.history, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              Text(
+                l10n.localDataExplanation,
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: OutlinedButton.icon(
+                    style: ButtonStyle(
+                      mouseCursor: WidgetStatePropertyAll(
+                        SystemMouseCursors.click,
+                      ),
+                    ),
+                    onPressed: appState.history.isEmpty
+                        ? null
+                        : () => _clearHistory(appState),
+                    icon: Icon(AppIcons.trash, size: 17),
+                    label: Text(l10n.clearTransferHistory),
+                  ),
+                ),
+              ),
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(title: l10n.about),
               _AboutRow(

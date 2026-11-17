@@ -165,6 +165,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get save => 'Save';
 
   @override
+  String get edit => 'Edit';
+
+  @override
+  String get change => 'Change';
+
+  @override
   String get clearHistoryTitle => 'Clear history?';
 
   @override
@@ -424,6 +430,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appearance => 'Appearance';
+
+  @override
+  String get lookAndFeel => 'Look and feel';
 
   @override
   String get language => 'Language';

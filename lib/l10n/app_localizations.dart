@@ -380,6 +380,18 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get save;
 
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @change.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get change;
+
   /// No description provided for @clearHistoryTitle.
   ///
   /// In en, this message translates to:
@@ -781,6 +793,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Appearance'**
   String get appearance;
+
+  /// No description provided for @lookAndFeel.
+  ///
+  /// In en, this message translates to:
+  /// **'Look and feel'**
+  String get lookAndFeel;
 
   /// No description provided for @language.
   ///
