@@ -1,15 +1,17 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
-import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
-import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -19,7 +21,6 @@ import 'package:free_send/services/permissions/transfer_setup.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
-import 'package:free_send/ui/widgets/scan_radar.dart';
 
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({super.key, this.onBack});
@@ -38,8 +39,11 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   /// Null while the grant check is in flight. False opens the setup screen.
   bool? _setupReady;
 
+  StreamSubscription<Knock>? _knocks;
+
   @override
   void dispose() {
+    unawaited(_knocks?.cancel());
     _scrollController.dispose();
     super.dispose();
   }
@@ -55,14 +59,44 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     if (!mounted) return;
     setState(() => _setupReady = ready);
     if (!ready) return;
-    _beginScanning();
+    _beginWaiting();
+    final controller = context.read<ReceiveController>();
+    _knocks = controller.knocks.listen(_showKnockDialog);
   }
 
-  void _beginScanning() {
+  /// The receiver waits; it does not hunt. The sender's signal finds it.
+  void _beginWaiting() {
     final controller = context.read<ReceiveController>();
     if (controller.phase == ReceivePhase.idle) {
-      controller.startScanning();
+      controller.startWaiting();
     }
+  }
+
+  Future<void> _showKnockDialog(Knock knock) async {
+    final controller = context.read<ReceiveController>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Accept files from ${knock.senderName}?'),
+        content: Text(
+          '${formatCount(knock.fileCount, 'file')} · '
+          '${formatBytes(knock.totalBytes)}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Decline'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    await controller.answerKnock(confirmed ?? false);
   }
 
   void _leave() {
@@ -142,7 +176,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           onLeave: _leave,
           onReady: () {
             setState(() => _setupReady = true);
-            _beginScanning();
+            _beginWaiting();
           },
         );
       }
@@ -192,7 +226,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                   ReceivePhase.idle ||
                   ReceivePhase.scanning ||
                   ReceivePhase.joining =>
-                    _ScanView(
+                    _WaitingView(
                       key: const ValueKey('scan'),
                       controller: controller,
                       onJoin: () => _openJoinSheet(controller),
@@ -235,8 +269,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   }
 }
 
-class _ScanView extends StatelessWidget {
-  const _ScanView({
+class _WaitingView extends StatelessWidget {
+  const _WaitingView({
     super.key,
     required this.controller,
     required this.onJoin,
@@ -254,9 +288,6 @@ class _ScanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context);
-    final sessions = controller.sessions;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -264,7 +295,7 @@ class _ScanView extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                l10n.nearbySessions,
+                'Waiting for a device',
                 style: theme.textTheme.headlineSmall,
               ),
             ),
@@ -280,31 +311,11 @@ class _ScanView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          controller.isScanning
-              ? l10n.listeningHotspot
-              : l10n.scanningPaused,
+          controller.isWaiting
+              ? 'Ready to receive. Keep this screen open.'
+              : 'Getting ready…',
           style: theme.textTheme.bodySmall,
         ),
-        const SizedBox(height: AppSpacing.md),
-        Center(
-          child: ScanRadar(
-            sessions: sessions,
-            active: controller.phase == ReceivePhase.scanning &&
-                controller.isScanning,
-            sweepColor: scheme.primary,
-            ringColor: scheme.surfaceContainerHigh,
-            blipColor: scheme.primary,
-            size: 220,
-            seed: controller.link.index,
-          ),
-        ),
-        if (PlatformEnv.isDesktop) ...[
-          const SizedBox(height: AppSpacing.md),
-          LinkPicker(
-            link: controller.link,
-            onChanged: controller.setLink,
-          ),
-        ],
         if (controller.hotspotNotice != null) ...[
           const SizedBox(height: AppSpacing.md),
           SurfaceCard(
@@ -345,207 +356,179 @@ class _ScanView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
-        Center(
-          child: TextButton.icon(
-            onPressed: ScanScreen.isSupported ? onScan : onPaste,
-            icon: Icon(AppIcons.qr, size: 16),
-            label: Text(
-              ScanScreen.isSupported
-                  ? 'Connect by scanning QR code instead'
-                  : 'Connect by code instead',
+        switch (controller.presence) {
+          ReceiverPresence.qr => _QrPanel(
+              payload: controller.waitingQrPayload ?? '',
             ),
-          ),
-        ),
-        if (sessions.isEmpty)
-          EmptyState(
-            icon: AppIcons.radar,
-            title: 'No sessions found',
-            message: 'Scan the pairing code shown on the sending device — it '
-                'joins the hotspot and connects for you.',
-            action: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: ScanScreen.isSupported ? onScan : onPaste,
-                    icon: Icon(
-                      ScanScreen.isSupported
-                          ? AppIcons.scan
-                          : AppIcons.paste,
-                      size: 17,
-                    ),
-                    label: Text(
-                      ScanScreen.isSupported ? 'Scan code' : 'Enter code',
-                    ),
-                  ),
-                ),
-                if (ScanScreen.isSupported) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: onPaste,
-                      icon: Icon(AppIcons.paste, size: 16),
-                      label: const Text('Enter code'),
-                    ),
-                  ),
-                ],
-                if (PlatformEnv.canJoinHotspot) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  TextButton.icon(
-                    onPressed: onJoin,
-                    icon: Icon(AppIcons.wifi, size: 16),
-                    label: const Text('Join a hotspot'),
-                  ),
-                ],
-              ],
+          ReceiverPresence.noCamera => const _NoCameraPanel(),
+          ReceiverPresence.joinPrompt => _JoinPromptPanel(onJoin: onJoin),
+          ReceiverPresence.idle => const SizedBox.shrink(),
+        },
+        const SizedBox(height: AppSpacing.lg),
+        Wrap(
+          spacing: AppSpacing.sm,
+          children: [
+            TextButton.icon(
+              onPressed: ScanScreen.isSupported ? onScan : null,
+              icon: Icon(AppIcons.scan, size: 16),
+              label: const Text('Scan code'),
             ),
-          )
-        else
-          Column(
-            children: [
-              for (final session in sessions) ...[
-                _SessionCard(
-                  session: session,
-                  onTap: () => controller.connectToSession(session),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
+            TextButton.icon(
+              onPressed: onPaste,
+              icon: Icon(AppIcons.paste, size: 16),
+              label: const Text('Enter code'),
+            ),
+            TextButton.icon(
+              onPressed: onManual,
+              icon: Icon(AppIcons.address, size: 16),
+              label: const Text('Connect by address'),
+            ),
           ],
         ),
-        if (controller.canResume) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Icon(
-                AppIcons.history,
-                size: 14,
-                color: theme.colorScheme.accentText,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Partial files resume where they stopped '
-                  '(${formatBytes(controller.resumedBytes)})',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.accentText,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: AppSpacing.lg),
-        if (PlatformEnv.canJoinHotspot && sessions.isNotEmpty) ...[
-          OutlinedButton.icon(
-            onPressed: onJoin,
-            icon: Icon(AppIcons.wifi, size: 17),
-            label: const Text('Join another hotspot'),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-        ],
-        if (sessions.isNotEmpty)
-          Wrap(
-            spacing: AppSpacing.sm,
-            children: [
-              TextButton.icon(
-                onPressed: ScanScreen.isSupported ? onScan : null,
-                icon: Icon(AppIcons.scan, size: 16),
-                label: const Text('Scan code'),
-              ),
-              TextButton.icon(
-                onPressed: onPaste,
-                icon: Icon(AppIcons.paste, size: 16),
-                label: const Text('Enter code'),
-              ),
-              TextButton.icon(
-                onPressed: onManual,
-                icon: Icon(AppIcons.address, size: 16),
-                label: const Text('Connect by address'),
-              ),
-            ],
-          )
-        else
-          TextButton.icon(
-            onPressed: onManual,
-            icon: Icon(AppIcons.address, size: 16),
-            label: const Text('Connect by address'),
-          ),
       ],
     );
   }
 }
 
-class _SessionCard extends StatelessWidget {
-  const _SessionCard({required this.session, required this.onTap});
+/// The receiver is the target: it shows the code instead of hunting for one.
+class _QrPanel extends StatelessWidget {
+  const _QrPanel({required this.payload});
 
-  final DiscoveredSession session;
-  final VoidCallback onTap;
+  final String payload;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.softFill,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(
-                  AppIcons.device,
-                  size: 18,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.neutral0,
+              borderRadius: BorderRadius.circular(AppRadii.field),
+            ),
+            child: QrImageView(
+              data: payload,
+              size: 172,
+              padding: EdgeInsets.zero,
+              backgroundColor: AppColors.neutral0,
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: AppColors.ink,
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.deviceName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${formatCount(session.fileCount, 'file')} · '
-                      '${formatBytes(session.totalBytes)} · ${session.ip}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: AppColors.ink,
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(
-                AppIcons.chevronRight,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
+              semanticsLabel: 'FreeSend pairing code',
+            ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Scan this from the other device',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'The other device opens FreeSend and scans this code to connect.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          TextButton.icon(
+            onPressed: () =>
+                Clipboard.setData(ClipboardData(text: payload)),
+            icon: Icon(AppIcons.copy, size: 16),
+            label: const Text('Copy code'),
+          ),
+        ],
       ),
     );
   }
 }
+
+class _NoCameraPanel extends StatelessWidget {
+  const _NoCameraPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            AppIcons.info,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              "There's nothing to scan here. The other device will find this "
+              'one by name - keep both on the same network.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JoinPromptPanel extends StatelessWidget {
+  const _JoinPromptPanel({required this.onJoin});
+
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                AppIcons.wifi,
+                size: 18,
+                color: theme.colorScheme.accentText,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  "Connect to the phone's hotspot",
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'This device joins the hotspot the phone creates. Pick it in the '
+            'list once it appears.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          OutlinedButton.icon(
+            onPressed: onJoin,
+            icon: Icon(AppIcons.wifi, size: 17),
+            label: const Text('Join a hotspot'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class _ReviewView extends StatelessWidget {
   const _ReviewView({super.key, required this.controller});

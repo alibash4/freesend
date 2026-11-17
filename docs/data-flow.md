@@ -259,8 +259,11 @@ Group without a phone: WF. Radar or typed code. Per-device consent.
 6.5 Receiver, authorization modal
     Title: "Accept files from <name>?"
     Body: "<count> files · <size>"
-    Actions: Decline / Accept, plus unchecked "Remember this device".
+    Actions: Decline / Accept.
     Never expires. Stays until answered, cancelled, or the peer goes offline.
+    The "Remember this device" checkbox is NOT in Phase 3: pinning needs the
+    Ed25519 fingerprint that only exists after the encrypted handshake, so it
+    lands in Phase 6 once the accept path has a manifest in hand.
 
 6.6 Sender, group view
     Multi-select on the radar. "Send to N devices". Per-person states.

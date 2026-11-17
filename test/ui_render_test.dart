@@ -15,7 +15,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/update/update_service.dart';
@@ -28,7 +30,6 @@ import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
-import 'package:free_send/ui/widgets/scan_radar.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
@@ -184,7 +185,7 @@ void main() {
 
     await tester.tap(find.text('Receive File').first);
     await settle(tester);
-    expect(find.text('Nearby sessions'), findsOneWidget);
+    expect(find.text('Waiting for a device'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '03-receive-scan');
 
@@ -217,7 +218,7 @@ void main() {
 
     await tester.tap(find.text('Receive File').first);
     await settle(tester);
-    expect(find.text('Nearby sessions'), findsOneWidget);
+    expect(find.text('Waiting for a device'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '12-receive-dark');
   });
@@ -307,7 +308,7 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('the receive radar sweeps and plots discovered sessions',
+  testWidgets('the receive screen waits and asks before accepting',
       (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
@@ -322,24 +323,38 @@ void main() {
       harness(home: const ReceiveScreen(), receiveController: controller),
     );
     await settle(tester);
-    expect(find.byType(ScanRadar), findsOneWidget);
-    expect(find.text('Connect by code instead'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await capture(tester, '18-receive-radar-empty');
 
-    // Feed three sessions straight into the controller the radar watches.
-    controller.debugSeedSessions(const [
-      ('Pixel 8', '192.168.43.12', 3, 1024 * 1024 * 640),
-      ('Desk Mini', '192.168.43.1', 12, 1024 * 1024 * 2048),
-      ('Galaxy Tab', '192.168.43.20', 1, 1024 * 1024 * 90),
-    ]);
-    await settle(tester);
-    expect(find.byType(ScanRadar), findsOneWidget);
-    expect(find.text('Pixel 8'), findsOneWidget);
-    expect(find.text('Desk Mini'), findsOneWidget);
-    expect(find.text('Galaxy Tab'), findsOneWidget);
+    expect(find.text('Waiting for a device'), findsOneWidget);
+    // On a desktop the phone hosts, so this device waits to be joined first.
+    expect(find.text("Connect to the phone's hotspot"), findsOneWidget);
+    expect(controller.doorbellPort, isNotNull);
+    expect(controller.presence, ReceiverPresence.joinPrompt);
     expect(tester.takeException(), isNull);
-    await capture(tester, '19-receive-radar-sessions');
+    await capture(tester, '18-receive-waiting');
+
+    await tester.runAsync(() async {
+      await KnockClient.send(
+        host: InternetAddress.loopbackIPv4.address,
+        port: controller.doorbellPort!,
+        senderInstanceId: 'sender-test',
+        senderName: 'Desk Mini',
+        platform: 'Linux',
+        fileCount: 12,
+        totalBytes: 640 * 1024 * 1024,
+        fileServerHost: InternetAddress.loopbackIPv4.address,
+        fileServerPort: 47811,
+        timeout: const Duration(seconds: 5),
+      );
+    });
+    await settle(tester);
+    expect(find.text('Accept files from Desk Mini?'), findsOneWidget);
+    expect(find.text('Decline'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Decline'));
+    await settle(tester);
+    expect(find.text('Accept files from Desk Mini?'), findsNothing);
+    expect(controller.activeKnock, isNull);
   });
 
   testWidgets('narrow screens do not overflow', (tester) async {

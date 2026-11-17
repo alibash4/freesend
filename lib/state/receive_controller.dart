@@ -6,12 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/services/transfer/transfer_client.dart';
 import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_recovery.dart';
@@ -46,6 +48,25 @@ class ReceiveController extends ChangeNotifier {
   String? _host;
   int? _port;
   StreamSubscription<List<DiscoveredSession>>? _scanSubscription;
+
+  // Receiving-side presence: the doorbell answers senders, and the responder
+  // tells seekers this device is waiting.
+  final ConsentDoorbell _doorbell = ConsentDoorbell();
+  final PresenceResponder _responder = PresenceResponder();
+  final StreamController<Knock> _knocks = StreamController<Knock>.broadcast();
+
+  /// What the waiting screen should show.
+  ReceiverPresence presence = ReceiverPresence.idle;
+
+  /// The knock currently awaiting an answer, if any.
+  Knock? activeKnock;
+
+  /// Payload of the QR this device shows, when it hosts the link.
+  String? waitingQrPayload;
+
+  Stream<Knock> get knocks => _knocks.stream;
+  int? get doorbellPort => _doorbell.port;
+  bool get isWaiting => _doorbell.isListening || _responder.isListening;
 
   String? errorMessage;
   String? connectingTo;
@@ -147,30 +168,88 @@ class ReceiveController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Test hook: replaces the live session list without opening a real
-  /// listener, so the radar can be rendered with a known set of blips.
-  @visibleForTesting
-  void debugSeedSessions(List<(String, String, int, int)> seeds) {
-    sessions = [
-      for (final (name, ip, files, bytes) in seeds)
-        DiscoveredSession(
-          instanceId: 'seed-$name',
-          deviceName: name,
-          platform: 'test',
-          ip: ip,
-          port: 47811,
-          fileCount: files,
-          totalBytes: bytes,
-          lastSeen: DateTime.now(),
-        ),
-    ];
-    phase = ReceivePhase.scanning;
-    notifyListeners();
-  }
-
   Future<void> stopScanning() async {
     await _scanner.stop();
     sessions = const [];
+    notifyListeners();
+  }
+
+  /// Brings up the receiving side: doorbell, presence answers, and - when this
+  /// device should host - the hotspot whose credentials become the QR.
+  ///
+  /// [host] is decided by the caller from the pairing rules; it is false until
+  /// the hotspot phase supplies the link.
+  Future<void> startWaiting({bool host = false}) async {
+    if (isWaiting) return;
+    errorMessage = null;
+    await _doorbell.start();
+    _doorbell.onKnock = _onKnock;
+    waitingQrPayload = host ? await _buildHostedQr() : null;
+    presence = waitingQrPayload != null
+        ? ReceiverPresence.qr
+        : PlatformEnv.isDesktop
+            ? ReceiverPresence.joinPrompt
+            : ReceiverPresence.noCamera;
+    await _responder.start(
+      ownInstanceId: appState.instanceId,
+      deviceName: appState.deviceName,
+      platform: PlatformEnv.label,
+      consentPort: _doorbell.port ?? 0,
+    );
+    notifyListeners();
+  }
+
+  /// The QR payload for a device that hosts the link itself.
+  Future<String?> _buildHostedQr() async {
+    if (!_hotspotService.canCreate) return null;
+    try {
+      await ensureHotspotPermissions();
+      final info = await _hotspotService.start(deviceName: appState.deviceName);
+      hotspotNotice = info.note;
+      final address = info.ip ?? await localIpv4();
+      if (address == null) return null;
+      return PairingCode(
+        ssid: info.ssid,
+        password: info.password,
+        host: address,
+        port: _doorbell.port ?? AppConstants.transferPort,
+        senderName: appState.deviceName,
+        senderPlatform: PlatformEnv.label,
+      ).encode();
+    } on HotspotException catch (error) {
+      errorMessage = error.message;
+      return null;
+    }
+  }
+
+  void _onKnock(Knock knock) {
+    activeKnock = knock;
+    notifyListeners();
+    if (!_knocks.isClosed) _knocks.add(knock);
+  }
+
+  /// Answers the pending knock. Accepting dials back the sender's file server
+  /// and continues into the normal review flow.
+  Future<void> answerKnock(bool accepted) async {
+    final knock = activeKnock;
+    if (knock == null) return;
+    activeKnock = null;
+    await _doorbell.decide(knock.requestId, accepted);
+    notifyListeners();
+    if (!accepted) return;
+    await connectToAddress(
+      knock.senderHost,
+      knock.senderPort,
+      label: knock.senderName,
+    );
+  }
+
+  /// Stops the doorbell and presence answers, releasing the link.
+  Future<void> stopWaiting() async {
+    activeKnock = null;
+    await _doorbell.stop();
+    await _responder.stop();
+    presence = ReceiverPresence.idle;
     notifyListeners();
   }
 
@@ -767,6 +846,9 @@ class ReceiveController extends ChangeNotifier {
   void dispose() {
     unawaited(_scanSubscription?.cancel());
     unawaited(_scanner.stop());
+    unawaited(_doorbell.stop());
+    unawaited(_responder.stop());
+    unawaited(_knocks.close());
     unawaited(_foreground.stop());
     unawaited(_saveRecovery());
     unawaited(_client?.dispose());

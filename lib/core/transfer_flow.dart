@@ -18,6 +18,21 @@ enum AuthState { pending, accepted, declined, offline }
 /// Entries offered by the send control.
 enum SendEntry { nearby, scanCode, group }
 
+/// What the receiver's waiting screen shows.
+enum ReceiverPresence {
+  /// Not receiving yet.
+  idle,
+
+  /// This device hosts the link and shows a QR for the other side to scan.
+  qr,
+
+  /// No camera can be used on either side, so there is nothing to scan.
+  noCamera,
+
+  /// A desktop that must join the phone's hotspot before anything works.
+  joinPrompt,
+}
+
 /// Which side runs the hotspot in a pairing.
 enum HotspotOwner { sender, receiver, none }
 
