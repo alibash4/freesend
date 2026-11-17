@@ -378,7 +378,7 @@ class _ThemeChoice extends StatelessWidget {
       cursor: SystemMouseCursors.click,
       child: Material(
         color: selected ? scheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.field),
+        borderRadius: BorderRadius.circular(AppRadii.field - 3),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
@@ -432,7 +432,7 @@ class _LanguageChoice extends StatelessWidget {
       cursor: SystemMouseCursors.click,
       child: Material(
         color: selected ? scheme.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.field),
+        borderRadius: BorderRadius.circular(AppRadii.field - 3),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
