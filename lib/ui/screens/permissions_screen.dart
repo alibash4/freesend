@@ -265,15 +265,31 @@ class _PermissionRow extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (status != null)
-                    Text(
-                      granted
-                          ? l10n.permAllowed
-                          : denied
-                              ? l10n.permBlocked
-                              : l10n.permNotAsked,
-                      style: theme.textTheme.labelSmall?.copyWith(color: tint),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        granted
+                            ? AppIcons.checkCircle
+                            : denied
+                                ? AppIcons.close
+                                : AppIcons.circle,
+                        size: 14,
+                        color: tint,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        granted
+                            ? l10n.permAllowed
+                            : denied
+                                ? l10n.permBlocked
+                                : l10n.permNotAsked,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: tint,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 2),
