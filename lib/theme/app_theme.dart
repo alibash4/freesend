@@ -212,12 +212,16 @@ abstract final class AppTheme {
 
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: scheme.inverseSurface,
+        backgroundColor: scheme.surfaceContainerLow,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: scheme.onInverseSurface,
+          color: scheme.onSurface,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(

@@ -139,6 +139,7 @@
   "protocol": "البروتوكول",
   "platform": "المنصة",
   "saveLocationUpdated": "تم تحديث موقع الحفظ",
+  "deviceNameUpdated": "تم تحديث اسم الجهاز",
   "couldNotChangeFolder": "تعذر تغيير المجلد: {error}",
   "chooseFolderTitle": "اختر مكان حفظ الملفات المستلمة",
   "clearHistoryQuestion": "مسح السجل؟",

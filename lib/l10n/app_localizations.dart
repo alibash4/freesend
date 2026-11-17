@@ -932,6 +932,12 @@ abstract class AppLocalizations {
   /// **'Save location updated'**
   String get saveLocationUpdated;
 
+  /// No description provided for @deviceNameUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name updated'**
+  String get deviceNameUpdated;
+
   /// No description provided for @couldNotChangeFolder.
   ///
   /// In en, this message translates to:

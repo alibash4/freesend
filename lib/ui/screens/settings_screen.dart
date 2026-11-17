@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -55,32 +57,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     await appState.setDeviceName(value);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).deviceNameUpdated)),
+      );
   }
 
   Future<void> _renameDevice() async {
+    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     _nameController.text = context.read<AppState>().deviceName;
     final editor = Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        PlatformEnv.isDesktop ? AppSpacing.lg : AppSpacing.sm,
+        AppSpacing.lg,
+        AppSpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(l10n.deviceName, style: theme.textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.lg),
           TextField(
             controller: _nameController,
             autofocus: true,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _saveNameAndClose(),
-            decoration: InputDecoration(hintText: l10n.deviceNameHint),
+            decoration: InputDecoration(
+              labelText: l10n.deviceName,
+              hintText: l10n.deviceNameHint,
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: double.infinity,
+          const SizedBox(height: AppSpacing.lg),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
             child: FilledButton(
+              style: ButtonStyle(
+                mouseCursor: WidgetStatePropertyAll(
+                  SystemMouseCursors.click,
+                ),
+              ),
               onPressed: _saveNameAndClose,
               child: Text(l10n.save),
             ),
@@ -88,12 +108,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) => editor,
-    );
+    if (PlatformEnv.isDesktop) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 48,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: editor,
+          ),
+        ),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheetContext) => editor,
+      );
+    }
   }
 
   void _saveNameAndClose() {
@@ -130,6 +166,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     if (updates.phase == UpdatePhase.available) {
       await UpdateSheet.show(context);
+    } else if (updates.phase == UpdatePhase.upToDate) {
+      Timer(const Duration(seconds: 3), () {
+        if (mounted) updates.dismiss();
+      });
     }
   }
 

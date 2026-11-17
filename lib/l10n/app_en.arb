@@ -139,6 +139,7 @@
   "protocol": "Protocol",
   "platform": "Platform",
   "saveLocationUpdated": "Save location updated",
+  "deviceNameUpdated": "Device name updated",
   "couldNotChangeFolder": "Could not change folder: {error}",
   "chooseFolderTitle": "Choose where received files go",
   "clearHistoryQuestion": "Clear history?",

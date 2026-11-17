@@ -505,6 +505,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveLocationUpdated => 'Save location updated';
 
   @override
+  String get deviceNameUpdated => 'Device name updated';
+
+  @override
   String couldNotChangeFolder(Object error) {
     return 'Could not change folder: $error';
   }

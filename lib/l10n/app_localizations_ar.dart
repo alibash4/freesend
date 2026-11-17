@@ -517,6 +517,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get saveLocationUpdated => 'تم تحديث موقع الحفظ';
 
   @override
+  String get deviceNameUpdated => 'تم تحديث اسم الجهاز';
+
+  @override
   String couldNotChangeFolder(Object error) {
     return 'تعذر تغيير المجلد: $error';
   }
