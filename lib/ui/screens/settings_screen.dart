@@ -208,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Three choices in one soft track, so the control reads as a
               // single object on the page.
               Container(
-                height: 48,
+                height: 45,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHigh,
@@ -245,7 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text(l10n.language, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               Container(
-                height: 48,
+                height: 45,
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHigh,
@@ -396,7 +396,7 @@ class _ThemeChoice extends StatelessWidget {
           mouseCursor: SystemMouseCursors.click,
           onTap: selected ? null : onTap,
           child: SizedBox(
-            height: 40,
+            height: 37,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -457,7 +457,7 @@ class _LanguageChoice extends StatelessWidget {
           mouseCursor: SystemMouseCursors.click,
           onTap: selected ? null : onTap,
           child: SizedBox(
-            height: 40,
+            height: 37,
             child: Center(
               child: Text(
                 label,
@@ -560,7 +560,7 @@ class _SlidingPill extends StatelessWidget {
         AnimatedAlign(
           duration: AppMotion.base,
           curve: Curves.easeOutCubic,
-          alignment: Alignment(
+          alignment: AlignmentDirectional(
             count <= 1 ? 0 : 2 * selectedIndex / (count - 1) - 1,
             0,
           ),

@@ -124,7 +124,7 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 48),
+          minimumSize: const Size(0, 45),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           textStyle: textTheme.labelLarge,
           shape: RoundedRectangleBorder(
@@ -135,7 +135,7 @@ abstract final class AppTheme {
       // The secondary button is a soft neutral fill rather than an outline.
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 45)),
           padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           ),

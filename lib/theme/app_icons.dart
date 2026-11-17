@@ -69,7 +69,7 @@ abstract final class AppIcons {
   // Appearance.
   static final IconData sun = UIcons.regularRounded.sun;
   static final IconData moon = UIcons.regularRounded.moon;
-  static final IconData auto = UIcons.regularRounded.sun;
+  static final IconData auto = UIcons.regularRounded.screen;
 
   // Settings sections.
   static final IconData deviceMobile = UIcons.regularRounded.smartphone;
