@@ -562,7 +562,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupSettings => 'Settings';
 
   @override
-  String get permTitle => 'Before you start';
+  String get permTitle => 'Please grant the following permissions';
 
   @override
   String get permIntro =>
@@ -619,7 +619,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get permNotAsked => 'Not asked';
 
   @override
-  String get permAllSet => 'Permissions granted. FreeSend is ready.';
+  String get permAllSet => 'FreeSend is ready.';
 
   @override
   String get permChangeLater =>

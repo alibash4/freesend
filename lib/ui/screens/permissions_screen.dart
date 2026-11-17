@@ -9,7 +9,6 @@ import 'package:free_send/services/permissions/app_permissions.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
-import 'package:free_send/ui/widgets/common.dart';
 
 /// First-launch runtime permission gate for Android.
 ///
@@ -28,6 +27,21 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   int? _sdkInt;
   bool _requesting = false;
 
+  // TEMP: preview toggle for the granted vs first-launch look.
+  bool _previewGranted = false;
+
+  Map<Permission, PermissionStatus> get _shown => _previewGranted
+      ? {
+          Permission.locationWhenInUse: PermissionStatus.granted,
+          Permission.nearbyWifiDevices: PermissionStatus.granted,
+          Permission.notification: PermissionStatus.granted,
+          Permission.photos: PermissionStatus.granted,
+          Permission.videos: PermissionStatus.granted,
+          Permission.audio: PermissionStatus.granted,
+          Permission.camera: PermissionStatus.granted,
+        }
+      : _statuses;
+
   @override
   void initState() {
     super.initState();
@@ -35,8 +49,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   }
 
   Future<void> _refresh() async {
+    final permissions = await AppPermissions.required;
     final statuses = <Permission, PermissionStatus>{};
-    for (final permission in await AppPermissions.required) {
+    for (final permission in permissions) {
       statuses[permission] = await permission.status;
     }
     _sdkInt = await AppPermissions.androidSdkInt;
@@ -72,11 +87,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final android = Platform.isAndroid;
-    final allGranted = _statuses.isNotEmpty &&
-        _statuses.values.every(
+    final allGranted = _shown.isNotEmpty &&
+        _shown.values.every(
           (status) => status.isGranted || status.isLimited,
         );
-    final permanentlyDenied = _statuses.values.any(
+    final permanentlyDenied = _shown.values.any(
       (status) => status.isPermanentlyDenied || status.isRestricted,
     );
     final showApi33 = !Platform.isAndroid || (_sdkInt ?? 33) >= 33;
@@ -93,16 +108,10 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               l10n.permTitle,
               textAlign: TextAlign.center,
               style: AppTypography.pageTitle.copyWith(
-                color: theme.colorScheme.accentText,
+                color: theme.colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              l10n.permIntro,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
-            ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.xl * 1.5),
             if (android) ...[
               _PermissionRow(
                 icon: AppIcons.wifi,
@@ -153,26 +162,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ),
             const SizedBox(height: AppSpacing.xl),
             if (allGranted)
-              SurfaceCard(
-                tint: AppColors.success.withValues(alpha: 0.08),
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  children: [
-                    Icon(
-                      AppIcons.checkCircle,
-                      size: 18,
-                      color: AppColors.success,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        l10n.permAllSet,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppColors.success,
-                        ),
-                      ),
-                    ),
-                  ],
+              Text(
+                l10n.permAllSet,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.success,
                 ),
               ),
             const SizedBox(height: AppSpacing.lg),
@@ -202,6 +196,23 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ],
 
 
+            // TEMP: preview toggle — remove before release.
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Preview: all granted',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                Switch(
+                  value: _previewGranted,
+                  onChanged: (value) =>
+                      setState(() => _previewGranted = value),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -209,7 +220,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   }
 
   PermissionStatus? _statusFor(Permission permission) =>
-      _statuses[permission];
+      _shown[permission];
 }
 
 class _PermissionRow extends StatelessWidget {
@@ -241,61 +252,60 @@ class _PermissionRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: tint.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: tint.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: tint),
           ),
-          child: Icon(icon, size: 18, color: tint),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        granted
-                            ? AppIcons.checkCircle
-                            : denied
-                                ? AppIcons.close
-                                : AppIcons.circle,
-                        size: 14,
-                        color: tint,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        granted
-                            ? l10n.permAllowed
-                            : denied
-                                ? l10n.permBlocked
-                                : l10n.permNotAsked,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: tint,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              Text(
+                title,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 body,
                 style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                granted
+                    ? AppIcons.checkCircle
+                    : denied
+                        ? AppIcons.close
+                        : AppIcons.circle,
+                size: 14,
+                color: tint,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                granted
+                    ? l10n.permAllowed
+                    : denied
+                        ? l10n.permBlocked
+                        : l10n.permNotAsked,
+                style: theme.textTheme.labelSmall?.copyWith(color: tint),
               ),
             ],
           ),

@@ -1037,7 +1037,7 @@ abstract class AppLocalizations {
   /// No description provided for @permTitle.
   ///
   /// In en, this message translates to:
-  /// **'Before you start'**
+  /// **'Please grant the following permissions'**
   String get permTitle;
 
   /// No description provided for @permIntro.
@@ -1139,7 +1139,7 @@ abstract class AppLocalizations {
   /// No description provided for @permAllSet.
   ///
   /// In en, this message translates to:
-  /// **'Permissions granted. FreeSend is ready.'**
+  /// **'FreeSend is ready.'**
   String get permAllSet;
 
   /// No description provided for @permChangeLater.

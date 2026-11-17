@@ -574,7 +574,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get setupSettings => 'الإعدادات';
 
   @override
-  String get permTitle => 'قبل أن تبدأ';
+  String get permTitle => 'يرجى منح الأذونات التالية';
 
   @override
   String get permIntro =>
@@ -630,7 +630,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get permNotAsked => 'لم يُطلب';
 
   @override
-  String get permAllSet => 'تم منح الأذونات. FreeSend جاهز.';
+  String get permAllSet => 'FreeSend جاهز.';
 
   @override
   String get permChangeLater => 'يمكنك تغييرها لاحقًا في إعدادات النظام.';
