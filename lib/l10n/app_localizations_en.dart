@@ -414,6 +414,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get receivedFiles => 'Received files';
 
   @override
+  String get saveLocation => 'Save location';
+
+  @override
   String get notSetYet => 'Not set yet';
 
   @override
@@ -482,6 +485,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkForUpdates => 'Check for updates';
+
+  @override
+  String get checkingUpdates => 'Checking';
 
   @override
   String get about => 'About';
@@ -620,6 +626,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get permAllSet => 'FreeSend is ready.';
+
+  @override
+  String get updateUpToDate => 'You\'re on the latest version.';
+
+  @override
+  String get updateFailed => 'Update failed';
 
   @override
   String get permChangeLater =>

@@ -426,6 +426,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get receivedFiles => 'الملفات المستلمة';
 
   @override
+  String get saveLocation => 'موقع الحفظ';
+
+  @override
   String get notSetYet => 'لم يُحدد بعد';
 
   @override
@@ -494,6 +497,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get checkForUpdates => 'التحقق من التحديثات';
+
+  @override
+  String get checkingUpdates => 'جارٍ التحقق';
 
   @override
   String get about => 'حول';
@@ -631,6 +637,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get permAllSet => 'FreeSend جاهز.';
+
+  @override
+  String get updateUpToDate => 'أنت تستخدم أحدث إصدار.';
+
+  @override
+  String get updateFailed => 'فشل التحديث';
 
   @override
   String get permChangeLater => 'يمكنك تغييرها لاحقًا في إعدادات النظام.';

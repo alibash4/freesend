@@ -57,6 +57,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await appState.setDeviceName(value);
   }
 
+  Future<void> _renameDevice() async {
+    final l10n = AppLocalizations.of(context);
+    _nameController.text = context.read<AppState>().deviceName;
+    final editor = Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _saveNameAndClose(),
+            decoration: InputDecoration(hintText: l10n.deviceNameHint),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saveNameAndClose,
+              child: Text(l10n.save),
+            ),
+          ),
+        ],
+      ),
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => editor,
+    );
+  }
+
+  void _saveNameAndClose() {
+    _saveName();
+    Navigator.of(context).pop();
+  }
+
   Future<void> _chooseFolder() async {
     final appState = context.read<AppState>();
     final l10n = AppLocalizations.of(context);
@@ -135,37 +179,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SectionHeader(title: l10n.thisDevice),
               Text(l10n.deviceName, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
-              TextField(
-                controller: _nameController,
-                focusNode: _focusNode,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _saveName(),
-                decoration: InputDecoration(
-                  hintText: l10n.deviceNameHint,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
+              Material(
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(AppRadii.field),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                mouseCursor: SystemMouseCursors.click,
+                onTap: _renameDevice,
+                child: Container(
                   constraints: const BoxConstraints(minHeight: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          appState.deviceName,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      PlatformEnv.canCreateHotspot
-                          ? l10n.platformCanHotspot(PlatformEnv.label)
-                          : l10n.platformSharesNetwork(PlatformEnv.label),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _saveName,
-                    child: Text(l10n.save),
-                  ),
-                ],
+                ),
               ),
               if (PlatformEnv.kind == PlatformKind.android ||
                   PlatformEnv.kind == PlatformKind.ios) ...[
@@ -179,26 +222,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const SizedBox(height: AppSpacing.xl),
               SectionHeader(title: l10n.receivedFiles),
-              Text(
-                appState.downloadDir.isEmpty
-                    ? l10n.notSetYet
-                    : appState.downloadDir,
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: OutlinedButton.icon(
-                    style: ButtonStyle(
-                      mouseCursor: WidgetStatePropertyAll(
-                        SystemMouseCursors.click,
-                      ),
+              Text(l10n.saveLocation, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              Material(
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(AppRadii.field),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  mouseCursor: SystemMouseCursors.click,
+                  onTap: _chooseFolder,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
                     ),
-                    onPressed: _chooseFolder,
-                    icon: Icon(AppIcons.folderOpen, size: 17),
-                    label: Text(l10n.changeFolder),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            appState.downloadDir.isEmpty
+                                ? l10n.notSetYet
+                                : appState.downloadDir,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -287,6 +345,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: AppSpacing.xl),
               ],
               SectionHeader(title: l10n.data),
+              Text(l10n.history, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
               Text(
                 l10n.localDataExplanation,
                 style: theme.textTheme.bodySmall,
@@ -333,16 +393,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         SystemMouseCursors.click,
                       ),
                     ),
-                    onPressed: _checkNow,
-                    icon: Icon(AppIcons.refresh, size: 17),
-                    label: Text(l10n.checkForUpdates),
+                    onPressed: updateState.phase == UpdatePhase.checking
+                        ? null
+                        : _checkNow,
+                    icon: updateState.phase == UpdatePhase.checking
+                        ? const _SpinnerIcon(size: 16)
+                        : Icon(AppIcons.refresh, size: 17),
+                    label: Text(
+                      updateState.phase == UpdatePhase.checking
+                          ? l10n.checkingUpdates
+                          : l10n.checkForUpdates,
+                    ),
                   ),
                 ),
               ),
-              if (updateState.message != null) ...[
+              if (updateState.localizedMessage(l10n).isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  updateState.message!,
+                  updateState.localizedMessage(l10n),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: updateState.phase == UpdatePhase.failed
                         ? theme.colorScheme.error
@@ -404,13 +472,17 @@ class _ThemeChoice extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 21,
-                  child: AnimatedScale(
-                    scale: selected ? 1 : 0,
-                    duration: AppMotion.base,
-                    curve: Curves.easeOutBack,
-                    child: Icon(icon, size: 15, color: foreground),
+                AnimatedContainer(
+                  duration: AppMotion.base,
+                  curve: Curves.easeOutBack,
+                  width: selected ? 21 : 0,
+                  child: ClipRect(
+                    child: AnimatedScale(
+                      scale: selected ? 1 : 0,
+                      duration: AppMotion.base,
+                      curve: Curves.easeOutBack,
+                      child: Icon(icon, size: 15, color: foreground),
+                    ),
                   ),
                 ),
                 // A choice slot is a third of a narrow page wide, so the label
@@ -536,16 +608,19 @@ class _AboutRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
-        Text(
-          value,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -589,6 +664,38 @@ class _SlidingPill extends StatelessWidget {
         ),
         child,
       ],
+    );
+  }
+}
+
+/// A continuously rotating uicons spinner glyph for inline loading states.
+class _SpinnerIcon extends StatefulWidget {
+  const _SpinnerIcon({required this.size});
+
+  final double size;
+
+  @override
+  State<_SpinnerIcon> createState() => _SpinnerIconState();
+}
+
+class _SpinnerIconState extends State<_SpinnerIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: Icon(AppIcons.loading, size: widget.size),
     );
   }
 }

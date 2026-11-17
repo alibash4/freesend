@@ -758,6 +758,12 @@ abstract class AppLocalizations {
   /// **'Received files'**
   String get receivedFiles;
 
+  /// No description provided for @saveLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Save location'**
+  String get saveLocation;
+
   /// No description provided for @notSetYet.
   ///
   /// In en, this message translates to:
@@ -889,6 +895,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Check for updates'**
   String get checkForUpdates;
+
+  /// No description provided for @checkingUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking'**
+  String get checkingUpdates;
 
   /// No description provided for @about.
   ///
@@ -1141,6 +1153,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'FreeSend is ready.'**
   String get permAllSet;
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re on the latest version.'**
+  String get updateUpToDate;
+
+  /// No description provided for @updateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed'**
+  String get updateFailed;
 
   /// No description provided for @permChangeLater.
   ///
