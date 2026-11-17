@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -16,7 +17,7 @@ class AppState extends ChangeNotifier {
   late String deviceName;
   String downloadDir = '';
   ThemeMode themeMode = ThemeMode.system;
-  Locale locale = const Locale('ar');
+  Locale locale = const Locale('en');
   List<TransferRecord> history = const [];
 
   /// Whether to look for a newer release on launch.
@@ -52,7 +53,14 @@ class AppState extends ChangeNotifier {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
-    locale = store.localeName == 'en' ? const Locale('en') : const Locale('ar');
+    locale = switch (store.localeName) {
+      'en' => const Locale('en'),
+      'ar' => const Locale('ar'),
+      // Never chosen: follow the device language, English otherwise.
+      _ => PlatformDispatcher.instance.locale.languageCode == 'ar'
+          ? const Locale('ar')
+          : const Locale('en'),
+    };
     history = store.history;
     autoUpdate = store.autoUpdate;
     minimizeToTray = store.minimizeToTray;

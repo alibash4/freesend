@@ -53,7 +53,7 @@ class LocalStore {
     await _prefs.setString(_kThemeMode, value);
   }
 
-  String get localeName => _prefs.getString(_kLocale) ?? 'ar';
+  String get localeName => _prefs.getString(_kLocale) ?? '';
 
   Future<void> setLocale(String value) async {
     await _prefs.setString(_kLocale, value);
