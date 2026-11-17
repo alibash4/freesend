@@ -94,6 +94,31 @@ build:apk:
     # Release builds run on tags only; pushes to main are covered by `test`.
     - if: $CI_COMMIT_TAG
 
+# A sideloadable debug APK on every push to main, so the current dev build
+# can be installed and tried without cutting a release.
+build:apk:debug:
+  stage: build
+  image: "ghcr.io/cirruslabs/flutter:3.44.0"
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends curl ca-certificates xz-utils unzip git
+    - sh scripts/install_flutter.sh
+    - export PATH="$FREESEND_FLUTTER_ROOT/bin:$PATH"
+    - export PATH="$PATH:$HOME/.pub-cache/bin"
+  script:
+    - flutter --version
+    - flutter pub get
+    - flutter analyze --no-fatal-infos
+    - flutter test
+    - flutter build apk --debug
+  artifacts:
+    name: "freesend-apk-debug"
+    paths:
+      - build/app/outputs/flutter-apk/app-debug.apk
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
 build:linux:
   stage: build
   image: "ghcr.io/cirruslabs/flutter:3.44.0"
