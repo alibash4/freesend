@@ -5,9 +5,9 @@ import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/permissions/app_permissions.dart';
 
 void main() {
-  test('desktop builds do not need runtime permissions', () {
+  test('desktop builds do not need runtime permissions', () async {
     expect(AppPermissions.isMobile, isFalse);
-    expect(AppPermissions.required, isEmpty);
+    expect(await AppPermissions.required, isEmpty);
     expect(AppPermissions.localNetworkNote, isEmpty);
   });
 

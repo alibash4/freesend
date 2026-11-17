@@ -24,6 +24,7 @@ class PermissionsScreen extends StatefulWidget {
 
 class _PermissionsScreenState extends State<PermissionsScreen> {
   Map<Permission, PermissionStatus> _statuses = const {};
+  int? _sdkInt;
   bool _requesting = false;
 
   @override
@@ -34,9 +35,10 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
 
   Future<void> _refresh() async {
     final statuses = <Permission, PermissionStatus>{};
-    for (final permission in AppPermissions.required) {
+    for (final permission in await AppPermissions.required) {
       statuses[permission] = await permission.status;
     }
+    _sdkInt = await AppPermissions.androidSdkInt;
     if (mounted) setState(() => _statuses = statuses);
   }
 
@@ -75,6 +77,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     final permanentlyDenied = _statuses.values.any(
       (status) => status.isPermanentlyDenied || status.isRestricted,
     );
+    final showApi33 = !Platform.isAndroid || (_sdkInt ?? 33) >= 33;
 
     return Scaffold(
       body: SafeArea(
@@ -120,13 +123,15 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     'discover other FreeSend devices.',
                 status: _statusFor(Permission.locationWhenInUse),
               ),
-              const SizedBox(height: AppSpacing.md),
-              _PermissionRow(
-                icon: AppIcons.device,
-                title: 'Nearby Wi-Fi devices',
-                body: 'Used on Android 13 and newer for device discovery.',
-                status: _statusFor(Permission.nearbyWifiDevices),
-              ),
+              if (showApi33) ...[
+                const SizedBox(height: AppSpacing.md),
+                _PermissionRow(
+                  icon: AppIcons.device,
+                  title: 'Nearby Wi-Fi devices',
+                  body: 'Used on Android 13 and newer for device discovery.',
+                  status: _statusFor(Permission.nearbyWifiDevices),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
             ] else ...[
               _PermissionRow(
@@ -137,21 +142,23 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
             ],
-            _PermissionRow(
-              icon: AppIcons.info,
-              title: 'Notifications',
-              body: 'Shows transfer progress while FreeSend is in the '
-                  'background.',
-              status: _statusFor(Permission.notification),
-            ),
+            if (showApi33)
+              _PermissionRow(
+                icon: AppIcons.info,
+                title: 'Notifications',
+                body: 'Shows transfer progress while FreeSend is in the '
+                    'background.',
+                status: _statusFor(Permission.notification),
+              ),
             const SizedBox(height: AppSpacing.md),
-            _PermissionRow(
-              icon: AppIcons.image,
-              title: 'Photos, videos, and audio',
-              body: 'Used by the media browser to show thumbnails and let you '
-                  'pick files.',
-              status: _statusFor(Permission.photos),
-            ),
+            if (showApi33)
+              _PermissionRow(
+                icon: AppIcons.image,
+                title: 'Photos, videos, and audio',
+                body: 'Used by the media browser to show thumbnails and let you '
+                    'pick files.',
+                status: _statusFor(Permission.photos),
+              ),
             const SizedBox(height: AppSpacing.md),
             _PermissionRow(
               icon: AppIcons.scan,
