@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
@@ -227,7 +228,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     for (final (mode, label, icon) in [
                       (ThemeMode.light, l10n.light, AppIcons.sun),
                       (ThemeMode.dark, l10n.dark, AppIcons.moon),
-                      (ThemeMode.system, l10n.auto, AppIcons.auto),
+                      (ThemeMode.system, l10n.auto,
+                        PlatformEnv.isDesktop
+                            ? AppIcons.auto
+                            : AppIcons.deviceMobile),
                     ])
                       Expanded(
                         child: _ThemeChoice(
@@ -507,7 +511,15 @@ class _UpdateRow extends StatelessWidget {
           ),
           MouseRegion(
             cursor: SystemMouseCursors.click,
-            child: Switch(value: value, onChanged: onChanged),
+            child: Switch(
+              value: value,
+              onChanged: (next) {
+                if (context.read<AppState>().haptics) {
+                  HapticFeedback.selectionClick();
+                }
+                onChanged(next);
+              },
+            ),
           ),
         ],
       ),
