@@ -27,6 +27,8 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/screens/receive_screen.dart';
+import 'package:free_send/ui/widgets/scan_radar.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
@@ -70,6 +72,7 @@ void main() {
     required Widget home,
     SendController? sendController,
     UpdateController? updateController,
+    ReceiveController? receiveController,
   }) {
     final light = AppTheme.light();
     final dark = AppTheme.dark();
@@ -84,9 +87,17 @@ void main() {
             )
           else
             ChangeNotifierProvider<SendController>.value(value: sendController),
-          ChangeNotifierProvider<ReceiveController>(
-            create: (_) => ReceiveController(appState: appState),
-          ),
+          if (receiveController == null)
+            ChangeNotifierProvider<ReceiveController>(
+              create: (_) => ReceiveController(
+                appState: appState,
+                hotspotService: ManualHotspotService(),
+              ),
+            )
+          else
+            ChangeNotifierProvider<ReceiveController>.value(
+              value: receiveController,
+            ),
           if (updateController == null)
             ChangeNotifierProvider<UpdateController>(
               create: (_) => UpdateController(),
@@ -294,6 +305,41 @@ void main() {
       controller.clearFiles();
     });
     await settle(tester);
+  });
+
+  testWidgets('the receive radar sweeps and plots discovered sessions',
+      (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    final controller = ReceiveController(
+      appState: appState,
+      hotspotService: ManualHotspotService(),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      harness(home: const ReceiveScreen(), receiveController: controller),
+    );
+    await settle(tester);
+    expect(find.byType(ScanRadar), findsOneWidget);
+    expect(find.text('Connect by code instead'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '18-receive-radar-empty');
+
+    // Feed three sessions straight into the controller the radar watches.
+    controller.debugSeedSessions(const [
+      ('Pixel 8', '192.168.43.12', 3, 1024 * 1024 * 640),
+      ('Desk Mini', '192.168.43.1', 12, 1024 * 1024 * 2048),
+      ('Galaxy Tab', '192.168.43.20', 1, 1024 * 1024 * 90),
+    ]);
+    await settle(tester);
+    expect(find.byType(ScanRadar), findsOneWidget);
+    expect(find.text('Pixel 8'), findsOneWidget);
+    expect(find.text('Desk Mini'), findsOneWidget);
+    expect(find.text('Galaxy Tab'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '19-receive-radar-sessions');
   });
 
   testWidgets('narrow screens do not overflow', (tester) async {

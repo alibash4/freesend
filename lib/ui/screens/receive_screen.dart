@@ -15,8 +15,11 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
+import 'package:free_send/services/permissions/transfer_setup.dart';
+import 'package:free_send/ui/screens/setup_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/scan_radar.dart';
 
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({super.key, this.onBack});
@@ -32,6 +35,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     animationFactory: const ChromiumEaseInOut(),
   );
 
+  /// Null while the grant check is in flight. False opens the setup screen.
+  bool? _setupReady;
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -41,12 +47,30 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final controller = context.read<ReceiveController>();
-      if (controller.phase == ReceivePhase.idle) {
-        controller.startScanning();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _enter());
+  }
+
+  Future<void> _enter() async {
+    final ready = !TransferSetup.applies || await TransferSetup.isReady;
+    if (!mounted) return;
+    setState(() => _setupReady = ready);
+    if (!ready) return;
+    _beginScanning();
+  }
+
+  void _beginScanning() {
+    final controller = context.read<ReceiveController>();
+    if (controller.phase == ReceivePhase.idle) {
+      controller.startScanning();
+    }
+  }
+
+  void _leave() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _openJoinSheet(ReceiveController controller) async {
@@ -111,6 +135,19 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_setupReady != true) {
+      if (_setupReady == false) {
+        return SetupScreen(
+          title: AppLocalizations.of(context).setupBeforeReceive,
+          onLeave: _leave,
+          onReady: () {
+            setState(() => _setupReady = true);
+            _beginScanning();
+          },
+        );
+      }
+      return Scaffold(backgroundColor: Theme.of(context).colorScheme.surface);
+    }
     final controller = context.watch<ReceiveController>();
     final l10n = AppLocalizations.of(context);
     return PopScope(
@@ -217,6 +254,7 @@ class _ScanView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final sessions = controller.sessions;
     return Column(
@@ -247,6 +285,26 @@ class _ScanView extends StatelessWidget {
               : l10n.scanningPaused,
           style: theme.textTheme.bodySmall,
         ),
+        const SizedBox(height: AppSpacing.md),
+        Center(
+          child: ScanRadar(
+            sessions: sessions,
+            active: controller.phase == ReceivePhase.scanning &&
+                controller.isScanning,
+            sweepColor: scheme.primary,
+            ringColor: scheme.surfaceContainerHigh,
+            blipColor: scheme.primary,
+            size: 220,
+            seed: controller.link.index,
+          ),
+        ),
+        if (PlatformEnv.isDesktop) ...[
+          const SizedBox(height: AppSpacing.md),
+          LinkPicker(
+            link: controller.link,
+            onChanged: controller.setLink,
+          ),
+        ],
         if (controller.hotspotNotice != null) ...[
           const SizedBox(height: AppSpacing.md),
           SurfaceCard(
@@ -287,6 +345,17 @@ class _ScanView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
+        Center(
+          child: TextButton.icon(
+            onPressed: ScanScreen.isSupported ? onScan : onPaste,
+            icon: Icon(AppIcons.qr, size: 16),
+            label: Text(
+              ScanScreen.isSupported
+                  ? 'Connect by scanning QR code instead'
+                  : 'Connect by code instead',
+            ),
+          ),
+        ),
         if (sessions.isEmpty)
           EmptyState(
             icon: AppIcons.radar,

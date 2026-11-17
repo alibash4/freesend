@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/services/saf_folders.dart';
@@ -15,6 +16,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
+import 'package:free_send/ui/screens/setup_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
@@ -186,6 +188,15 @@ class _SendScreenState extends State<SendScreen> {
     _toast('$label copied');
   }
 
+  Future<void> _start(SendController controller) async {
+    final ready = await SetupScreen.ensure(
+      context,
+      title: AppLocalizations.of(context).setupBeforeSend,
+    );
+    if (!ready || !mounted) return;
+    await controller.startSession();
+  }
+
   Future<bool> _confirmLeave(SendController controller) async {
     if (!controller.isBusy) return true;
     final l10n = AppLocalizations.of(context);
@@ -248,7 +259,7 @@ class _SendScreenState extends State<SendScreen> {
                     SendPhase.idle => SendSelectView(
                         key: const ValueKey('select'),
                         controller: controller,
-                        onStart: controller.startSession,
+                        onStart: () => _start(controller),
                       ),
                     SendPhase.preparing => _BusyView(
                         key: const ValueKey('preparing'),
@@ -271,7 +282,7 @@ class _SendScreenState extends State<SendScreen> {
                         onAgain: () async {
                           await controller.reset();
                           if (!context.mounted) return;
-                          await controller.startSession();
+                          await _start(controller);
                         },
                       ),
                     SendPhase.failed || SendPhase.cancelled => _FailedView(
@@ -280,7 +291,7 @@ class _SendScreenState extends State<SendScreen> {
                         onRetry: () async {
                           await controller.reset();
                           if (!context.mounted) return;
-                          await controller.startSession();
+                          await _start(controller);
                         },
                         onBack: () async {
                           await controller.reset();
@@ -519,8 +530,8 @@ class _SessionView extends StatelessWidget {
     final hotspot = controller.hotspot;
     final transferring = controller.phase == SendPhase.transferring;
     final paused = controller.paused;
-    final address = hotspot?.ip != null
-        ? '${hotspot!.ip}:${controller.port}'
+    final address = controller.sessionAddress != null
+        ? '${controller.sessionAddress}:${controller.port}'
         : 'Port ${controller.port}';
 
     return Column(
@@ -611,13 +622,23 @@ class _SessionView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DetailRow(
-                  label: 'Hotspot',
-                  value: hotspot?.ssid ?? controller.appState.deviceName,
-                  onCopy: hotspot == null
-                      ? null
-                      : () => onCopy(hotspot.ssid, 'Hotspot name'),
-                ),
+                if (controller.link == ShareLink.ethernet)
+                  DetailRow(
+                    label: 'Network',
+                    value: controller.sessionAddress ?? 'Wired',
+                    monospace: true,
+                    onCopy: controller.sessionAddress == null
+                        ? null
+                        : () => onCopy(controller.sessionAddress!, 'Network'),
+                  )
+                else
+                  DetailRow(
+                    label: 'Hotspot',
+                    value: hotspot?.ssid ?? controller.appState.deviceName,
+                    onCopy: hotspot == null
+                        ? null
+                        : () => onCopy(hotspot.ssid, 'Hotspot name'),
+                  ),
                 if (hotspot?.hasCredentials ?? false) ...[
                   const SizedBox(height: AppSpacing.sm),
                   DetailRow(
