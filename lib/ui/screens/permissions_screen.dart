@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/permissions/app_permissions.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -69,6 +70,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final android = Platform.isAndroid;
     final allGranted = _statuses.isNotEmpty &&
         _statuses.values.every(
@@ -82,53 +84,38 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.xl,
-            AppSpacing.lg,
-            AppSpacing.xl,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md).copyWith(
+            top: AppSpacing.xl,
+            bottom: AppSpacing.xl,
           ),
           children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(
-                AppIcons.device,
-                color: theme.colorScheme.onPrimaryContainer,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
             Text(
-              'Before you start',
-              style: theme.textTheme.displaySmall,
+              l10n.permTitle,
+              textAlign: TextAlign.center,
+              style: AppTypography.pageTitle.copyWith(
+                color: theme.colorScheme.accentText,
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'FreeSend needs access to the local link and camera to find '
-              'nearby devices and scan pairing codes. Nothing leaves your '
-              'network.',
-              style: theme.textTheme.bodyMedium,
+              l10n.permIntro,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
             ),
             const SizedBox(height: AppSpacing.xl),
             if (android) ...[
               _PermissionRow(
                 icon: AppIcons.wifi,
-                title: 'Location / nearby devices',
-                body: 'Required by Android to create or join a hotspot and '
-                    'discover other FreeSend devices.',
+                title: l10n.permLocationTitle,
+                body: l10n.permLocationBody,
                 status: _statusFor(Permission.locationWhenInUse),
               ),
               if (showApi33) ...[
                 const SizedBox(height: AppSpacing.md),
                 _PermissionRow(
                   icon: AppIcons.device,
-                  title: 'Nearby Wi-Fi devices',
-                  body: 'Used on Android 13 and newer for device discovery.',
+                  title: l10n.permNearbyTitle,
+                  body: l10n.permNearbyBody,
                   status: _statusFor(Permission.nearbyWifiDevices),
                 ),
               ],
@@ -136,7 +123,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ] else ...[
               _PermissionRow(
                 icon: AppIcons.device,
-                title: 'Local network',
+                title: l10n.permLocalNetworkTitle,
                 body: AppPermissions.localNetworkNote,
                 status: null,
               ),
@@ -145,26 +132,23 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             if (showApi33)
               _PermissionRow(
                 icon: AppIcons.info,
-                title: 'Notifications',
-                body: 'Shows transfer progress while FreeSend is in the '
-                    'background.',
+                title: l10n.permNotificationsTitle,
+                body: l10n.permNotificationsBody,
                 status: _statusFor(Permission.notification),
               ),
             const SizedBox(height: AppSpacing.md),
             if (showApi33)
               _PermissionRow(
                 icon: AppIcons.image,
-                title: 'Photos, videos, and audio',
-                body: 'Used by the media browser to show thumbnails and let you '
-                    'pick files.',
+                title: l10n.permMediaTitle,
+                body: l10n.permMediaBody,
                 status: _statusFor(Permission.photos),
               ),
             const SizedBox(height: AppSpacing.md),
             _PermissionRow(
               icon: AppIcons.scan,
-              title: 'Camera',
-              body: 'Only used to scan a pairing QR code. You can still pair '
-                  'by typing or pasting the code.',
+              title: l10n.permCameraTitle,
+              body: l10n.permCameraBody,
               status: _statusFor(Permission.camera),
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -182,7 +166,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Permissions granted. FreeSend is ready.',
+                        l10n.permAllSet,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppColors.success,
                         ),
@@ -190,30 +174,22 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     ),
                   ],
                 ),
-              )
-            else
-              Text(
-                'You can change these later in the system settings.',
-                style: theme.textTheme.bodySmall,
               ),
             const SizedBox(height: AppSpacing.lg),
-            FilledButton.icon(
-              onPressed: _requesting
-                  ? null
-                  : (allGranted ? _finish : _request),
-              icon: _requesting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(AppIcons.check, size: 17),
-              label: Text(
-                _requesting
-                    ? 'Requesting…'
-                    : allGranted
-                        ? 'Continue'
-                        : 'Allow permissions',
+            Center(
+              child: FilledButton(
+                onPressed: _requesting
+                    ? null
+                    : (allGranted ? _finish : _request),
+                child: _requesting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        allGranted ? l10n.permContinue : l10n.permAllow,
+                      ),
               ),
             ),
             if (permanentlyDenied) ...[
@@ -221,21 +197,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               OutlinedButton.icon(
                 onPressed: _openSettings,
                 icon: Icon(AppIcons.settings, size: 17),
-                label: const Text('Open system settings'),
+                label: Text(l10n.permOpenSettings),
               ),
             ],
-            const SizedBox(height: AppSpacing.sm),
-            TextButton(
-              onPressed: _finish,
-              child: Text(allGranted ? 'Continue' : 'Continue without'),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text(
-              'Desktop builds do not need this screen: local sockets, the tray, '
-              'and the file picker already work.',
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
+
+
           ],
         ),
       ),
@@ -262,6 +228,7 @@ class _PermissionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final granted = status != null &&
         (status!.isGranted || status!.isLimited);
     final denied = status != null &&
@@ -293,24 +260,27 @@ class _PermissionRow extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   if (status != null)
                     Text(
                       granted
-                          ? 'Allowed'
+                          ? l10n.permAllowed
                           : denied
-                              ? 'Blocked'
-                              : 'Not asked',
+                              ? l10n.permBlocked
+                              : l10n.permNotAsked,
                       style: theme.textTheme.labelSmall?.copyWith(color: tint),
                     ),
                 ],
               ),
               const SizedBox(height: 2),
-              Text(body, style: theme.textTheme.bodySmall),
+              Text(
+                body,
+                style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
+              ),
             ],
           ),
         ),

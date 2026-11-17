@@ -560,4 +560,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupSettings => 'Settings';
+
+  @override
+  String get permTitle => 'Before you start';
+
+  @override
+  String get permIntro =>
+      'FreeSend needs access to the local link and camera to find nearby devices and scan pairing codes. Nothing leaves your network.';
+
+  @override
+  String get permSection => 'Permissions';
+
+  @override
+  String get permLocationTitle => 'Location / nearby devices';
+
+  @override
+  String get permLocationBody =>
+      'Required by Android to create or join a hotspot and discover other FreeSend devices.';
+
+  @override
+  String get permNearbyTitle => 'Nearby Wi-Fi devices';
+
+  @override
+  String get permNearbyBody =>
+      'Used on Android 13 and newer for device discovery.';
+
+  @override
+  String get permLocalNetworkTitle => 'Local network';
+
+  @override
+  String get permNotificationsTitle => 'Notifications';
+
+  @override
+  String get permNotificationsBody =>
+      'Shows transfer progress while FreeSend is in the background.';
+
+  @override
+  String get permMediaTitle => 'Photos, videos, and audio';
+
+  @override
+  String get permMediaBody =>
+      'Used by the media browser to show thumbnails and let you pick files.';
+
+  @override
+  String get permCameraTitle => 'Camera';
+
+  @override
+  String get permCameraBody =>
+      'Only used to scan a pairing QR code. You can still pair by typing or pasting the code.';
+
+  @override
+  String get permAllowed => 'Allowed';
+
+  @override
+  String get permBlocked => 'Blocked';
+
+  @override
+  String get permNotAsked => 'Not asked';
+
+  @override
+  String get permAllSet => 'Permissions granted. FreeSend is ready.';
+
+  @override
+  String get permChangeLater =>
+      'You can change these later in the system settings.';
+
+  @override
+  String get permRequesting => 'Requesting…';
+
+  @override
+  String get permContinue => 'Continue';
+
+  @override
+  String get permAllow => 'Allow permissions';
+
+  @override
+  String get permOpenSettings => 'Open system settings';
 }

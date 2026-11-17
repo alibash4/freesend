@@ -36,7 +36,7 @@ abstract final class AppColors {
 
 abstract final class AppRadii {
   static const card = 18.0;
-  static const field = 12.0;
+  static const field = 10.0;
   static const pill = 999.0;
 }
 

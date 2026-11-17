@@ -572,4 +572,78 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get setupSettings => 'الإعدادات';
+
+  @override
+  String get permTitle => 'قبل أن تبدأ';
+
+  @override
+  String get permIntro =>
+      'يحتاج FreeSend إلى الوصول إلى الرابط المحلي والكاميرا للعثور على الأجهزة القريبة ومسح رموز الاقتران. لا يغادر أي شيء شبكتك.';
+
+  @override
+  String get permSection => 'الأذونات';
+
+  @override
+  String get permLocationTitle => 'الموقع / الأجهزة القريبة';
+
+  @override
+  String get permLocationBody =>
+      'يتطلبه أندرويد لإنشاء نقطة اتصال أو الانضمام إليها واكتشاف أجهزة FreeSend الأخرى.';
+
+  @override
+  String get permNearbyTitle => 'أجهزة Wi-Fi القريبة';
+
+  @override
+  String get permNearbyBody => 'يُستخدم في أندرويد 13 وما فوق لاكتشاف الأجهزة.';
+
+  @override
+  String get permLocalNetworkTitle => 'الشبكة المحلية';
+
+  @override
+  String get permNotificationsTitle => 'الإشعارات';
+
+  @override
+  String get permNotificationsBody =>
+      'يعرض تقدم التحويل أثناء وجود FreeSend في الخلفية.';
+
+  @override
+  String get permMediaTitle => 'الصور ومقاطع الفيديو والصوت';
+
+  @override
+  String get permMediaBody =>
+      'يستخدمه متصفح الوسائط لعرض الصور المصغرة وتتيح لك اختيار الملفات.';
+
+  @override
+  String get permCameraTitle => 'الكاميرا';
+
+  @override
+  String get permCameraBody =>
+      'تُستخدم فقط لمسح رمز QR الخاص بالاقتران. لا يزال بإمكانك الاقتران بكتابة الرمز أو لصقه.';
+
+  @override
+  String get permAllowed => 'مسموح';
+
+  @override
+  String get permBlocked => 'محظور';
+
+  @override
+  String get permNotAsked => 'لم يُطلب';
+
+  @override
+  String get permAllSet => 'تم منح الأذونات. FreeSend جاهز.';
+
+  @override
+  String get permChangeLater => 'يمكنك تغييرها لاحقًا في إعدادات النظام.';
+
+  @override
+  String get permRequesting => 'جارٍ الطلب…';
+
+  @override
+  String get permContinue => 'متابعة';
+
+  @override
+  String get permAllow => 'السماح بالأذونات';
+
+  @override
+  String get permOpenSettings => 'فتح إعدادات النظام';
 }
