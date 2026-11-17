@@ -214,7 +214,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: theme.colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(AppRadii.field),
                 ),
-                child: Row(
+                child: _SlidingPill(
+                  selectedIndex: [
+                    ThemeMode.light,
+                    ThemeMode.dark,
+                    ThemeMode.system,
+                  ].indexOf(appState.themeMode),
+                  count: 3,
+                  child: Row(
                   spacing: 4,
                   children: [
                     for (final (mode, label, icon) in [
@@ -231,6 +238,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                   ],
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
@@ -381,7 +389,7 @@ class _ThemeChoice extends StatelessWidget {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: Material(
-        color: selected ? scheme.primaryContainer : Colors.transparent,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(AppRadii.field - 3),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -392,8 +400,15 @@ class _ThemeChoice extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 15, color: foreground),
-                const SizedBox(width: 6),
+                SizedBox(
+                  width: 21,
+                  child: AnimatedScale(
+                    scale: selected ? 1 : 0,
+                    duration: AppMotion.base,
+                    curve: Curves.easeOutBack,
+                    child: Icon(icon, size: 15, color: foreground),
+                  ),
+                ),
                 // A choice slot is a third of a narrow page wide, so the label
                 // ellipsises instead of spilling over the next choice.
                 Flexible(
@@ -518,6 +533,49 @@ class _AboutRow extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// The moving selection pill behind a segmented strip. [child] is the row of
+/// choices; the pill slides to [selectedIndex] with the app's standard
+/// 200ms ease-out motion.
+class _SlidingPill extends StatelessWidget {
+  const _SlidingPill({
+    required this.selectedIndex,
+    required this.count,
+    required this.child,
+  });
+
+  final int selectedIndex;
+  final int count;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        AnimatedAlign(
+          duration: AppMotion.base,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment(
+            count <= 1 ? 0 : 2 * selectedIndex / (count - 1) - 1,
+            0,
+          ),
+          child: FractionallySizedBox(
+            widthFactor: 1 / count,
+            heightFactor: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(AppRadii.field - 3),
+              ),
+            ),
+          ),
+        ),
+        child,
       ],
     );
   }
