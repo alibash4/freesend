@@ -132,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SectionHeader(title: l10n.thisDevice, icon: AppIcons.deviceMobile),
+              SectionHeader(title: l10n.thisDevice),
               Text(l10n.deviceName, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               TextField(
@@ -178,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.receivedFiles, icon: AppIcons.inbox),
+              SectionHeader(title: l10n.receivedFiles),
               Text(
                 appState.downloadDir.isEmpty
                     ? l10n.notSetYet
@@ -203,7 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.appearance, icon: AppIcons.palette),
+              SectionHeader(title: l10n.appearance),
               Text(l10n.theme, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               // Three choices in one soft track, so the control reads as a
@@ -277,7 +277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: AppSpacing.xl),
               if (PlatformEnv.supportsTray) ...[
-                SectionHeader(title: l10n.systemTray, icon: AppIcons.compress),
+                SectionHeader(title: l10n.systemTray),
                 _UpdateRow(
                   label: l10n.minimizeToTray,
                   subtitle: l10n.keepRunningInTray,
@@ -286,7 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xl),
               ],
-              SectionHeader(title: l10n.data, icon: AppIcons.database),
+              SectionHeader(title: l10n.data),
               Text(
                 l10n.localDataExplanation,
                 style: theme.textTheme.bodySmall,
@@ -311,7 +311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.updates, icon: AppIcons.update),
+              SectionHeader(title: l10n.updates),
               _UpdateRow(
                 label: l10n.checkAutomatically,
                 subtitle: l10n.lookForNewerRelease,
@@ -351,7 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),
-              SectionHeader(title: l10n.about, icon: AppIcons.info),
+              SectionHeader(title: l10n.about),
               _AboutRow(
                 label: l10n.app,
                 value: '${AppConstants.appName} ${updateState.currentVersion}',
