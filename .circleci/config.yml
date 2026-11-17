@@ -1,5 +1,5 @@
-# CircleCI builds macOS, which GitLab CI here cannot reach. That needs a
-# macOS executor, so it runs on Apple silicon.
+# CircleCI builds macOS and Windows, which GitLab CI here cannot reach: macOS
+# needs an Apple-silicon executor and Windows needs a Windows host.
 #
 # Release publishing stays in GitLab CI, which owns the tags and the release
 # token. This pipeline only builds and stores artifacts.
@@ -13,6 +13,10 @@ executors:
     macos:
       xcode: 16.4.0
       resource_class: m4pro.medium
+  windows:
+    machine:
+      image: windows-server-2022-gui:current
+      resource_class: windows.medium
 
 jobs:
   build-macos:
@@ -112,6 +116,75 @@ jobs:
       - store_artifacts:
           path: dist
 
+  build-windows:
+    executor: windows
+    steps:
+      - checkout
+      # The Windows image ships no Flutter SDK. Pin the same version as the
+      # macOS job rather than tracking whatever stable happens to be.
+      - run:
+          name: Install Flutter
+          command: |
+            $ErrorActionPreference = "Stop"
+            $flutterVersion = "3.50.0"
+            $flutterRoot = "C:\flutter"
+            if (-not (Test-Path (Join-Path $flutterRoot "bin\flutter.bat"))) {
+              $zip = Join-Path $env:TEMP "flutter-windows.zip"
+              curl.exe --location --silent --show-error --fail --output $zip "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_$flutterVersion-stable.zip"
+              Expand-Archive -LiteralPath $zip -DestinationPath "C:\" -Force
+              Remove-Item -LiteralPath $zip
+            }
+            $env:PATH = "$flutterRoot\bin;$env:PATH"
+            flutter --version
+      - run:
+          name: Build Windows
+          command: |
+            $env:PATH = "C:\flutter\bin;$env:PATH"
+            flutter pub get
+            flutter build windows --release
+      - run:
+          name: Package the app
+          command: |
+            $env:PATH = "C:\flutter\bin;$env:PATH"
+            powershell -File scripts/package_windows.ps1
+            Get-ChildItem dist
+      - run:
+          name: Attach the Windows build to the GitLab release
+          command: |
+            $ErrorActionPreference = "Stop"
+            if (-not $env:RELEASE_TOKEN) { Write-Error "Set RELEASE_TOKEN to a GitLab project access token with the api scope."; exit 1 }
+            if (-not $env:CIRCLE_TAG) { Write-Error "This job only runs on tags."; exit 1 }
+
+            $gitlabApi = "https://gitlab.com/api/v4/projects/88767048"
+            $assetName = "FreeSend for Windows (exe)"
+            $file = "dist\freesend-windows-x64.zip"
+
+            if (-not (Test-Path $file)) { Write-Error "$file was not produced"; exit 1 }
+
+            # Upload to GitLab first: a release asset link points at the
+            # uploaded file. curl.exe, not the PowerShell curl alias.
+            $upload = curl.exe --silent --show-error --fail --request POST --header "PRIVATE-TOKEN: $env:RELEASE_TOKEN" --form "file=@$file" "$gitlabApi/uploads"
+            if ($LASTEXITCODE -ne 0) { Write-Error "Upload failed: $upload"; exit 1 }
+            $uploadUrl = "https://gitlab.com" + ($upload | ConvertFrom-Json).url
+            Write-Output "Uploaded $file to $uploadUrl"
+
+            $body = @{
+              name             = $assetName
+              url              = $uploadUrl
+              direct_asset_url = $uploadUrl
+              link_type        = "package"
+            } | ConvertTo-Json -Compress
+
+            $httpCode = curl.exe --silent --show-error --request POST --header "PRIVATE-TOKEN: $env:RELEASE_TOKEN" --header "Content-Type: application/json" --data $body --output NUL --write-out "%{http_code}" "$gitlabApi/releases/$env:CIRCLE_TAG/assets/links"
+            if ($LASTEXITCODE -ne 0) { Write-Error "Attach request failed."; exit 1 }
+            if ("$httpCode" -notmatch "^2") {
+              Write-Error "Could not attach $assetName to release $env:CIRCLE_TAG (HTTP $httpCode). Create the release in GitLab before pushing the tag."
+              exit 1
+            }
+            Write-Output "Attached $assetName to release $env:CIRCLE_TAG."
+      - store_artifacts:
+          path: dist
+
 workflows:
   macos:
     # CircleCI skips every job for a tag unless a filter explicitly allows it,
@@ -119,4 +192,8 @@ workflows:
     # tags are the only thing that should build macOS.
     jobs:
       - build-macos:
+          filters: pipeline.git.tag matches /^v.*/
+  windows:
+    jobs:
+      - build-windows:
           filters: pipeline.git.tag matches /^v.*/
