@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
@@ -666,24 +667,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: ExcludeSemantics(
               child: Opacity(
                 opacity: _titleFade,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.scaffoldBackgroundColor,
-                    border: Border(
-                      bottom: BorderSide(color: theme.colorScheme.hairline),
-                    ),
-                  ),
-                  child: Text(
-                    l10n.settings,
-                    style: AppTypography.pageTitle.copyWith(
-                      fontSize: 20,
-                      color: theme.brightness == Brightness.dark
-                          ? AppColors.neutral200
-                          : AppColors.neutral800,
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.md,
+                      ),
+                      color: theme.scaffoldBackgroundColor.withValues(
+                        alpha: 0.72,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          l10n.settings,
+                          textAlign: TextAlign.center,
+                          style: AppTypography.pageTitle.copyWith(
+                            fontSize: 20,
+                            color: theme.brightness == Brightness.dark
+                                ? AppColors.neutral200
+                                : AppColors.neutral800,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
