@@ -361,7 +361,10 @@ class _WaitingView extends StatelessWidget {
               payload: controller.waitingQrPayload ?? '',
             ),
           ReceiverPresence.noCamera => const _NoCameraPanel(),
-          ReceiverPresence.joinPrompt => _JoinPromptPanel(onJoin: onJoin),
+          ReceiverPresence.joinPrompt => _JoinPromptPanel(
+              controller: controller,
+              onJoin: onJoin,
+            ),
           ReceiverPresence.idle => const SizedBox.shrink(),
         },
         const SizedBox(height: AppSpacing.lg),
@@ -482,8 +485,9 @@ class _NoCameraPanel extends StatelessWidget {
 }
 
 class _JoinPromptPanel extends StatelessWidget {
-  const _JoinPromptPanel({required this.onJoin});
+  const _JoinPromptPanel({required this.controller, required this.onJoin});
 
+  final ReceiveController controller;
   final VoidCallback onJoin;
 
   @override
@@ -523,6 +527,33 @@ class _JoinPromptPanel extends StatelessWidget {
             icon: Icon(AppIcons.wifi, size: 17),
             label: const Text('Join a hotspot'),
           ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: controller.toggleLocalWifiQr,
+              icon: Icon(
+                controller.showLocalWifiQr ? AppIcons.wifi : AppIcons.link,
+                size: 16,
+              ),
+              label: Text(
+                controller.showLocalWifiQr
+                    ? 'Back to the hotspot'
+                    : 'Unable to connect? Use local Wi-Fi network',
+              ),
+            ),
+          ),
+          if (controller.showLocalWifiQr) ...[
+            const SizedBox(height: AppSpacing.sm),
+            if (controller.localWifiQrPayload == null)
+              Text(
+                'This device has no usable local address. Connect both devices '
+                'to the same network first.',
+                style: theme.textTheme.bodySmall,
+              )
+            else
+              _QrPanel(payload: controller.localWifiQrPayload!),
+          ],
         ],
       ),
     );

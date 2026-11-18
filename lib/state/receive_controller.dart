@@ -244,6 +244,33 @@ class ReceiveController extends ChangeNotifier {
     );
   }
 
+  /// Whether the desktop is showing its own code for local-Wi-Fi mode.
+  bool showLocalWifiQr = false;
+  String? localWifiQrPayload;
+
+  /// Switches from hotspot mode to local-Wi-Fi mode: the desktop shows an
+  /// address code the phone can scan instead of joining a hotspot.
+  Future<void> toggleLocalWifiQr() async {
+    if (showLocalWifiQr) {
+      showLocalWifiQr = false;
+      localWifiQrPayload = null;
+      notifyListeners();
+      return;
+    }
+    final address = await localIpv4();
+    final port = _doorbell.port;
+    localWifiQrPayload = address == null || port == null
+        ? null
+        : PairingCode(
+            host: address,
+            port: port,
+            senderName: appState.deviceName,
+            senderPlatform: PlatformEnv.label,
+          ).encode();
+    showLocalWifiQr = true;
+    notifyListeners();
+  }
+
   /// Stops the doorbell and presence answers, releasing the link.
   Future<void> stopWaiting() async {
     activeKnock = null;

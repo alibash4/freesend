@@ -448,6 +448,20 @@ void main() {
     await settle(tester);
     expect(find.text('Accept files from Desk Mini?'), findsNothing);
     expect(controller.activeKnock, isNull);
+
+    // The desktop escape hatch shows an address code for the phone.
+    await tester.tap(find.text('Unable to connect? Use local Wi-Fi network'));
+    await tester.pump();
+    // Resolving the local address is real I/O.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 400)),
+    );
+    await settle(tester);
+    expect(controller.showLocalWifiQr, isTrue);
+    expect(controller.localWifiQrPayload, isNotNull);
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '19-receive-local-wifi');
   });
 
   testWidgets('narrow screens do not overflow', (tester) async {
