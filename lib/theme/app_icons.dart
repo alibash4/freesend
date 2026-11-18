@@ -47,8 +47,11 @@ abstract final class AppIcons {
   static final IconData back = UIcons.regularRounded.arrow_left;
   static final IconData forward = UIcons.regularRounded.arrow_right;
   static final IconData chevronRight = UIcons.regularRounded.angle_right;
+  static final IconData chevronLeft = UIcons.regularRounded.angle_left;
   static final IconData close = UIcons.regularRounded.x;
   static final IconData refresh = UIcons.regularRounded.refresh;
+  static final IconData spinner = UIcons.regularRounded.spinner;
+  static final IconData loading = UIcons.regularRounded.loading;
 
   // State.
   static final IconData check = UIcons.regularRounded.check;
@@ -65,11 +68,17 @@ abstract final class AppIcons {
   static final IconData radar = UIcons.regularRounded.signal_alt;
   static final IconData search = UIcons.regularRounded.search;
   static final IconData cameraOff = UIcons.regularRounded.video_slash;
+  static final IconData camera = UIcons.regularRounded.camera;
+  static final IconData bell = UIcons.regularRounded.bell;
 
   // Appearance.
   static final IconData sun = UIcons.regularRounded.sun;
   static final IconData moon = UIcons.regularRounded.moon;
-  static final IconData auto = UIcons.regularRounded.sun;
+  static final IconData auto = UIcons.regularRounded.screen;
+
+  // System states.
+  static final IconData shieldAlert = UIcons.regularRounded.shield_exclamation;
+  static final IconData locationPin = UIcons.regularRounded.location_alt;
 
   // Settings sections.
   static final IconData deviceMobile = UIcons.regularRounded.smartphone;
@@ -77,6 +86,8 @@ abstract final class AppIcons {
   static final IconData compress = UIcons.regularRounded.compress;
   static final IconData database = UIcons.regularRounded.database;
   static final IconData update = UIcons.regularRounded.arrow_circle_up;
+  static final IconData sliders = UIcons.regularRounded.settings_sliders;
+  static final IconData apps = UIcons.regularRounded.apps;
 
   // Bottom navigation: regular when idle, solid when active.
   static final IconData homeActive = UIcons.solidRounded.home;

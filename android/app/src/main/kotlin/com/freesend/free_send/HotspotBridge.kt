@@ -1,6 +1,9 @@
 package com.freesend.free_send
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -11,13 +14,13 @@ import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.SocketException
-
 /**
  * Bridges the hotspot-only transport to Android:
  *  - host side: WifiManager.startLocalOnlyHotspot (no internet, WPA2)
@@ -76,6 +79,31 @@ class HotspotBridge(
             result.error("unsupported", "This device has no Wi-Fi adapter.", null)
             return
         }
+        // startLocalOnlyHotspot throws SecurityException both when the runtime
+        // grant is missing and when location services are switched off, which
+        // reads as "no permission" even for a user who already granted one.
+        // Check each case so the message can say which one it is.
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            result.error(
+                "permission",
+                "Location (Nearby devices) permission is required to create a hotspot.",
+                null,
+            )
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isLocationEnabled()) {
+            result.error(
+                "location_off",
+                "Location services are off. Android needs them on to create a "
+                    + "hotspot; turn them on and try again.",
+                null,
+            )
+            return
+        }
         replied = false
         stopHotspot()
         try {
@@ -124,6 +152,13 @@ class HotspotBridge(
         } catch (error: Exception) {
             result.error("failed", error.message ?: "Could not start the hotspot.", null)
         }
+    }
+
+    private fun isLocationEnabled(): Boolean {
+        val manager = context.getSystemService(Context.LOCATION_SERVICE)
+            as? LocationManager ?: return true
+        return manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     }
 
     private fun ssidOf(res: WifiManager.LocalOnlyHotspotReservation): String {

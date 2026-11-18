@@ -3,14 +3,19 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
+import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/services/transfer/transfer_client.dart';
 import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_recovery.dart';
@@ -35,6 +40,10 @@ class ReceiveController extends ChangeNotifier {
 
   final AppState appState;
   final HotspotService _hotspotService;
+
+  /// Strings for messages this controller produces; resolved at call time so
+  /// a locale change applies to the next message, not just the next rebuild.
+  AppLocalizations get _l10n => lookupAppLocalizations(appState.locale);
   final SessionScanner _scanner = SessionScanner();
   final TransferForeground _foreground = TransferForeground();
 
@@ -45,6 +54,25 @@ class ReceiveController extends ChangeNotifier {
   String? _host;
   int? _port;
   StreamSubscription<List<DiscoveredSession>>? _scanSubscription;
+
+  // Receiving-side presence: the doorbell answers senders, and the responder
+  // tells seekers this device is waiting.
+  final ConsentDoorbell _doorbell = ConsentDoorbell();
+  final PresenceResponder _responder = PresenceResponder();
+  final StreamController<Knock> _knocks = StreamController<Knock>.broadcast();
+
+  /// What the waiting screen should show.
+  ReceiverPresence presence = ReceiverPresence.idle;
+
+  /// The knock currently awaiting an answer, if any.
+  Knock? activeKnock;
+
+  /// Payload of the QR this device shows, when it hosts the link.
+  String? waitingQrPayload;
+
+  Stream<Knock> get knocks => _knocks.stream;
+  int? get doorbellPort => _doorbell.port;
+  bool get isWaiting => _doorbell.isListening || _responder.isListening;
 
   String? errorMessage;
   String? connectingTo;
@@ -77,6 +105,7 @@ class ReceiveController extends ChangeNotifier {
   bool get isPaused => receivedItems.any(
         (item) => item.status == TransferStatus.paused && !item.done,
       );
+
   /// The receiver asked for the stream to stop. Distinct from a sender pause,
   /// which arrives as a frame while the socket is still being read.
   bool pausedByMe = false;
@@ -88,6 +117,22 @@ class ReceiveController extends ChangeNotifier {
       resumeOffsets.values.fold<int>(0, (sum, value) => sum + value);
   bool get canJoinHotspot => _hotspotService.canJoin;
   bool get isScanning => _scanner.isScanning;
+
+  /// The transport the receiver listens on.
+  ShareLink link = ShareLink.wifi;
+
+  /// Switches the transport and re-scans, so the listener follows the link the
+  /// user picked.
+  Future<void> setLink(ShareLink value) async {
+    if (link == value) return;
+    link = value;
+    if (_scanner.isScanning) {
+      await _scanner.stop();
+      await startScanning();
+    } else {
+      notifyListeners();
+    }
+  }
 
   int get selectedBytes => manifest == null
       ? 0
@@ -103,14 +148,26 @@ class ReceiveController extends ChangeNotifier {
 
   Future<void> startScanning() async {
     if (_scanner.isScanning) return;
-    final ok = await _scanner.start(ownInstanceId: appState.instanceId);
+    String? bindAddress;
+    if (link == ShareLink.ethernet) {
+      bindAddress = await wiredIpv4();
+      if (bindAddress == null) {
+        errorMessage = _l10n.noWiredNetworkReceive;
+        phase = ReceivePhase.failed;
+        notifyListeners();
+        return;
+      }
+    }
+    final ok = await _scanner.start(
+      ownInstanceId: appState.instanceId,
+      bindAddress: bindAddress,
+    );
     _scanSubscription ??= _scanner.sessions.listen((list) {
       sessions = list;
       notifyListeners();
     });
     if (!ok) {
-      errorMessage =
-          'Discovery could not start. You can still connect by IP address.';
+      errorMessage = _l10n.discoveryFailedBody;
     }
     phase = ReceivePhase.scanning;
     notifyListeners();
@@ -119,6 +176,138 @@ class ReceiveController extends ChangeNotifier {
   Future<void> stopScanning() async {
     await _scanner.stop();
     sessions = const [];
+    notifyListeners();
+  }
+
+  /// Brings up the receiving side: doorbell, presence answers, and - when this
+  /// device should host - the hotspot whose credentials become the QR.
+  ///
+  /// [host] is decided by the caller from the pairing rules; it is false until
+  /// the hotspot phase supplies the link.
+  Future<void> startWaiting({bool host = false}) async {
+    if (isWaiting) return;
+    errorMessage = null;
+    await _doorbell.start();
+    _doorbell.onKnock = _onKnock;
+    waitingQrPayload = host ? await _buildHostedQr() : null;
+    presence = waitingQrPayload != null
+        ? ReceiverPresence.qr
+        : PlatformEnv.isDesktop
+            ? ReceiverPresence.joinPrompt
+            : ReceiverPresence.noCamera;
+    await _responder.start(
+      ownInstanceId: appState.instanceId,
+      deviceName: appState.deviceName,
+      platform: PlatformEnv.label,
+      consentPort: _doorbell.port ?? 0,
+    );
+    AppLog.info(
+        'receive',
+        'waiting (presence: ${presence.name}, '
+            'doorbell :${_doorbell.port})');
+    notifyListeners();
+  }
+
+  /// The QR payload for a device that hosts the link itself.
+  Future<String?> _buildHostedQr() async {
+    if (!_hotspotService.canCreate) return null;
+    try {
+      await ensureHotspotPermissions();
+      final info = await _hotspotService.start(deviceName: appState.deviceName);
+      AppLog.info('hotspot', 'started "${info.ssid}" (${info.ip})');
+      hotspotNotice = info.note;
+      final address = info.ip ?? await localIpv4();
+      if (address == null) return null;
+      return PairingCode(
+        ssid: info.ssid,
+        password: info.password,
+        host: address,
+        port: _doorbell.port ?? AppConstants.transferPort,
+        senderName: appState.deviceName,
+        senderPlatform: PlatformEnv.label,
+      ).encode();
+    } on HotspotException catch (error) {
+      AppLog.error('hotspot', 'could not start hotspot: ${error.message}');
+      errorMessage = error.message;
+      return null;
+    }
+  }
+
+  /// Devices already pinned during an earlier encrypted session are trusted
+  /// from then on, so they do not get asked again. Everyone else gets the
+  /// modal exactly once.
+  bool isRemembered(String instanceId) => appState.store.trustedDevices
+      .any((device) => device.instanceId == instanceId);
+
+  Future<void> _onKnock(Knock knock) async {
+    AppLog.info('consent', 'knock from ${knock.senderName}');
+    if (isRemembered(knock.senderInstanceId)) {
+      AppLog.info(
+        'consent',
+        '${knock.senderName} is a remembered device - accepting directly',
+      );
+      await answerKnock(true);
+      return;
+    }
+    activeKnock = knock;
+    notifyListeners();
+    if (!_knocks.isClosed) _knocks.add(knock);
+  }
+
+  /// Answers the pending knock. Accepting dials back the sender's file server
+  /// and continues into the normal review flow.
+  Future<void> answerKnock(bool accepted) async {
+    final knock = activeKnock;
+    if (knock == null) return;
+    activeKnock = null;
+    await _doorbell.decide(knock.requestId, accepted);
+    notifyListeners();
+    if (!accepted) {
+      AppLog.info('consent', 'declined ${knock.senderName}');
+      return;
+    }
+    AppLog.info(
+        'host', 'connecting back to ${knock.senderHost}:${knock.senderPort}');
+    await connectToAddress(
+      knock.senderHost,
+      knock.senderPort,
+      label: knock.senderName,
+    );
+  }
+
+  /// Whether the desktop is showing its own code for local-Wi-Fi mode.
+  bool showLocalWifiQr = false;
+  String? localWifiQrPayload;
+
+  /// Switches from hotspot mode to local-Wi-Fi mode: the desktop shows an
+  /// address code the phone can scan instead of joining a hotspot.
+  Future<void> toggleLocalWifiQr() async {
+    if (showLocalWifiQr) {
+      showLocalWifiQr = false;
+      localWifiQrPayload = null;
+      notifyListeners();
+      return;
+    }
+    final address = await localIpv4();
+    final port = _doorbell.port;
+    localWifiQrPayload = address == null || port == null
+        ? null
+        : PairingCode(
+            host: address,
+            port: port,
+            senderName: appState.deviceName,
+            senderPlatform: PlatformEnv.label,
+          ).encode();
+    showLocalWifiQr = true;
+    notifyListeners();
+  }
+
+  /// Stops the doorbell and presence answers, releasing the link.
+  Future<void> stopWaiting() async {
+    activeKnock = null;
+    await _doorbell.stop();
+    await _responder.stop();
+    presence = ReceiverPresence.idle;
     notifyListeners();
   }
 
@@ -134,15 +323,14 @@ class ReceiveController extends ChangeNotifier {
       // the permission cannot be assumed to be granted yet.
       await ensureHotspotPermissions();
       final info = await _hotspotService.join(ssid.trim(), password);
-      hotspotNotice = info.note ??
-          'Connected to "${info.ssid}". Looking for the sharing device…';
+      hotspotNotice = info.note ?? _l10n.connectedLooking(info.ssid);
       await startScanning();
       phase = ReceivePhase.scanning;
     } on HotspotException catch (error) {
       errorMessage = error.message;
       phase = ReceivePhase.failed;
     } on Object catch (error) {
-      errorMessage = 'Could not join the hotspot: $error';
+      errorMessage = _l10n.couldNotJoinHotspot('$error');
       phase = ReceivePhase.failed;
     }
     notifyListeners();
@@ -162,13 +350,11 @@ class ReceiveController extends ChangeNotifier {
       if (code.hasHotspot && canJoinHotspot) {
         await ensureHotspotPermissions();
         final info = await _hotspotService.join(code.ssid!, code.password);
-        hotspotNotice = info.note ?? 'Joined "${code.ssid}".';
+        hotspotNotice = info.note ?? _l10n.joinedHotspotNote(code.ssid ?? '');
       } else if (code.hasHotspot) {
         // Windows cannot join a hotspot on the user's behalf, so it falls back
         // to the system Wi-Fi menu and then finds the session by discovery.
-        hotspotNotice =
-            'Join "${code.ssid}" from your Wi-Fi menu. The session appears here '
-            'as soon as you are connected.';
+        hotspotNotice = _l10n.joinHotspotManuallyNote(code.ssid ?? '');
       }
 
       final host = code.host;
@@ -234,9 +420,7 @@ class ReceiveController extends ChangeNotifier {
       await _loadRecovery();
       phase = ReceivePhase.reviewing;
     } on SocketException {
-      errorMessage =
-          'Could not reach $ip:$port. Make sure both devices are on the same '
-          'hotspot.';
+      errorMessage = _l10n.couldNotReachAddress('$ip:$port');
       phase = ReceivePhase.failed;
       await client.dispose();
       _client = null;
@@ -317,8 +501,9 @@ class ReceiveController extends ChangeNotifier {
     _recovery ??= TransferRecovery(saveLocation);
     phase = ReceivePhase.transferring;
     await _foreground.start(
-      title: 'Receiving files',
-      text: '${selectedIds.length} file${selectedIds.length == 1 ? '' : 's'} · ${formatBytes(totalBytes)}',
+      title: _l10n.receivingFilesTitle,
+      text:
+          '${_l10n.fileCount(selectedIds.length)} · ${formatBytes(totalBytes)}',
     );
     notifyListeners();
 
@@ -334,7 +519,7 @@ class ReceiveController extends ChangeNotifier {
       // The client already reported a specific message via events.
       if (phase != ReceivePhase.completed) {
         phase = ReceivePhase.failed;
-        errorMessage ??= 'The transfer did not finish.';
+        errorMessage ??= _l10n.transferDidNotFinish;
       }
       notifyListeners();
     } finally {
@@ -468,8 +653,8 @@ class ReceiveController extends ChangeNotifier {
       _lastSampleBytes = receivedBytes;
       phase = ReceivePhase.transferring;
       await _foreground.start(
-        title: 'Retrying transfer',
-        text: '${retryIds.length} file${retryIds.length == 1 ? '' : 's'} failed earlier',
+        title: _l10n.retryingTransferTitle,
+        text: _l10n.retryFailedFiles(retryIds.length),
       );
       notifyListeners();
       await client.receive(
@@ -479,8 +664,7 @@ class ReceiveController extends ChangeNotifier {
         baseBytes: doneBytes,
       );
     } on SocketException {
-      errorMessage = 'Could not reach $host:$port. Make sure both devices are '
-          'on the same hotspot.';
+      errorMessage = _l10n.couldNotReachAddress('$host:$port');
       phase = ReceivePhase.failed;
     } on Object catch (error) {
       if (phase != ReceivePhase.completed) {
@@ -520,7 +704,10 @@ class ReceiveController extends ChangeNotifier {
     currentFileName = item.name;
     receivedBytes = bytes;
     unawaited(_foreground.update(
-      title: 'Receiving ${formatBytes(receivedBytes)} of ${formatBytes(totalBytes)}',
+      title: _l10n.receivingProgressTitle(
+        formatBytes(receivedBytes),
+        formatBytes(totalBytes),
+      ),
       text: currentFileName,
     ));
     _maybeSaveRecovery();
@@ -539,8 +726,9 @@ class ReceiveController extends ChangeNotifier {
     final elapsed = now.difference(last).inMilliseconds;
     if (elapsed < AppConstants.progressInterval.inMilliseconds) return;
     final instant = (receivedBytes - _lastSampleBytes) / (elapsed / 1000);
-    speedBytesPerSecond =
-        speedBytesPerSecond == 0 ? instant : speedBytesPerSecond * 0.7 + instant * 0.3;
+    speedBytesPerSecond = speedBytesPerSecond == 0
+        ? instant
+        : speedBytesPerSecond * 0.7 + instant * 0.3;
     _lastSampleAt = now;
     _lastSampleBytes = receivedBytes;
   }
@@ -632,7 +820,7 @@ class ReceiveController extends ChangeNotifier {
     final record = TransferRecord(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       direction: TransferDirection.receive,
-      peerName: manifest?.hostName ?? 'Nearby device',
+      peerName: manifest?.hostName ?? _l10n.nearbyDevice,
       peerPlatform: manifest?.hostPlatform,
       fileCount: files,
       bytes: bytes,
@@ -715,6 +903,9 @@ class ReceiveController extends ChangeNotifier {
   void dispose() {
     unawaited(_scanSubscription?.cancel());
     unawaited(_scanner.stop());
+    unawaited(_doorbell.stop());
+    unawaited(_responder.stop());
+    unawaited(_knocks.close());
     unawaited(_foreground.stop());
     unawaited(_saveRecovery());
     unawaited(_client?.dispose());

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/common.dart';
@@ -22,6 +23,7 @@ enum _MediaKind { all, image, video, audio }
 class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
   bool _loading = true;
   bool _sending = false;
+  bool _permissionDenied = false;
   String? _error;
   List<AssetPathEntity> _albums = const [];
   AssetPathEntity? _album;
@@ -48,6 +50,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _permissionDenied = false;
     });
     try {
       final permission = await PhotoManager.requestPermissionExtend();
@@ -55,8 +58,8 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
         if (!mounted) return;
         setState(() {
           _loading = false;
-          _error = 'Photo access is off. Allow it in system settings to browse '
-              'this device.';
+          _permissionDenied = true;
+          _error = AppLocalizations.of(context).mediaPermissionOff;
         });
         return;
       }
@@ -93,7 +96,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not read the media library: $error';
+        _error = AppLocalizations.of(context).mediaReadFailed('$error');
       });
     }
   }
@@ -118,7 +121,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Could not read that album: $error';
+        _error = AppLocalizations.of(context).albumReadFailed('$error');
       });
     }
   }
@@ -154,7 +157,9 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
     setState(() => _sending = false);
     if (files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Those items are not readable on this device.')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).mediaItemsUnreadable),
+        ),
       );
       return;
     }
@@ -164,6 +169,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final needle = _query.trim().toLowerCase();
     final visible = _assets
         .where((asset) =>
@@ -173,14 +179,14 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Media'),
+        title: Text(l10n.mediaTitle),
         actions: [
           if (_selected.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: AppSpacing.sm),
               child: Center(
                 child: Text(
-                  '${_selected.length} selected',
+                  l10n.selectedCount(_selected.length),
                   style: theme.textTheme.bodySmall,
                 ),
               ),
@@ -200,8 +206,8 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
               child: TextField(
                 onChanged: (value) => setState(() => _query = value),
                 decoration: InputDecoration(
-                  hintText: 'Search this album',
-               prefixIcon: Icon(AppIcons.search, size: 18),
+                  hintText: l10n.searchAlbum,
+                  prefixIcon: Icon(AppIcons.search, size: 18),
                   isDense: true,
                 ),
               ),
@@ -220,10 +226,10 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                       padding: const EdgeInsets.only(right: AppSpacing.xs),
                       child: ChoiceChip(
                         label: Text(switch (kind) {
-                          _MediaKind.all => 'All',
-                          _MediaKind.image => 'Photos',
-                          _MediaKind.video => 'Videos',
-                          _MediaKind.audio => 'Audio',
+                          _MediaKind.all => l10n.allFilter,
+                          _MediaKind.image => l10n.photosFilter,
+                          _MediaKind.video => l10n.videos,
+                          _MediaKind.audio => l10n.audioLabel,
                         }),
                         selected: _kind == kind,
                         onSelected: (_) => _changeKind(kind),
@@ -240,7 +246,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                 child: DropdownButton<String>(
                   isExpanded: true,
                   value: _album?.id,
-                  hint: const Text('Album'),
+                  hint: Text(l10n.albumLabel),
                   items: [
                     for (final album in _albums)
                       DropdownMenuItem<String>(
@@ -273,8 +279,8 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                           : Icon(AppIcons.send, size: 17),
                       label: Text(
                         _sending
-                            ? 'Preparing…'
-                            : 'Send ${_selected.length} item${_selected.length == 1 ? '' : 's'}',
+                            ? l10n.preparing
+                            : l10n.sendItems(_selected.length),
                       ),
                     ),
                   ),
@@ -287,32 +293,33 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
   }
 
   Widget _body(ThemeData theme, List<AssetEntity> assets) {
+    final l10n = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
       return EmptyState(
         icon: AppIcons.image,
-        title: 'Media unavailable',
+        title: l10n.mediaUnavailable,
         message: _error!,
         action: OutlinedButton.icon(
           onPressed: () {
-            if (_error!.startsWith('Photo access')) {
+            if (_permissionDenied) {
               PhotoManager.openSetting();
             } else {
               _load();
             }
           },
           icon: Icon(AppIcons.refresh, size: 17),
-          label: const Text('Try again'),
+          label: Text(l10n.tryAgain),
         ),
       );
     }
     if (assets.isEmpty) {
       return EmptyState(
         icon: AppIcons.image,
-        title: 'No media here',
-        message: 'Pick another album or choose files with the system picker.',
+        title: l10n.noMediaHere,
+        message: l10n.noMediaHint,
       );
     }
     return GridView.builder(
@@ -397,7 +404,9 @@ class _AssetTile extends StatelessWidget {
                   durationLabel,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: Colors.white,
-                    shadows: const [Shadow(color: Colors.black54, blurRadius: 4)],
+                    shadows: const [
+                      Shadow(color: Colors.black54, blurRadius: 4)
+                    ],
                   ),
                 ),
               ),
@@ -405,9 +414,7 @@ class _AssetTile extends StatelessWidget {
               top: 6,
               right: 6,
               child: Icon(
-                selected
-                    ? AppIcons.checkCircle
-                    : AppIcons.circle,
+                selected ? AppIcons.checkCircle : AppIcons.circle,
                 size: 20,
                 color: selected
                     ? theme.colorScheme.primary

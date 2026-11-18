@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -16,15 +17,16 @@ class PeerList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text('Receivers', style: theme.textTheme.titleSmall),
+            Text(l10n.receivers, style: theme.textTheme.titleSmall),
             const Spacer(),
             Text(
-              formatCount(peers.length, 'device'),
+              l10n.deviceCount(peers.length),
               style: theme.textTheme.bodySmall,
             ),
           ],
@@ -64,8 +66,7 @@ class PeerList extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: peer.progress,
                     minHeight: 4,
-                    backgroundColor:
-                        theme.colorScheme.surfaceContainerHigh,
+                    backgroundColor: theme.colorScheme.surfaceContainerHigh,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -73,9 +74,12 @@ class PeerList extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        '${formatBytes(peer.transferred)} of '
-                        '${formatBytes(peer.totalBytes)} · '
-                        '${peer.completedFiles}/${peer.selectedIds.length} files',
+                        l10n.peerProgress(
+                          formatBytes(peer.transferred),
+                          formatBytes(peer.totalBytes),
+                          '${peer.completedFiles}',
+                          '${peer.selectedIds.length}',
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall,
@@ -87,7 +91,7 @@ class PeerList extends StatelessWidget {
                 if (peer.currentFile != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Sending ${peer.currentFile}',
+                    l10n.sendingFile(peer.currentFile ?? ''),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -112,14 +116,14 @@ class _PeerState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final label = switch (peer.status) {
-      TransferStatus.done => 'Done',
-      TransferStatus.failed => 'Failed',
-      TransferStatus.active => peer.currentFile == null
-          ? 'Sending'
-          : 'Active',
-      TransferStatus.paused => 'Paused',
-      TransferStatus.pending => 'Connecting',
+      TransferStatus.done => l10n.done,
+      TransferStatus.failed => l10n.failedTag,
+      TransferStatus.active =>
+        peer.currentFile == null ? l10n.sendingTag : l10n.activeTag,
+      TransferStatus.paused => l10n.paused,
+      TransferStatus.pending => l10n.connectingTag,
     };
     final color = switch (peer.status) {
       TransferStatus.done => AppColors.success,

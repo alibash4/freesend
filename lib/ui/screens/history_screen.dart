@@ -61,7 +61,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final records = appState.history;
     final l10n = AppLocalizations.of(context);
 
-    final totalBytes = records.fold<int>(0, (sum, record) => sum + record.bytes);
+    final totalBytes =
+        records.fold<int>(0, (sum, record) => sum + record.bytes);
 
     return ListView(
       controller: _scrollController,
@@ -95,11 +96,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         if (records.isEmpty)
           Padding(
             padding: kPagePadding,
-             child: EmptyState(
-               icon: AppIcons.history,
-               title: l10n.noHistoryTitle,
-               message: l10n.noHistoryMessage,
-             ),
+            child: EmptyState(
+              icon: AppIcons.history,
+              title: l10n.noHistoryTitle,
+              message: l10n.noHistoryMessage,
+            ),
           )
         else
           Padding(
@@ -176,15 +177,14 @@ class _RecordCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      formatTimestamp(record.timestamp),
+                      formatTimestamp(record.timestamp, l10n),
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     if (!record.succeeded)
                       StatusPill(
-                        label: record.bytes > 0
-                            ? l10n.interrupted
-                            : l10n.failed,
+                        label:
+                            record.bytes > 0 ? l10n.interrupted : l10n.failed,
                         color: scheme.error,
                       ),
                   ],

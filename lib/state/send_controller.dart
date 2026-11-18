@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -13,7 +15,9 @@ import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_host.dart';
 import 'package:free_send/state/app_state.dart';
@@ -35,7 +39,12 @@ class SendController extends ChangeNotifier {
 
   final AppState appState;
   final HotspotService _hotspotService;
-  final SessionBroadcaster _broadcaster = SessionBroadcaster();
+
+  /// Strings for messages this controller produces; resolved at call time so
+  /// a locale change applies to the next message, not just the next rebuild.
+  AppLocalizations get _l10n => lookupAppLocalizations(appState.locale);
+  final SessionSeeker _seeker = SessionSeeker();
+  StreamSubscription<List<SeekCandidate>>? _candidateSub;
 
   final List<TransferItem> items = [];
 
@@ -44,6 +53,10 @@ class SendController extends ChangeNotifier {
 
   SendPhase phase = SendPhase.idle;
   HotspotInfo? hotspot;
+
+  /// The transport the next session will use.
+  ShareLink link = ShareLink.wifi;
+  String? _sessionAddress;
   String? errorMessage;
   String? peerName;
   String? peerPlatform;
@@ -68,26 +81,84 @@ class SendController extends ChangeNotifier {
 
   bool get canCreateHotspot => _hotspotService.canCreate;
 
+  /// The address a receiver should connect to for the running session.
+  String? get sessionAddress => _sessionAddress;
+
+  /// Picks the transport before a session starts. Ethernet skips the hotspot
+  /// and advertises the wired interface instead.
+  void setLink(ShareLink value) {
+    if (link == value) return;
+    link = value;
+    notifyListeners();
+  }
+
   /// The invitation the other device can scan. It only exists once the
   /// listener is up, and only carries a hotspot when this app created one:
   /// on Windows and macOS the session runs over a network the user picked, so
   /// the code just points at the address.
+  bool _disposed = false;
+
+  List<SeekCandidate> _candidates = const [];
+
+  /// Receivers that answered the sender's signal.
+  List<SeekCandidate> get candidates => _candidates;
+
+  set candidates(List<SeekCandidate> value) {
+    _candidates = value;
+    notifyListeners();
+  }
+
+  /// The entry the user picked from the send control.
+  SendMode mode = SendMode.nearby;
+
+  /// Receivers ticked in group mode.
+  final Set<String> selected = {};
+
+  void setMode(SendMode value) {
+    if (mode == value) return;
+    mode = value;
+    selected.clear();
+    notifyListeners();
+  }
+
+  void toggleSelected(String id) {
+    if (!selected.remove(id)) selected.add(id);
+    notifyListeners();
+  }
+
+  /// Asks every ticked receiver, one independent request each.
+  Future<void> knockSelected() async {
+    final targets = candidates
+        .where((candidate) => selected.contains(candidate.id))
+        .toList(growable: false);
+    await Future.wait(targets.map(knock));
+  }
+
+  /// Per-receiver consent state, keyed by [SeekCandidate.id].
+  final Map<String, AuthState> peerStates = {};
+
+  bool get isHunting => _seeker.isSeeking;
+
+  AuthState? stateOf(SeekCandidate candidate) => peerStates[candidate.id];
+
   PairingCode? get pairingCode {
-    final info = hotspot;
-    if (info == null || port <= 0) return null;
+    final address = sessionAddress;
+    if (address == null || port <= 0) return null;
     if (phase != SendPhase.waitingForPeer && phase != SendPhase.transferring) {
       return null;
     }
+    final info = hotspot;
     final code = PairingCode(
-      ssid: info.created ? info.ssid : null,
-      password: info.created ? info.password : null,
-      host: info.ip,
+      ssid: info != null && info.created ? info.ssid : null,
+      password: info != null && info.created ? info.password : null,
+      host: address,
       port: port,
       senderName: appState.deviceName,
       senderPlatform: PlatformEnv.label,
     );
     return code.isUsable ? code : null;
   }
+
   bool get isBusy =>
       phase == SendPhase.preparing ||
       phase == SendPhase.waitingForPeer ||
@@ -213,15 +284,28 @@ class SendController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await ensureHotspotPermissions();
-
-      hotspot = await _hotspotService.start(deviceName: appState.deviceName);
-      if (hotspot!.note != null) {
-        // Surfaced in the connection panel, not as an error.
-        debugPrint('FreeSend: ${hotspot!.note}');
+      late final String? bindAddress;
+      if (link == ShareLink.ethernet) {
+        // A cable needs no hotspot: the wired address is the one to advertise.
+        final wired = await wiredIpv4();
+        if (wired == null) {
+          _fail(_l10n.noWiredNetworkSend);
+          return;
+        }
+        bindAddress = wired;
+      } else {
+        // Nobody hosts on the sender's side: phones host whenever one is
+        // involved (R4) and desktop pairs share a network (R5). The sender
+        // advertises whatever address this device already has, and joins the
+        // receiver's hotspot when the user scans its code.
+        await ensureHotspotPermissions();
+        bindAddress = await localIpv4();
+        if (bindAddress == null) {
+          _fail(_l10n.noLocalAddressSend);
+          return;
+        }
       }
-
-      final bindAddress = hotspot?.ip ?? await localIpv4();
+      _sessionAddress = bindAddress;
       final host = TransferHost(
         items: items,
         deviceName: appState.deviceName,
@@ -239,29 +323,34 @@ class SendController extends ChangeNotifier {
       port = await host.start();
       _host = host;
       await _foreground.start(
-        title: 'Ready to share',
-        text: '${items.length} file${items.length == 1 ? '' : 's'} · waiting for a receiver',
+        title: _l10n.readyToShare,
+        text:
+            '${_l10n.fileCount(items.length)} · ${_l10n.waitingForReceiverNote}',
       );
 
-      await _broadcaster.start(
-        instanceId: appState.instanceId,
+      await _seeker.start(
+        ownInstanceId: appState.instanceId,
         deviceName: appState.deviceName,
         platform: PlatformEnv.label,
-        port: port,
-        fileCount: items.length,
-        totalBytes: totalBytes,
-        bindAddress: bindAddress,
       );
+      AppLog.info(
+        'send',
+        'session up on ${_sessionAddress ?? 'unknown'}:$port with '
+            '${items.length} files (${formatBytes(totalBytes)})',
+      );
+      _candidateSub ??= _seeker.candidates.listen((list) {
+        candidates = list;
+        notifyListeners();
+      });
 
       phase = SendPhase.waitingForPeer;
       notifyListeners();
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
-      _fail('Could not open the transfer listener. Allow FreeSend through the system '
-          'firewall on private networks, then try again (${error.message}).');
+      _fail(_l10n.listenerFailed(error.message));
     } on Object catch (error) {
-      _fail('Could not start sharing: $error');
+      _fail(_l10n.couldNotStartSharing(error));
     }
   }
 
@@ -337,7 +426,10 @@ class SendController extends ChangeNotifier {
     item.status = TransferStatus.active;
     sentBytes = items.fold<int>(0, (sum, entry) => sum + entry.transferred);
     unawaited(_foreground.update(
-      title: 'Sending ${formatBytes(sentBytes)} of ${formatBytes(totalBytes)}',
+      title: _l10n.sendingProgressTitle(
+        formatBytes(sentBytes),
+        formatBytes(totalBytes),
+      ),
       text: currentFileName,
     ));
     _sampleSpeed();
@@ -361,8 +453,9 @@ class SendController extends ChangeNotifier {
     final delta = sentBytes - _lastSampleBytes;
     final instant = delta / (elapsed / 1000);
     // Exponential smoothing keeps the number readable while it fluctuates.
-    speedBytesPerSecond =
-        speedBytesPerSecond == 0 ? instant : speedBytesPerSecond * 0.7 + instant * 0.3;
+    speedBytesPerSecond = speedBytesPerSecond == 0
+        ? instant
+        : speedBytesPerSecond * 0.7 + instant * 0.3;
     _lastSampleAt = now;
     _lastSampleBytes = sentBytes;
   }
@@ -438,7 +531,7 @@ class SendController extends ChangeNotifier {
     final record = TransferRecord(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       direction: TransferDirection.send,
-      peerName: peerName ?? 'Nearby device',
+      peerName: peerName ?? _l10n.nearbyDevice,
       peerPlatform: peerPlatform,
       fileCount: files,
       bytes: bytes,
@@ -455,9 +548,128 @@ class SendController extends ChangeNotifier {
     await appState.recordTransfer(record);
   }
 
+  /// Asks a receiver to accept. The receiver dials back our file server once
+  /// it agrees, so the transfer itself needs no further work here.
+  Future<void> knock(SeekCandidate candidate) async {
+    await _knock(
+      id: candidate.id,
+      ip: candidate.ip,
+      consentPort: candidate.consentPort,
+    );
+  }
+
+  /// Follows a scanned receiver code: joins the receiver's hotspot when the
+  /// code carries one, moves this session onto that link, then asks.
+  Future<void> knockScanned(PairingCode code) async {
+    final host = code.host;
+    if (host == null) return;
+    if (code.hasHotspot) {
+      final joined = await _joinReceiverHotspot(code);
+      if (!joined) return;
+    }
+    await knockAddress(host, code.port);
+  }
+
+  Future<bool> _joinReceiverHotspot(PairingCode code) async {
+    if (!_hotspotService.canJoin) {
+      errorMessage = _l10n.cannotJoinHotspot;
+      notifyListeners();
+      return false;
+    }
+    try {
+      await ensureHotspotPermissions();
+      final info = await _hotspotService.join(code.ssid!, code.password);
+      AppLog.info('hotspot', 'joined "${info.ssid}" (${info.ip})');
+      await _rebindSession();
+      return true;
+    } on HotspotException catch (error) {
+      AppLog.error(
+          'hotspot',
+          'could not join "${code.ssid}": '
+              '${error.message}');
+      errorMessage = error.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Moves the file server and the seeker onto the current interface after the
+  /// Wi-Fi changed, so the receiver can dial back on a reachable address.
+  Future<void> _rebindSession() async {
+    final address = await localIpv4();
+    if (address == null || address == _sessionAddress) return;
+    await _seeker.stop();
+    await _host?.dispose();
+    _host = null;
+    final host = TransferHost(
+      items: items,
+      deviceName: appState.deviceName,
+      instanceId: appState.instanceId,
+      identityStore: appState.store,
+      events: HostEvents(
+        onPeersChanged: _onPeersChanged,
+        onPeerFinished: _onPeerFinished,
+        onPeerError: _onPeerError,
+        onProgress: _onProgress,
+        onFinished: _onFinished,
+        onError: _onHostError,
+      ),
+    );
+    port = await host.start();
+    _host = host;
+    _sessionAddress = address;
+    await _seeker.start(
+      ownInstanceId: appState.instanceId,
+      deviceName: appState.deviceName,
+      platform: PlatformEnv.label,
+    );
+    AppLog.info('send', 're-bound the session on $address:$port');
+  }
+
+  /// Knocks a scanned address, whose QR carries the receiver's doorbell port.
+  Future<void> knockAddress(String host, int doorbellPort) async {
+    await _knock(
+        id: 'scanned@$host:$doorbellPort', ip: host, consentPort: doorbellPort);
+  }
+
+  Future<void> _knock({
+    required String id,
+    required String ip,
+    required int consentPort,
+  }) async {
+    if (phase != SendPhase.waitingForPeer) return;
+    final address = _sessionAddress;
+    if (address == null || port <= 0) return;
+    peerStates[id] = AuthState.pending;
+    notifyListeners();
+    AppLog.info('send', 'asking $ip:$consentPort');
+    final outcome = await KnockClient.send(
+      host: ip,
+      port: consentPort,
+      senderInstanceId: appState.instanceId,
+      senderName: appState.deviceName,
+      platform: PlatformEnv.label,
+      fileCount: items.length,
+      totalBytes: totalBytes,
+      fileServerHost: address,
+      fileServerPort: port,
+    );
+    peerStates[id] = switch (outcome) {
+      KnockOutcome.accepted => AuthState.accepted,
+      KnockOutcome.declined => AuthState.declined,
+      KnockOutcome.timedOut => AuthState.offline,
+    };
+    notifyListeners();
+  }
+
   Future<void> _teardown() async {
     await _foreground.stop();
-    await _broadcaster.stop();
+    await _candidateSub?.cancel();
+    _candidateSub = null;
+    await _seeker.stop();
+    candidates = const [];
+    peerStates.clear();
+    selected.clear();
     await _host?.dispose();
     _host = null;
     await _hotspotService.stop();
@@ -467,6 +679,7 @@ class SendController extends ChangeNotifier {
   Future<void> reset() async {
     await _teardown();
     hotspot = null;
+    _sessionAddress = null;
     peerName = null;
     peerPlatform = null;
     peerCount = 0;
@@ -490,7 +703,16 @@ class SendController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     unawaited(_teardown());
     super.dispose();
+  }
+
+  /// Teardown can finish after [dispose] returns, and the host notifies as it
+  /// closes; a late notification must not assert.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
   }
 }

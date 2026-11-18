@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 
 /// A host session visible on the local link.
@@ -113,11 +114,19 @@ class SessionScanner {
   List<DiscoveredSession> get current => _sessions.values.toList();
   bool get isScanning => _socket != null;
 
-  Future<bool> start({required String ownInstanceId}) async {
+  Future<bool> start({
+    required String ownInstanceId,
+    String? bindAddress,
+  }) async {
     if (_socket != null) return true;
+    // Binding to a specific interface keeps the listener on the link the user
+    // picked; anyIPv4 hears every interface.
+    final address = bindAddress == null
+        ? InternetAddress.anyIPv4
+        : InternetAddress.tryParse(bindAddress) ?? InternetAddress.anyIPv4;
     try {
       _socket = await RawDatagramSocket.bind(
-        InternetAddress.anyIPv4,
+        address,
         AppConstants.discoveryPort,
         reuseAddress: true,
         reusePort: true,
@@ -126,7 +135,7 @@ class SessionScanner {
       try {
         // reusePort is not supported everywhere; retry without it.
         _socket = await RawDatagramSocket.bind(
-          InternetAddress.anyIPv4,
+          address,
           AppConstants.discoveryPort,
           reuseAddress: true,
         );
@@ -201,5 +210,290 @@ class SessionScanner {
     _socket = null;
     _sessions.clear();
     _emit();
+  }
+}
+
+/// A receiver that answered a seeker's "I'm looking to send" packet.
+class SeekCandidate {
+  SeekCandidate({
+    required this.instanceId,
+    required this.deviceName,
+    required this.platform,
+    required this.ip,
+    required this.consentPort,
+    required this.lastSeen,
+  });
+
+  final String instanceId;
+  final String deviceName;
+  final String platform;
+  final String ip;
+
+  /// The receiver's doorbell port.
+  final int consentPort;
+  DateTime lastSeen;
+
+  /// Identity is the instance id: a device that answers on two
+  /// interfaces must still appear once.
+  String get id => instanceId;
+}
+
+/// Sender side of discovery.
+///
+/// Broadcasts an intent packet on the local link and collects the answers from
+/// receivers sitting in Receive. The sender binds an ephemeral port, so a
+/// device can be a sender and a receiver at the same time without fighting over
+/// the discovery port.
+class SessionSeeker {
+  RawDatagramSocket? _socket;
+  Timer? _timer;
+  Timer? _pruneTimer;
+  final Map<String, SeekCandidate> _candidates = {};
+  final StreamController<List<SeekCandidate>> _controller =
+      StreamController<List<SeekCandidate>>.broadcast();
+
+  Stream<List<SeekCandidate>> get candidates => _controller.stream;
+  List<SeekCandidate> get current => _candidates.values.toList();
+  bool get isSeeking => _socket != null;
+
+  /// How long a candidate stays on the radar without a fresh answer.
+  final Duration ttl;
+
+  int _discoveryPort = AppConstants.discoveryPort;
+
+  SessionSeeker({this.ttl = const Duration(seconds: 6)});
+
+  Future<bool> start({
+    required String ownInstanceId,
+    required String deviceName,
+    required String platform,
+    int? discoveryPort,
+  }) async {
+    if (_socket != null) return true;
+    _discoveryPort = discoveryPort ?? AppConstants.discoveryPort;
+    try {
+      _socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        0,
+        reuseAddress: true,
+        reusePort: true,
+      );
+    } on SocketException {
+      _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+    }
+    final socket = _socket!;
+    socket.broadcastEnabled = true;
+    socket.listen(
+      (event) {
+        if (event != RawSocketEvent.read) return;
+        final datagram = socket.receive();
+        if (datagram == null) return;
+        _handle(datagram, ownInstanceId);
+      },
+      onError: (_) {},
+    );
+    _payload = {
+      'app': 'free-send',
+      'v': AppConstants.protocolVersion,
+      'kind': 'seek',
+      'id': ownInstanceId,
+      'name': deviceName,
+      'pf': platform,
+    };
+    AppLog.info('seeker', 'seeking as "$deviceName" on port $_discoveryPort');
+    _send();
+    _timer = Timer.periodic(AppConstants.beaconInterval, (_) => _send());
+    _pruneTimer = Timer.periodic(const Duration(seconds: 2), (_) => _prune());
+    return true;
+  }
+
+  Map<String, Object?> _payload = const {};
+
+  void _send() {
+    final socket = _socket;
+    if (socket == null) return;
+    final data = utf8.encode(jsonEncode(_payload));
+    // Loopback is included so the mechanism works when both roles run on one
+    // machine; on real hardware it only reaches the device itself, which
+    // ignores its own packets. Each target is independent: an unreachable
+    // broadcast address must not stop the others.
+    for (final target in const [
+      '255.255.255.255',
+      '192.168.43.255',
+      '192.168.49.255',
+      '10.42.0.255',
+      '127.0.0.1',
+    ]) {
+      try {
+        socket.send(data, InternetAddress(target), _discoveryPort);
+      } on Object {
+        // Transient network errors are expected while a hotspot settles.
+      }
+    }
+  }
+
+  void _handle(Datagram datagram, String ownInstanceId) {
+    try {
+      final decoded = jsonDecode(utf8.decode(datagram.data));
+      if (decoded is! Map<String, Object?>) return;
+      if (decoded['app'] != 'free-send') return;
+      if (decoded['kind'] != 'presence') return;
+      final id = decoded['id'] as String?;
+      final port = (decoded['port'] as num?)?.toInt();
+      if (id == null || port == null || id == ownInstanceId) return;
+      final candidate = SeekCandidate(
+        instanceId: id,
+        deviceName: (decoded['name'] as String?) ?? 'Nearby device',
+        platform: (decoded['pf'] as String?) ?? 'unknown',
+        ip: datagram.address.address,
+        consentPort: port,
+        lastSeen: DateTime.now(),
+      );
+      final existing = _candidates[candidate.id];
+      if (existing != null) {
+        // Keep the first address we saw rather than flapping between
+        // interfaces.
+        existing.lastSeen = candidate.lastSeen;
+      } else {
+        _candidates[candidate.id] = candidate;
+        AppLog.info(
+          'seeker',
+          'found ${candidate.deviceName} (${candidate.platform}) at '
+          '${candidate.ip}:${candidate.consentPort}',
+        );
+      }
+      _emit();
+    } on Object {
+      // Ignore malformed packets from unrelated broadcast traffic.
+    }
+  }
+
+  void _prune() {
+    final cutoff = DateTime.now().subtract(ttl);
+    final stale = _candidates.entries
+        .where((entry) => entry.value.lastSeen.isBefore(cutoff))
+        .map((entry) => entry.key)
+        .toList();
+    if (stale.isEmpty) return;
+    for (final key in stale) {
+      final lost = _candidates.remove(key);
+      if (lost != null) {
+        AppLog.debug('seeker', 'dropped ${lost.deviceName} (no answer)');
+      }
+    }
+    _emit();
+  }
+
+  void _emit() {
+    if (_controller.isClosed) return;
+    final list = _candidates.values.toList()
+      ..sort((a, b) => b.lastSeen.compareTo(a.lastSeen));
+    _controller.add(list);
+  }
+
+  Future<void> stop() async {
+    _timer?.cancel();
+    _timer = null;
+    _pruneTimer?.cancel();
+    _pruneTimer = null;
+    _socket?.close();
+    _socket = null;
+    _candidates.clear();
+    _emit();
+    AppLog.info('seeker', 'stopped');
+  }
+}
+
+/// Receiver side of discovery: answers a seeker once it is sitting in Receive.
+class PresenceResponder {
+  RawDatagramSocket? _socket;
+  final Map<String, DateTime> _lastReply = {};
+
+  bool get isListening => _socket != null;
+
+  Future<bool> start({
+    required String ownInstanceId,
+    required String deviceName,
+    required String platform,
+    required int consentPort,
+    int? discoveryPort,
+  }) async {
+    if (_socket != null) return true;
+    final port = discoveryPort ?? AppConstants.discoveryPort;
+    try {
+      _socket = await RawDatagramSocket.bind(
+        InternetAddress.anyIPv4,
+        port,
+        reuseAddress: true,
+        reusePort: true,
+      );
+    } on SocketException {
+      try {
+        _socket = await RawDatagramSocket.bind(
+          InternetAddress.anyIPv4,
+          port,
+          reuseAddress: true,
+        );
+      } on SocketException {
+        _socket = null;
+        return false;
+      }
+    }
+    _payload = {
+      'app': 'free-send',
+      'v': AppConstants.protocolVersion,
+      'kind': 'presence',
+      'id': ownInstanceId,
+      'name': deviceName,
+      'pf': platform,
+      'port': consentPort,
+    };
+    _socket!.listen(
+      (event) {
+        if (event != RawSocketEvent.read) return;
+        final datagram = _socket!.receive();
+        if (datagram == null) return;
+        _handle(datagram, ownInstanceId);
+      },
+      onError: (_) {},
+    );
+    AppLog.info('responder', 'answering seekers as "$deviceName" '
+        '(doorbell :$consentPort)');
+    return true;
+  }
+
+  Map<String, Object?> _payload = const {};
+
+  /// Answers at most once per second per seeker, so a burst of intent packets
+  /// cannot turn into a reply storm.
+  void _handle(Datagram datagram, String ownInstanceId) {
+    try {
+      final decoded = jsonDecode(utf8.decode(datagram.data));
+      if (decoded is! Map<String, Object?>) return;
+      if (decoded['app'] != 'free-send') return;
+      if (decoded['kind'] != 'seek') return;
+      final seeker = decoded['id'] as String?;
+      if (seeker == null || seeker == ownInstanceId) return;
+      final now = DateTime.now();
+      final last = _lastReply[seeker];
+      if (last != null && now.difference(last) < const Duration(seconds: 1)) {
+        return;
+      }
+      _lastReply[seeker] = now;
+      AppLog.debug('responder', 'answered seeker $seeker');
+      _socket?.send(
+        utf8.encode(jsonEncode(_payload)),
+        datagram.address,
+        datagram.port,
+      );
+    } on Object {
+      // Ignore malformed packets.
+    }
+  }
+
+  Future<void> stop() async {
+    _socket?.close();
+    _socket = null;
+    _lastReply.clear();
   }
 }

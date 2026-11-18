@@ -14,6 +14,16 @@ abstract final class AppColors {
   static const ink = Color(0xFF1C1C1C);
   static const surfaceRaised = Color(0xFF242424);
 
+  /// The "black" dark variant: a softened near-black page with a real
+  /// elevation scale, friendlier on OLED than pure #000. Every surface step
+  /// sits below the old flat #242424 so cards and controls match the page.
+  static const blackPage = Color(0xFF121212);
+  static const blackLowest = Color(0xFF0A0A0A);
+  static const blackLow = Color(0xFF161616);
+  static const blackContainer = Color(0xFF1C1C1C);
+  static const blackHigh = Color(0xFF212121);
+  static const blackHighest = Color(0xFF282828);
+
   static const neutral0 = Color(0xFFFFFFFF);
   static const neutral50 = Color(0xFFFAFAFA);
   static const neutral100 = Color(0xFFF5F5F5);
@@ -36,7 +46,7 @@ abstract final class AppColors {
 
 abstract final class AppRadii {
   static const card = 18.0;
-  static const field = 12.0;
+  static const field = 10.0;
   static const pill = 999.0;
 }
 
@@ -46,6 +56,7 @@ abstract final class AppSpacing {
   static const md = 16.0;
   static const lg = 24.0;
   static const xl = 32.0;
+  static const xxl = 40.0;
 }
 
 abstract final class AppTypography {
@@ -54,7 +65,7 @@ abstract final class AppTypography {
   static const TextStyle pageTitle = TextStyle(
     fontFamily: 'Public Sans',
     fontFamilyFallback: ['Cairo'],
-    fontSize: 20,
+    fontSize: 24,
     height: 1.2,
     fontWeight: FontWeight.w500,
     letterSpacing: -0.2,
@@ -63,9 +74,9 @@ abstract final class AppTypography {
   static const TextStyle sectionTitle = TextStyle(
     fontFamily: 'Public Sans',
     fontFamilyFallback: ['Cairo'],
-    fontSize: 16,
+    fontSize: 14,
     height: 1.3,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w600,
     letterSpacing: -0.1,
   );
 

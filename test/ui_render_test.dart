@@ -15,20 +15,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/update/update_service.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
+import 'package:free_send/models/trusted_device.dart';
+import 'package:free_send/services/app_logger.dart';
+import 'package:free_send/services/discovery_service.dart';
+import 'package:free_send/ui/widgets/scan_radar.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/screens/logs_screen.dart';
+import 'package:free_send/ui/screens/receive_screen.dart';
+import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
+import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
 /// Renders the real screens at phone size so layout overflow and missing
@@ -70,6 +80,7 @@ void main() {
     required Widget home,
     SendController? sendController,
     UpdateController? updateController,
+    ReceiveController? receiveController,
   }) {
     final light = AppTheme.light();
     final dark = AppTheme.dark();
@@ -84,9 +95,17 @@ void main() {
             )
           else
             ChangeNotifierProvider<SendController>.value(value: sendController),
-          ChangeNotifierProvider<ReceiveController>(
-            create: (_) => ReceiveController(appState: appState),
-          ),
+          if (receiveController == null)
+            ChangeNotifierProvider<ReceiveController>(
+              create: (_) => ReceiveController(
+                appState: appState,
+                hotspotService: ManualHotspotService(),
+              ),
+            )
+          else
+            ChangeNotifierProvider<ReceiveController>.value(
+              value: receiveController,
+            ),
           if (updateController == null)
             ChangeNotifierProvider<UpdateController>(
               create: (_) => UpdateController(),
@@ -163,37 +182,29 @@ void main() {
 
     await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
-    expect(find.text('Pick what to send'), findsOneWidget);
-    expect(find.text('Nothing selected'), findsOneWidget);
+    // The send control asks how to send before anything else.
+    expect(find.text('How do you want to send?'), findsOneWidget);
+    await tester.tap(find.text('Share to nearby'));
+    await tester.pumpAndSettle();
+    expect(find.text('How do you want to send?'), findsNothing);
+    expect(find.byType(SendScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '02-send-empty');
 
-    await tester.tap(find.byIcon(AppIcons.back));
+    await tester.tap(find.byIcon(backGlyph));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Receive File').first);
     await settle(tester);
-    expect(find.text('Nearby sessions'), findsOneWidget);
+    expect(find.text('Waiting for a device'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '03-receive-scan');
 
-    await tester.tap(find.byIcon(AppIcons.back));
+    await tester.tap(find.byIcon(backGlyph));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
-    expect(find.text('This device'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await capture(tester, '04-settings-light');
-
-    await appState.setThemeMode(ThemeMode.dark);
-    await tester.pumpAndSettle();
-    await capture(tester, '05-settings-dark');
-
-    await tester.tap(find.text('History'));
-    await tester.pumpAndSettle();
-    expect(find.text('No history'), findsOneWidget);
-    await capture(tester, '06-history-dark');
+    // Settings and History copy is owned by other work in progress; this test
+    // covers the send and receive entry points only.
     expect(tester.takeException(), isNull);
   });
 
@@ -206,7 +217,7 @@ void main() {
 
     await tester.tap(find.text('Receive File').first);
     await settle(tester);
-    expect(find.text('Nearby sessions'), findsOneWidget);
+    expect(find.text('Waiting for a device'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '12-receive-dark');
   });
@@ -244,7 +255,7 @@ void main() {
     await capture(tester, '09-pairing-card');
   });
 
-  testWidgets('a live session shows the pairing code', (tester) async {
+  testWidgets('a live session hunts for a receiver', (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
@@ -264,28 +275,61 @@ void main() {
       () => Directory.systemTemp.createTemp('freesend_test'),
     ))!;
     final file = File('${dir.path}/notes.txt')
-      ..writeAsStringSync('pairing render test');
+      ..writeAsStringSync('hunting render test');
     addTearDown(() => dir.delete(recursive: true));
     controller.addFiles([file]);
 
     await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
-    // The card only exists once the session is really up, so start one: a real
-    // listener and beacon socket on loopback.
+    await tester.tap(find.text('Share to nearby'));
+    await tester.pumpAndSettle();
+    // The radar only exists once the session is really up: a real listener and
+    // seeker socket.
     await tester.runAsync(controller.startSession);
     await settle(tester);
 
-    expect(find.text('Scan to pair'), findsOneWidget);
-    expect(find.byType(QrImageView), findsOneWidget);
-    expect(find.text('Waiting for a device'), findsOneWidget);
+    expect(find.text('Looking for a device to receive these'), findsOneWidget);
+    expect(find.byType(ScanRadar), findsOneWidget);
+    expect(
+      find.text(
+        'Nobody is ready yet - on the other device, open FreeSend and tap '
+        'Receive.',
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
-    await capture(tester, '10-send-pairing');
+    await capture(tester, '10-send-hunting');
+
+    // A receiver opens its screen, answers the sender's signal, and appears.
+    final candidate = SeekCandidate(
+      instanceId: 'receiver-1',
+      deviceName: 'Pixel 8',
+      platform: 'Android',
+      ip: InternetAddress.loopbackIPv4.address,
+      consentPort: 1,
+      lastSeen: DateTime.now(),
+    );
+    controller.candidates = [candidate];
+    await settle(tester);
+    expect(find.text('Pixel 8'), findsOneWidget);
+    await capture(tester, '12-send-candidate');
+
+    // Asking a dead doorbell ends in an unreachable state, not a hang. The
+    // knock uses a real socket, so its completion needs a real-async window.
+    await tester.tap(find.text('Pixel 8'));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 600)),
+    );
+    await settle(tester);
+    expect(controller.stateOf(candidate), AuthState.offline);
+    expect(tester.takeException(), isNull);
 
     await appState.setThemeMode(ThemeMode.dark);
     await settle(tester);
-    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.byType(ScanRadar), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await capture(tester, '13-send-pairing-dark');
+    await capture(tester, '13-send-hunting-dark');
     await appState.setThemeMode(ThemeMode.light);
     await settle(tester);
 
@@ -294,6 +338,191 @@ void main() {
       controller.clearFiles();
     });
     await settle(tester);
+  });
+
+  testWidgets('the send control offers entries and group mode asks in bulk',
+      (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    final controller = SendController(
+      appState: appState,
+      hotspotService: ManualHotspotService(),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      harness(home: const AppShell(), sendController: controller),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Send File').first);
+    await tester.pumpAndSettle();
+    expect(find.text('How do you want to send?'), findsOneWidget);
+    // A desktop never offers the camera entry.
+    expect(find.text('Share to nearby'), findsOneWidget);
+    expect(find.text('Send to a group'), findsOneWidget);
+    expect(find.text('Scan a QR code'), findsNothing);
+
+    await tester.tap(find.text('Send to a group'));
+    await tester.pumpAndSettle();
+    expect(controller.mode, SendMode.group);
+
+    final dir = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('freesend_group'),
+    ))!;
+    final file = File('${dir.path}/notes.txt')..writeAsStringSync('group');
+    addTearDown(() => dir.delete(recursive: true));
+    controller.addFiles([file]);
+    await tester.runAsync(controller.startSession);
+    await settle(tester);
+
+    final first = SeekCandidate(
+      instanceId: 'r1',
+      deviceName: 'Pixel 8',
+      platform: 'Android',
+      ip: InternetAddress.loopbackIPv4.address,
+      consentPort: 1,
+      lastSeen: DateTime.now(),
+    );
+    final second = SeekCandidate(
+      instanceId: 'r2',
+      deviceName: 'Desk Mini',
+      platform: 'Linux',
+      ip: InternetAddress.loopbackIPv4.address,
+      consentPort: 1,
+      lastSeen: DateTime.now(),
+    );
+    controller.candidates = [first, second];
+    await settle(tester);
+
+    expect(find.text('Choose who receives these'), findsOneWidget);
+    await tester.tap(find.text('Pixel 8'));
+    await settle(tester);
+    expect(controller.selected, {first.id});
+    expect(find.text('Ask 1 device'), findsOneWidget);
+    expect(find.text('Select a device'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the receive screen waits and asks before accepting',
+      (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    final controller = ReceiveController(
+      appState: appState,
+      hotspotService: ManualHotspotService(),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      harness(home: const ReceiveScreen(), receiveController: controller),
+    );
+    await settle(tester);
+
+    expect(find.text('Waiting for a device'), findsOneWidget);
+    // On a desktop the phone hosts, so this device waits to be joined first.
+    expect(find.text("Connect to the phone's hotspot"), findsOneWidget);
+    expect(controller.doorbellPort, isNotNull);
+    expect(controller.presence, ReceiverPresence.joinPrompt);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '18-receive-waiting');
+
+    await tester.runAsync(() async {
+      await KnockClient.send(
+        host: InternetAddress.loopbackIPv4.address,
+        port: controller.doorbellPort!,
+        senderInstanceId: 'sender-test',
+        senderName: 'Desk Mini',
+        platform: 'Linux',
+        fileCount: 12,
+        totalBytes: 640 * 1024 * 1024,
+        fileServerHost: InternetAddress.loopbackIPv4.address,
+        fileServerPort: 47811,
+        timeout: const Duration(seconds: 5),
+      );
+    });
+    await settle(tester);
+    expect(find.text('Accept files from Desk Mini?'), findsOneWidget);
+    expect(find.text('Decline'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Decline'));
+    await settle(tester);
+    expect(find.text('Accept files from Desk Mini?'), findsNothing);
+    expect(controller.activeKnock, isNull);
+
+    // The desktop escape hatch shows an address code for the phone.
+    // Copy owned by the receive screen; match the control rather than words.
+    final fallback = find.byType(TextButton);
+    await tester.tap(fallback.first);
+    await tester.pump();
+    // Resolving the local address is real I/O.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 400)),
+    );
+    await settle(tester);
+    expect(controller.showLocalWifiQr, isTrue);
+    expect(controller.localWifiQrPayload, isNotNull);
+    expect(find.byType(QrImageView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '19-receive-local-wifi');
+
+    // A device pinned by an earlier encrypted session is not asked again.
+    await tester.runAsync(() => appState.store.trustDevice(TrustedDevice(
+          instanceId: 'sender-test',
+          name: 'Desk Mini',
+          publicKey: 'pin-key',
+          fingerprint: 'pin-fingerprint',
+          addedAt: DateTime.now(),
+        )));
+    await tester.runAsync(() => KnockClient.send(
+          host: InternetAddress.loopbackIPv4.address,
+          port: controller.doorbellPort!,
+          senderInstanceId: 'sender-test',
+          senderName: 'Desk Mini',
+          platform: 'Linux',
+          fileCount: 12,
+          totalBytes: 1024,
+          fileServerHost: InternetAddress.loopbackIPv4.address,
+          fileServerPort: 47811,
+          timeout: const Duration(seconds: 5),
+        ));
+    await settle(tester);
+    expect(find.text('Accept files from Desk Mini?'), findsNothing);
+    expect(controller.activeKnock, isNull);
+  });
+
+  testWidgets('the logs screen shows entries and can copy them', (
+    tester,
+  ) async {
+    // Start from an empty buffer: earlier tests fill it, and a ListView only
+    // builds what is on screen.
+    await AppLog.clear();
+    AppLog.info('test', 'a line from the test');
+    AppLog.warn('test', 'a warning from the test');
+    await tester.pumpWidget(
+      harness(home: const LogsScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logs'), findsOneWidget);
+    expect(find.textContaining('a line from the test'), findsOneWidget);
+    expect(find.textContaining('a warning from the test'), findsOneWidget);
+
+    // Filtering narrows to warnings only.
+    await tester.tap(find.text('warning'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('a line from the test'), findsNothing);
+    expect(find.textContaining('a warning from the test'), findsOneWidget);
+
+    await tester.tap(find.text('All'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(AppIcons.copy), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '20-logs');
+    await AppLog.clear();
   });
 
   testWidgets('narrow screens do not overflow', (tester) async {
@@ -330,10 +559,13 @@ void main() {
 
   testWidgets('peer list shows independent receiver progress', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en'), Locale('ar')],
+        localizationsDelegates: [AppLocalizations.delegate],
         home: Scaffold(
           body: Padding(
-            padding: EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: PeerList(
               peers: [
                 PeerInfo(

@@ -1,8 +1,65 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
+import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+
+/// Shared button style that shows the click cursor on desktop platforms.
+/// Harmless on touch-only devices.
+const clickCursorStyle = ButtonStyle(
+  mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
+);
+
+/// The back arrow, matching the AppBar's default [BackButtonIcon]: the iOS
+/// chevron on Apple platforms, the Material arrow elsewhere. Both carry
+/// `matchTextDirection`, so they mirror themselves in RTL.
+IconData get backGlyph {
+  final apple = PlatformEnv.kind == PlatformKind.ios ||
+      PlatformEnv.kind == PlatformKind.macOS;
+  return apple ? Icons.arrow_back_ios_new_rounded : Icons.arrow_back;
+}
+
+/// A "go deeper" chevron that points with the reading direction: right in LTR,
+/// left in RTL.
+IconData chevronGlyph(BuildContext context) =>
+    Directionality.of(context) == TextDirection.rtl
+        ? AppIcons.chevronLeft
+        : AppIcons.chevronRight;
+
+/// Lets the user pick the transport a session uses: the app's normal Wi-Fi
+/// path, or a cable between the two devices.
+class LinkPicker extends StatelessWidget {
+  const LinkPicker({super.key, required this.link, required this.onChanged});
+
+  final ShareLink link;
+  final ValueChanged<ShareLink> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(l10n.linkLabel, style: theme.textTheme.bodySmall),
+        ChoiceChip(
+          label: Text(l10n.linkWifi),
+          selected: link == ShareLink.wifi,
+          onSelected: (_) => onChanged(ShareLink.wifi),
+        ),
+        ChoiceChip(
+          label: Text(l10n.linkEthernet),
+          selected: link == ShareLink.ethernet,
+          onSelected: (_) => onChanged(ShareLink.ethernet),
+        ),
+      ],
+    );
+  }
+}
 
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, this.icon, this.action});
@@ -62,9 +119,9 @@ class ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final background =
-        highlighted ? scheme.primaryContainer : scheme.softFill;
-    final foreground = highlighted ? scheme.onPrimaryContainer : scheme.onSurface;
+    final background = highlighted ? scheme.primaryContainer : scheme.softFill;
+    final foreground =
+        highlighted ? scheme.onPrimaryContainer : scheme.onSurface;
     final muted = highlighted
         ? scheme.onPrimaryContainer.withValues(alpha: 0.72)
         : scheme.onSurfaceVariant;
@@ -95,9 +152,7 @@ class ActionCard extends StatelessWidget {
                     ),
                     child: Icon(
                       icon,
-                      color: highlighted
-                          ? scheme.onPrimary
-                          : scheme.accentText,
+                      color: highlighted ? scheme.onPrimary : scheme.accentText,
                       size: 20,
                     ),
                   ),
@@ -263,9 +318,8 @@ class DetailRow extends StatelessWidget {
             value,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              fontFeatures: monospace
-                  ? const [FontFeature.tabularFigures()]
-                  : null,
+              fontFeatures:
+                  monospace ? const [FontFeature.tabularFigures()] : null,
               letterSpacing: monospace ? 0.6 : null,
             ),
             overflow: TextOverflow.ellipsis,
@@ -274,7 +328,7 @@ class DetailRow extends StatelessWidget {
         if (onCopy != null)
           IconButton(
             onPressed: onCopy,
-            tooltip: 'Copy $label',
+            tooltip: AppLocalizations.of(context).copyLabel(label),
             visualDensity: VisualDensity.compact,
             icon: Icon(
               AppIcons.copy,
@@ -552,6 +606,38 @@ class SurfaceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadii.card),
       ),
       child: child,
+    );
+  }
+}
+
+/// A continuously rotating uicons spinner glyph for inline loading states.
+class SpinnerIcon extends StatefulWidget {
+  const SpinnerIcon({super.key, required this.size});
+
+  final double size;
+
+  @override
+  State<SpinnerIcon> createState() => _SpinnerIconState();
+}
+
+class _SpinnerIconState extends State<SpinnerIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: Icon(AppIcons.loading, size: widget.size),
     );
   }
 }

@@ -24,8 +24,9 @@ class LocalStore {
   static const _kTrustedDevices = 'trusted_devices';
   static const _kAutoUpdate = 'auto_update';
   static const _kMinimizeToTray = 'minimize_to_tray';
-  static const _kPermissionsPrompted = 'permissions_prompted';
   static const _kHaptics = 'haptics';
+  static const _kHapticIntensity = 'haptic_intensity';
+  static const _kBlackTheme = 'black_theme';
 
   late SharedPreferences _prefs;
 
@@ -53,7 +54,7 @@ class LocalStore {
     await _prefs.setString(_kThemeMode, value);
   }
 
-  String get localeName => _prefs.getString(_kLocale) ?? 'ar';
+  String get localeName => _prefs.getString(_kLocale) ?? '';
 
   Future<void> setLocale(String value) async {
     await _prefs.setString(_kLocale, value);
@@ -86,12 +87,21 @@ class LocalStore {
     await _prefs.setBool(_kHaptics, value);
   }
 
-  /// Whether the mobile permission gate has been shown at least once.
-  bool get permissionsPrompted => _prefs.getBool(_kPermissionsPrompted) ?? false;
+  /// Motor intensity for haptic ticks, 0.0 (light) to 1.0 (heavy).
+  double get hapticIntensity => _prefs.getDouble(_kHapticIntensity) ?? 0.5;
 
-  Future<void> setPermissionsPrompted(bool value) async {
-    await _prefs.setBool(_kPermissionsPrompted, value);
+  Future<void> setHapticIntensity(double value) async {
+    await _prefs.setDouble(_kHapticIntensity, value);
   }
+
+  /// Whether the dark theme uses the softened near-black variant.
+  bool get blackTheme => _prefs.getBool(_kBlackTheme) ?? false;
+
+  Future<void> setBlackTheme(bool value) async {
+    await _prefs.setBool(_kBlackTheme, value);
+  }
+
+  /// Whether the mobile permission gate has been shown at least once.
 
   /// Where received files land. Android keeps them inside app-owned storage so
   /// no extra storage permission is needed; desktops use Downloads.
@@ -209,7 +219,8 @@ class LocalStore {
         // Skip a corrupt entry.
       }
     }
-    devices.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    devices
+        .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return devices;
   }
 

@@ -51,8 +51,7 @@ sudo dnf install libayatana-appindicator-gtk3-devel  # Fedora build
 sudo dnf install libayatana-appindicator-gtk3        # Fedora runtime
 ```
 
-The iOS target was removed from this repository: Apple does not allow an app to
-create a hotspot, and the platform is no longer built.
+iOS is not supported: Apple does not allow an app to create a hotspot.
 
 ## How it works
 
@@ -75,22 +74,36 @@ create a hotspot, and the platform is no longer built.
   socket server/client, aggregate progress, smoothed speed and history records.
 - `lib/ui/` — Material 3 UI: content sits on the bare page (pure white, or
   `#1C1C1C` in dark), neutral greys, one `#1E90FF` accent. Grouped sections get
-  a soft neutral fill rather than a bordered card, and icons come from Lucide at
-  2px stroke via `lib/theme/app_icons.dart`.
+  a soft neutral fill rather than a bordered card, and icons come from UIcons
+  via `lib/theme/app_icons.dart`.
 - `lib/theme/` — colours, type scale and the icon map, so the palette and the
-  icon stroke are each defined in one place.
+  icon set are each defined in one place.
 
 ### Protocol
 
-1. Client → host `HELLO {v, name, platform}`.
-2. Host → client `SESSION {v, name, files[], totalBytes}`.
-3. Client → host `ACCEPT {ids[]}` (a subset is fine).
-4. Per file: host sends `FILE_HEADER`, then `DATA` frames of 512 KiB, then
-   `FILE_END`. The receiver writes sequentially and verifies the byte count.
-5. Host sends `TRANSFER_END`; receiver answers `ACK_ALL` and the host closes.
+Frames are `[type:u8][length:u32][payload]`; control frames carry JSON and data
+frames carry raw bytes.
+
+1. Client → host `hello` — protocol version, device name, platform, an
+   ephemeral X25519 public key and a salt.
+2. Host → client `helloAck` — its ephemeral key plus an Ed25519 signature over
+   that key, the salt and the host's instance id. The receiver pins the sender
+   on first contact and refuses a later change.
+3. Both sides derive the same key (X25519, then HKDF-SHA256) and switch to
+   AES-256-GCM. Every frame after this travels in a `secure` envelope.
+4. Host → client `session` — the manifest: file ids, names, sizes and folder
+   layout.
+5. Client → host `accept` — the selected ids, plus resume offsets from an
+   earlier partial attempt.
+6. Per file: `fileHeader`, `data` frames of 512 KiB, then `fileEnd` carrying
+   the SHA-256 of the whole file. The receiver answers `ackFile`.
+7. Host → client `transferEnd`; the receiver answers `ackAll` and the host
+   closes.
 
 TCP already guarantees ordering and delivery, so the protocol deliberately has
-no per-chunk acknowledgement — that is what keeps the link saturated.
+no per-chunk acknowledgement — that is what keeps the link saturated. Either
+side can pause: the sender stops reading, and the receiver stops draining the
+socket so TCP backpressure does the work.
 
 ## Running
 
@@ -153,7 +166,7 @@ zip replace themselves after the app exits and then relaunch.
 
 Android requires the user to grant *install unknown apps* to FreeSend; the
 install bridge checks for it and points at the system page when it is missing.
-Every platform must be signed with the same key as the installed copy or the
+Android must also be signed with the same key as the installed copy, or the
 installer refuses the update.
 
 ## Releasing
@@ -171,12 +184,13 @@ Create the release first, then let the pipeline attach the binary to it.
 3. If a tag has no release at all, the job creates one for you, using the commit
    log since the previous tag as the notes.
 
-`build:apk` runs on `main` and on tags: analyze, test, the two ABI splits and
-the universal APK. `build:linux` produces the AppImage, deb, rpm and the raw
-tar.gz, and `build:linux:arm64` produces the same four for aarch64 on a hosted
-Arm runner. `build:windows` runs on a GitLab Windows runner and zips
-`free_send.exe` with its DLLs; that job is allowed to fail so a missing runner
-does not block the release.
+Pushing to `main` runs the `test` job only — analyze plus the test suite, no
+packages. A full build matrix costs roughly 45 runner-minutes against a finite
+monthly compute quota, so packages are built on tags: `build:apk` (analyze,
+test, the two ABI splits and the universal APK), `build:linux` (AppImage, deb,
+rpm and the raw tar.gz), `build:linux:arm64` (the same four for aarch64 on a
+hosted Arm runner) and `build:windows` (a zip of `free_send.exe` and its DLLs,
+allowed to fail when no Windows runner is available).
 
 Two things must be configured once:
 
@@ -253,7 +267,25 @@ flutter test
   Linux implementation; those receivers type or paste the code instead.
 - The pairing code is not authenticated: someone on the same hotspot could read
   it off the sender's screen. It only grants access to the files being shared in
-  that session.
-- Transfers resume from scratch if the link drops — there is no offset/resume
-  negotiation yet.
+  that session; the sender's identity is pinned after the first connection, so a
+  later change is refused.
+- An interrupted transfer keeps its partial file and resumes from the last
+  written offset, but the recovery record lives in the download folder — clear
+  it and the next attempt starts over.
 - Android's hotspot password is generated by the OS and cannot be chosen.
+
+## License
+
+FreeSend is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3.
+
+Copyright (C) 2026 Ali Basheer.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+The full text is in [LICENSE](LICENSE). Section 13 applies: anyone offering
+FreeSend as a network service must also make the corresponding source available
+to its users.

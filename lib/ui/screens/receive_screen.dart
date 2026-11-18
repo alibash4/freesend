@@ -1,20 +1,27 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
-import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/core/format.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
-import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
+import 'package:free_send/services/permissions/transfer_setup.dart';
+import 'package:free_send/ui/screens/setup_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
@@ -32,8 +39,14 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     animationFactory: const ChromiumEaseInOut(),
   );
 
+  /// Null while the grant check is in flight. False opens the setup screen.
+  bool? _setupReady;
+
+  StreamSubscription<Knock>? _knocks;
+
   @override
   void dispose() {
+    unawaited(_knocks?.cancel());
     _scrollController.dispose();
     super.dispose();
   }
@@ -41,12 +54,84 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final controller = context.read<ReceiveController>();
-      if (controller.phase == ReceivePhase.idle) {
-        controller.startScanning();
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _enter());
+  }
+
+  Future<void> _enter() async {
+    final ready = !TransferSetup.applies || await TransferSetup.isReady;
+    if (!mounted) return;
+    setState(() => _setupReady = ready);
+    if (!ready) return;
+    _beginWaiting();
+    final controller = context.read<ReceiveController>();
+    _knocks = controller.knocks.listen(_showKnockDialog);
+  }
+
+  /// The receiver waits; it does not hunt. The sender's signal finds it.
+  void _beginWaiting() {
+    final controller = context.read<ReceiveController>();
+    if (controller.phase == ReceivePhase.idle) {
+      // A phone hosts whenever one is involved (R3/R4), so an Android
+      // receiver brings its link up straight away.
+      controller.startWaiting(
+        host: PlatformEnv.kind == PlatformKind.android,
+      );
+    }
+  }
+
+  Future<void> _showKnockDialog(Knock knock) async {
+    final controller = context.read<ReceiveController>();
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.knockAcceptTitle(knock.senderName)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${l10n.fileCount(knock.fileCount)} · '
+              '${formatBytes(knock.totalBytes)}',
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              l10n.knockNote,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Navigator.of(context).pop(false);
+            },
+            child: Text(l10n.decline),
+          ),
+          FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Navigator.of(context).pop(true);
+            },
+            child: Text(l10n.accept),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    await controller.answerKnock(confirmed ?? false);
+  }
+
+  void _leave() {
+    if (widget.onBack != null) {
+      widget.onBack!();
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _openJoinSheet(ReceiveController controller) async {
@@ -85,8 +170,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('That is not a FreeSend pairing code.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).invalidPairingCode),
           ),
         );
       return;
@@ -103,16 +188,27 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     if (target == null) return;
     final parts = target.split(':');
     final host = parts.first.trim();
-    final port = parts.length > 1
-        ? int.tryParse(parts[1].trim()) ?? 47811
-        : 47811;
+    final port =
+        parts.length > 1 ? int.tryParse(parts[1].trim()) ?? 47811 : 47811;
     await controller.connectToAddress(host, port);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_setupReady != true) {
+      if (_setupReady == false) {
+        return SetupScreen(
+          title: AppLocalizations.of(context).setupBeforeReceive,
+          onLeave: _leave,
+          onReady: () {
+            setState(() => _setupReady = true);
+            _beginWaiting();
+          },
+        );
+      }
+      return Scaffold(backgroundColor: Theme.of(context).colorScheme.surface);
+    }
     final controller = context.watch<ReceiveController>();
-    final l10n = AppLocalizations.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -120,86 +216,77 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(l10n.receiveTitle),
           leading: IconButton(
-            icon: Icon(AppIcons.back),
-            onPressed: () => widget.onBack?.call(),
+            icon: Icon(backGlyph),
+            mouseCursor: SystemMouseCursors.click,
+            onPressed: () {
+              context.read<AppState>().tick();
+              widget.onBack?.call();
+            },
           ),
-        actions: [
-          if (ScanScreen.isSupported &&
-              (controller.phase == ReceivePhase.idle ||
-                  controller.phase == ReceivePhase.scanning))
-            IconButton(
-              tooltip: l10n.scanPairingCode,
-              onPressed: () => _openScanner(controller),
-              icon: Icon(AppIcons.scan),
-            ),
-          if (controller.phase == ReceivePhase.scanning)
-            IconButton(
-              tooltip: l10n.rescan,
-              onPressed: controller.startScanning,
-              icon: Icon(AppIcons.refresh),
-            ),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-          children: [
-            Padding(
-              padding: kPagePadding,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: switch (controller.phase) {
-                  ReceivePhase.idle ||
-                  ReceivePhase.scanning ||
-                  ReceivePhase.joining =>
-                    _ScanView(
-                      key: const ValueKey('scan'),
-                      controller: controller,
-                      onJoin: () => _openJoinSheet(controller),
-                      onManual: () => _openManualConnect(controller),
-                      onScan: () => _openScanner(controller),
-                      onPaste: () => _enterCode(controller),
-                    ),
-                  ReceivePhase.reviewing => _ReviewView(
-                      key: const ValueKey('review'),
-                      controller: controller,
-                    ),
-                  ReceivePhase.transferring => _ProgressView(
-                      key: const ValueKey('progress'),
-                      controller: controller,
-                    ),
-                  ReceivePhase.completed => _DoneView(
-                      key: const ValueKey('done'),
-                      controller: controller,
-                      onDone: () async {
-                        await controller.reset();
-                        if (context.mounted) Navigator.of(context).pop();
-                      },
-                    ),
-                  ReceivePhase.failed || ReceivePhase.cancelled => _ErrorView(
-                      key: const ValueKey('error'),
-                      controller: controller,
-                      onRetry: () async {
-                        await controller.reset();
-                        if (context.mounted) await controller.startScanning();
-                      },
-                    ),
-                },
+        ),
+        body: SafeArea(
+          child: ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+            children: [
+              Padding(
+                padding: kPagePadding,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: switch (controller.phase) {
+                    ReceivePhase.idle ||
+                    ReceivePhase.scanning ||
+                    ReceivePhase.joining =>
+                      _WaitingView(
+                        key: const ValueKey('scan'),
+                        controller: controller,
+                        onJoin: () => _openJoinSheet(controller),
+                        onManual: () => _openManualConnect(controller),
+                        onScan: () => _openScanner(controller),
+                        onPaste: () => _enterCode(controller),
+                      ),
+                    ReceivePhase.reviewing => _ReviewView(
+                        key: const ValueKey('review'),
+                        controller: controller,
+                      ),
+                    ReceivePhase.transferring => _ProgressView(
+                        key: const ValueKey('progress'),
+                        controller: controller,
+                      ),
+                    ReceivePhase.completed => _DoneView(
+                        key: const ValueKey('done'),
+                        controller: controller,
+                        onDone: () async {
+                          await controller.reset();
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                      ),
+                    ReceivePhase.failed || ReceivePhase.cancelled => _ErrorView(
+                        key: const ValueKey('error'),
+                        controller: controller,
+                        onRetry: () async {
+                          await controller.reset();
+                          if (context.mounted) {
+                            await controller.startWaiting(
+                              host: PlatformEnv.kind == PlatformKind.android,
+                            );
+                          }
+                        },
+                      ),
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 
-class _ScanView extends StatelessWidget {
-  const _ScanView({
+class _WaitingView extends StatelessWidget {
+  const _WaitingView({
     super.key,
     required this.controller,
     required this.onJoin,
@@ -218,17 +305,13 @@ class _ScanView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    final sessions = controller.sessions;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(
-              child: Text(
-                l10n.nearbySessions,
-                style: theme.textTheme.headlineSmall,
-              ),
+              child: AppPageTitle(l10n.waitingForDevice),
             ),
             if (controller.phase == ReceivePhase.joining)
               const SizedBox(
@@ -242,9 +325,7 @@ class _ScanView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          controller.isScanning
-              ? l10n.listeningHotspot
-              : l10n.scanningPaused,
+          controller.isWaiting ? l10n.waitingHintOpen : l10n.waitingHintReady,
           style: theme.textTheme.bodySmall,
         ),
         if (controller.hotspotNotice != null) ...[
@@ -287,192 +368,337 @@ class _ScanView extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
-        if (sessions.isEmpty)
-          EmptyState(
-            icon: AppIcons.radar,
-            title: 'No sessions found',
-            message: 'Scan the pairing code shown on the sending device — it '
-                'joins the hotspot and connects for you.',
-            action: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: ScanScreen.isSupported ? onScan : onPaste,
-                    icon: Icon(
-                      ScanScreen.isSupported
-                          ? AppIcons.scan
-                          : AppIcons.paste,
-                      size: 17,
-                    ),
-                    label: Text(
-                      ScanScreen.isSupported ? 'Scan code' : 'Enter code',
-                    ),
-                  ),
-                ),
-                if (ScanScreen.isSupported) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: onPaste,
-                      icon: Icon(AppIcons.paste, size: 16),
-                      label: const Text('Enter code'),
-                    ),
-                  ),
-                ],
-                if (PlatformEnv.canJoinHotspot) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  TextButton.icon(
-                    onPressed: onJoin,
-                    icon: Icon(AppIcons.wifi, size: 16),
-                    label: const Text('Join a hotspot'),
-                  ),
-                ],
-              ],
+        switch (controller.presence) {
+          ReceiverPresence.qr => _QrPanel(
+              payload: controller.waitingQrPayload ?? '',
             ),
-          )
-        else
-          Column(
-            children: [
-              for (final session in sessions) ...[
-                _SessionCard(
-                  session: session,
-                  onTap: () => controller.connectToSession(session),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-          ],
-        ),
-        if (controller.canResume) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Icon(
-                AppIcons.history,
-                size: 14,
-                color: theme.colorScheme.accentText,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Partial files resume where they stopped '
-                  '(${formatBytes(controller.resumedBytes)})',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.accentText,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ReceiverPresence.noCamera => const _NoCameraPanel(),
+          ReceiverPresence.joinPrompt => _JoinPromptPanel(
+              controller: controller,
+              onJoin: onJoin,
+            ),
+          ReceiverPresence.idle => const SizedBox.shrink(),
+        },
         const SizedBox(height: AppSpacing.lg),
-        if (PlatformEnv.canJoinHotspot && sessions.isNotEmpty) ...[
-          OutlinedButton.icon(
-            onPressed: onJoin,
-            icon: Icon(AppIcons.wifi, size: 17),
-            label: const Text('Join another hotspot'),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-        ],
-        if (sessions.isNotEmpty)
-          Wrap(
-            spacing: AppSpacing.sm,
-            children: [
-              TextButton.icon(
-                onPressed: ScanScreen.isSupported ? onScan : null,
-                icon: Icon(AppIcons.scan, size: 16),
-                label: const Text('Scan code'),
-              ),
-              TextButton.icon(
-                onPressed: onPaste,
-                icon: Icon(AppIcons.paste, size: 16),
-                label: const Text('Enter code'),
-              ),
-              TextButton.icon(
-                onPressed: onManual,
-                icon: Icon(AppIcons.address, size: 16),
-                label: const Text('Connect by address'),
-              ),
-            ],
-          )
-        else
-          TextButton.icon(
-            onPressed: onManual,
-            icon: Icon(AppIcons.address, size: 16),
-            label: const Text('Connect by address'),
-          ),
+        _OtherWaysToConnect(
+          controller: controller,
+          onScan: onScan,
+          onPaste: onPaste,
+          onManual: onManual,
+        ),
       ],
     );
   }
 }
 
-class _SessionCard extends StatelessWidget {
-  const _SessionCard({required this.session, required this.onTap});
+/// The escape hatches, folded away so the waiting state stays the anchor.
+/// Each row names the action and says when to use it.
+class _OtherWaysToConnect extends StatelessWidget {
+  const _OtherWaysToConnect({
+    required this.controller,
+    required this.onScan,
+    required this.onPaste,
+    required this.onManual,
+  });
 
-  final DiscoveredSession session;
+  final ReceiveController controller;
+  final VoidCallback onScan;
+  final VoidCallback onPaste;
+  final VoidCallback onManual;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final scheme = theme.colorScheme;
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: Icon(
+          AppIcons.link,
+          size: 18,
+          color: scheme.onSurfaceVariant,
+        ),
+        title: Text(
+          l10n.otherWaysTitle,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          l10n.otherWaysSubtitle,
+          style: theme.textTheme.bodySmall,
+        ),
+        children: [
+          if (ScanScreen.isSupported)
+            _ConnectOption(
+              icon: AppIcons.scan,
+              title: l10n.scanPairingCode,
+              subtitle: l10n.scanPairingCodeHint,
+              onTap: () {
+                controller.appState.tick();
+                onScan();
+              },
+            ),
+          _ConnectOption(
+            icon: AppIcons.paste,
+            title: l10n.enterPairingCode,
+            subtitle: l10n.enterPairingCodeHint,
+            onTap: () {
+              controller.appState.tick();
+              onPaste();
+            },
+          ),
+          _ConnectOption(
+            icon: AppIcons.address,
+            title: l10n.connectByAddress,
+            subtitle: l10n.connectByAddressHint,
+            onTap: () {
+              controller.appState.tick();
+              onManual();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One self-explaining row inside "Other ways to connect".
+class _ConnectOption extends StatelessWidget {
+  const _ConnectOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.softFill,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      clipBehavior: Clip.antiAlias,
+    final scheme = theme.colorScheme;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
           child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(
-                  AppIcons.device,
-                  size: 18,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
+              Icon(icon, size: 18, color: scheme.onSurfaceVariant),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      session.deviceName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      title,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${formatCount(session.fileCount, 'file')} · '
-                      '${formatBytes(session.totalBytes)} · ${session.ip}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
               Icon(
-                AppIcons.chevronRight,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
+                chevronGlyph(context),
+                size: 16,
+                color: scheme.onSurfaceVariant,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The receiver is the target: it shows the code instead of hunting for one.
+class _QrPanel extends StatelessWidget {
+  const _QrPanel({required this.payload});
+
+  final String payload;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.neutral0,
+              borderRadius: BorderRadius.circular(AppRadii.field),
+            ),
+            child: QrImageView(
+              data: payload,
+              size: 172,
+              padding: EdgeInsets.zero,
+              backgroundColor: AppColors.neutral0,
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: AppColors.ink,
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: AppColors.ink,
+              ),
+              semanticsLabel: l10n.qrCodeSemantics,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.qrScanTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            l10n.qrScanHint,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          TextButton.icon(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Clipboard.setData(ClipboardData(text: payload));
+            },
+            icon: Icon(AppIcons.copy, size: 16),
+            label: Text(l10n.copyCode),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoCameraPanel extends StatelessWidget {
+  const _NoCameraPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    return SurfaceCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            AppIcons.info,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              l10n.noCameraBody,
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _JoinPromptPanel extends StatelessWidget {
+  const _JoinPromptPanel({required this.controller, required this.onJoin});
+
+  final ReceiveController controller;
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                AppIcons.wifi,
+                size: 18,
+                color: theme.colorScheme.accentText,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  l10n.joinHotspotPromptTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            l10n.joinHotspotPromptBody,
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              controller.appState.tick();
+              onJoin();
+            },
+            child: Text(l10n.joinHotspot),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                controller.appState.tick();
+                controller.toggleLocalWifiQr();
+              },
+              icon: Icon(
+                controller.showLocalWifiQr ? AppIcons.wifi : AppIcons.link,
+                size: 16,
+              ),
+              label: Text(
+                controller.showLocalWifiQr
+                    ? l10n.backToHotspot
+                    : l10n.sameWifiShowCode,
+              ),
+            ),
+          ),
+          if (controller.showLocalWifiQr) ...[
+            const SizedBox(height: AppSpacing.sm),
+            if (controller.localWifiQrPayload == null)
+              Text(
+                l10n.noLocalAddressBody,
+                style: theme.textTheme.bodySmall,
+              )
+            else
+              _QrPanel(payload: controller.localWifiQrPayload!),
+          ],
+        ],
       ),
     );
   }
@@ -486,111 +712,157 @@ class _ReviewView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final manifest = controller.manifest!;
     final selectedCount = controller.selectedIds.length;
-    final allSelected = selectedCount == manifest.items.length && selectedCount > 0;
+    final allSelected =
+        selectedCount == manifest.items.length && selectedCount > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(manifest.hostName, style: theme.textTheme.headlineSmall),
+        AppPageTitle(manifest.hostName),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Offering ${formatCount(manifest.items.length, 'file')} · '
-          '${formatBytes(manifest.totalBytes)}',
+          l10n.offeringSummary(
+            l10n.fileCount(manifest.items.length),
+            formatBytes(manifest.totalBytes),
+          ),
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Text('Choose what to receive', style: theme.textTheme.titleMedium),
-            const Spacer(),
-            TextButton(
-              onPressed: () => controller.selectAll(value: !allSelected),
-              child: Text(allSelected ? 'Clear all' : 'Select all'),
-            ),
-          ],
+        SectionHeader(
+          title: l10n.chooseWhatToReceive,
+          icon: AppIcons.inbox,
+          action: TextButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              controller.appState.tick();
+              controller.selectAll(value: !allSelected);
+            },
+            child: Text(allSelected ? l10n.clearAll : l10n.selectAll),
+          ),
         ),
-        const SizedBox(height: AppSpacing.xs),
         Column(
           children: [
             for (var i = 0; i < manifest.items.length; i++) ...[
-              if (i > 0)
-                Divider(height: 1, color: theme.colorScheme.hairline),
-              CheckboxListTile(
-                value: controller.selectedIds.contains(manifest.items[i].id),
-                onChanged: (_) =>
-                    controller.toggleSelection(manifest.items[i].id),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.trailing,
-                dense: true,
-                title: Text(
-                  manifest.items[i].name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+              if (i > 0) Divider(height: 1, color: theme.colorScheme.hairline),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: CheckboxListTile(
+                  value: controller.selectedIds.contains(manifest.items[i].id),
+                  onChanged: (_) {
+                    controller.appState.tick();
+                    controller.toggleSelection(manifest.items[i].id);
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  dense: true,
+                  title: Text(
+                    manifest.items[i].name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  formatBytes(manifest.items[i].size),
-                  style: theme.textTheme.bodySmall,
+                  subtitle: Text(
+                    formatBytes(manifest.items[i].size),
+                    style: theme.textTheme.bodySmall,
+                  ),
                 ),
               ),
             ],
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        SurfaceCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    AppIcons.folder,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.savingTo(controller.saveLocation),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              if (controller.encrypted) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Icon(
+                      AppIcons.lock,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        controller.securityCode == null
+                            ? l10n.encryptedSession
+                            : '${l10n.encryptedSession} · ${controller.securityCode}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
-            Icon(
-              AppIcons.folder,
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
             Expanded(
-              child: Text(
-                'Saving to ${controller.saveLocation}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+              child: OutlinedButton(
+                style: clickCursorStyle,
+                onPressed: () {
+                  controller.appState.tick();
+                  controller.cancel();
+                },
+                child: Text(l10n.backToSessions),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: FilledButton.icon(
+                style: clickCursorStyle,
+                onPressed: selectedCount == 0
+                    ? null
+                    : () {
+                        controller.appState.tick();
+                        controller.beginReceive();
+                      },
+                icon: Icon(AppIcons.download, size: 17),
+                label: Text(
+                  selectedCount == 0
+                      ? l10n.selectFiles
+                      : l10n.receiveCountLabel(
+                          l10n.fileCount(selectedCount),
+                          formatBytes(controller.selectedBytes),
+                        ),
+                ),
               ),
             ),
           ],
-        ),
-        if (controller.encrypted) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Icon(AppIcons.lock, size: 14, color: theme.colorScheme.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Encrypted session'
-                  '${controller.securityCode == null ? '' : ' · ${controller.securityCode}'}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: AppSpacing.lg),
-        FilledButton.icon(
-          onPressed: selectedCount == 0 ? null : controller.beginReceive,
-          icon: Icon(AppIcons.download, size: 17),
-          label: Text(
-            selectedCount == 0
-                ? 'Select files to receive'
-                : 'Receive $selectedCount · ${formatBytes(controller.selectedBytes)}',
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: controller.cancel,
-          child: const Text('Back to sessions'),
         ),
       ],
     );
@@ -605,18 +877,20 @@ class _ProgressView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (controller.encrypted)
           StatusPill(
-            label: 'Encrypted',
+            label: l10n.encryptedTag,
             icon: AppIcons.lock,
             color: theme.colorScheme.primary,
           ),
         if (controller.anyPaused) ...[
           StatusPill(
-            label: controller.pausedByMe ? 'Paused by you' : 'Paused by sender',
+            label:
+                controller.pausedByMe ? l10n.pausedByYou : l10n.pausedBySender,
             icon: AppIcons.pause,
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -626,60 +900,65 @@ class _ProgressView extends StatelessWidget {
           child: ProgressRing(
             progress: controller.overallProgress,
             headline: '${(controller.overallProgress * 100).round()}%',
-            caption: '${formatBytes(controller.receivedBytes)} of '
-                '${formatBytes(controller.totalBytes)}',
+            caption: l10n.ofTotal(
+              formatBytes(controller.receivedBytes),
+              formatBytes(controller.totalBytes),
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: _Metric(
-                label: 'From',
-                value: controller.manifest?.hostName ?? 'Nearby device',
-              ),
-            ),
-            Expanded(
-              child: _Metric(
-                label: 'Speed',
-                value: formatSpeed(controller.speedBytesPerSecond),
-              ),
-            ),
-            Expanded(
-              child: _Metric(
-                label: 'Remaining',
-                value: formatEta(
-                  (controller.totalBytes - controller.receivedBytes)
-                      .clamp(0, controller.totalBytes),
-                  controller.speedBytesPerSecond,
+        SurfaceCard(
+          child: Row(
+            children: [
+              Expanded(
+                child: _Metric(
+                  label: l10n.fromLabel,
+                  value: controller.manifest?.hostName ?? l10n.nearbyDevice,
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: _Metric(
+                  label: l10n.speed,
+                  value: formatSpeed(controller.speedBytesPerSecond),
+                ),
+              ),
+              Expanded(
+                child: _Metric(
+                  label: l10n.remaining,
+                  value: formatEta(
+                    (controller.totalBytes - controller.receivedBytes)
+                        .clamp(0, controller.totalBytes),
+                    controller.speedBytesPerSecond,
+                    l10n,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text('Files', style: theme.textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
+        SectionHeader(title: l10n.files, icon: AppIcons.inbox),
         Column(
           children: [
             for (var i = 0; i < controller.receivedItems.length; i++) ...[
-              if (i > 0)
-                Divider(height: 1, color: theme.colorScheme.hairline),
+              if (i > 0) Divider(height: 1, color: theme.colorScheme.hairline),
               FileTile(
                 name: controller.receivedItems[i].name,
                 size: controller.receivedItems[i].size,
                 progress: controller.receivedItems[i].progress,
                 subtitle: switch (controller.receivedItems[i].status) {
-                  TransferStatus.done =>
-                    '${formatBytes(controller.receivedItems[i].size)} · saved',
-                  TransferStatus.paused =>
-                    '${formatBytes(controller.receivedItems[i].transferred)} of '
-                        '${formatBytes(controller.receivedItems[i].size)} · paused',
-                  TransferStatus.failed => 'Failed',
+                  TransferStatus.done => l10n.statusSaved(
+                      formatBytes(controller.receivedItems[i].size)),
+                  TransferStatus.paused => l10n.statusPaused(
+                      formatBytes(controller.receivedItems[i].transferred),
+                      formatBytes(controller.receivedItems[i].size)),
+                  TransferStatus.failed => l10n.failedTag,
                   TransferStatus.active ||
                   TransferStatus.pending =>
-                    '${formatBytes(controller.receivedItems[i].transferred)} of '
-                        '${formatBytes(controller.receivedItems[i].size)}',
+                    l10n.ofTotal(
+                      formatBytes(controller.receivedItems[i].transferred),
+                      formatBytes(controller.receivedItems[i].size),
+                    ),
                 },
                 trailing: controller.receivedItems[i].done
                     ? Icon(
@@ -697,22 +976,34 @@ class _ProgressView extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: controller.pausedByMe
-                    ? controller.resume
-                    : controller.pause,
+                style: clickCursorStyle,
+                onPressed: () {
+                  controller.appState.tick();
+                  if (controller.pausedByMe) {
+                    controller.resume();
+                  } else {
+                    controller.pause();
+                  }
+                },
                 icon: Icon(
                   controller.pausedByMe ? AppIcons.play : AppIcons.pause,
                   size: 17,
                 ),
-                label: Text(controller.pausedByMe ? 'Resume' : 'Pause'),
+                label: Text(
+                  controller.pausedByMe ? l10n.resume : l10n.pause,
+                ),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: controller.cancel,
+                style: clickCursorStyle,
+                onPressed: () {
+                  controller.appState.tick();
+                  controller.cancel();
+                },
                 icon: Icon(AppIcons.stop, size: 17),
-                label: const Text('Cancel'),
+                label: Text(l10n.cancel),
               ),
             ),
           ],
@@ -735,69 +1026,102 @@ class _DoneView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final record = controller.lastRecord;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpacing.lg),
-        Container(
-          width: 68,
-          height: 68,
-          decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            AppIcons.check,
-            size: 30,
-            color: AppColors.success,
+        Center(
+          child: Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              AppIcons.check,
+              size: 30,
+              color: AppColors.success,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text('Files received', style: theme.textTheme.headlineSmall),
+        Center(
+            child: AppPageTitle(l10n.filesReceivedTitle,
+                textAlign: TextAlign.center)),
         const SizedBox(height: AppSpacing.xs),
-        Text(
-          record == null
-              ? ''
-              : '${formatCount(record.fileCount, 'file')} · '
-                  '${formatBytes(record.bytes)} · '
-                  '${formatSpeed(record.averageBytesPerSecond)} average',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Icon(
-              AppIcons.folder,
-              size: 15,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                controller.saveLocation,
-                style: theme.textTheme.bodySmall,
-                maxLines: 2,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            if (!Platform.isAndroid)
-              TextButton(
-                onPressed: () => _revealFolder(controller.saveLocation),
-                child: const Text('Open'),
-              ),
-          ],
+        Center(
+          child: Text(
+            record == null
+                ? ''
+                : l10n.doneSummaryAverage(
+                    l10n.fileCount(record.fileCount),
+                    formatBytes(record.bytes),
+                    formatSpeed(record.averageBytesPerSecond),
+                  ),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        FilledButton(onPressed: () => onDone(), child: const Text('Done')),
+        SurfaceCard(
+          child: Row(
+            children: [
+              Icon(
+                AppIcons.folder,
+                size: 15,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  controller.saveLocation,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (!Platform.isAndroid)
+                TextButton(
+                  style: clickCursorStyle,
+                  onPressed: () {
+                    context.read<AppState>().tick();
+                    _revealFolder(controller.saveLocation);
+                  },
+                  child: Text(l10n.open),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              onDone();
+            },
+            child: Text(l10n.done),
+          ),
+        ),
         const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: () async {
-            await controller.reset();
-            if (!context.mounted) return;
-            await controller.startScanning();
-          },
-          child: const Text('Receive more'),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            style: clickCursorStyle,
+            onPressed: () async {
+              context.read<AppState>().tick();
+              await controller.reset();
+              if (!context.mounted) return;
+              await controller.startWaiting(
+                host: PlatformEnv.kind == PlatformKind.android,
+              );
+            },
+            child: Text(l10n.receiveMore),
+          ),
         ),
       ],
     );
@@ -831,51 +1155,74 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final cancelled = controller.phase == ReceivePhase.cancelled;
     final failed = controller.receivedItems
-        .where((item) =>
-            !item.done && controller.selectedIds.contains(item.id))
+        .where((item) => !item.done && controller.selectedIds.contains(item.id))
         .length;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpacing.lg),
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.error.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            cancelled ? AppIcons.stop : AppIcons.unlink,
-            size: 30,
-            color: theme.colorScheme.error,
+        Center(
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.error.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              cancelled ? AppIcons.stop : AppIcons.unlink,
+              size: 30,
+              color: theme.colorScheme.error,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text(
-          cancelled ? 'Transfer cancelled' : 'Could not connect',
-          style: theme.textTheme.headlineSmall,
-          textAlign: TextAlign.center,
+        Center(
+          child: AppPageTitle(
+            cancelled ? l10n.transferCancelled : l10n.couldNotConnect,
+            textAlign: TextAlign.center,
+          ),
         ),
         if (controller.errorMessage != null) ...[
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            controller.errorMessage!,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall,
+          Center(
+            child: Text(
+              controller.errorMessage!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
         if (failed > 0 && !cancelled) ...[
-          FilledButton.icon(
-            onPressed: controller.retryFailed,
-            icon: Icon(AppIcons.refresh, size: 17),
-            label: Text('Retry $failed file${failed == 1 ? '' : 's'}'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                controller.retryFailed();
+              },
+              icon: Icon(AppIcons.refresh, size: 17),
+              label: Text(l10n.retryFiles(failed)),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
-        FilledButton(onPressed: () => onRetry(), child: const Text('Scan again')),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              onRetry();
+            },
+            child: Text(l10n.scanAgain),
+          ),
+        ),
       ],
     );
   }
@@ -899,7 +1246,7 @@ class _Metric extends StatelessWidget {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall?.copyWith(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -929,45 +1276,53 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Join the hotspot', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Use the hotspot name and password shown on the sending device.',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _ssid,
-            autofocus: true,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Hotspot name'),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton.icon(
-            onPressed: _submit,
-            icon: Icon(AppIcons.wifi, size: 17),
-            label: const Text('Join and scan'),
-          ),
-        ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.joinHotspotSheetTitle, style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              l10n.hotspotCredentialsHint,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _ssid,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(labelText: l10n.hotspotName),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: _password,
+              obscureText: true,
+              decoration: InputDecoration(labelText: l10n.password),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                _submit();
+              },
+              icon: Icon(AppIcons.wifi, size: 17),
+              label: Text(l10n.joinAndScan),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -998,40 +1353,47 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Connect by address', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Enter the address shown on the sending device. The port is '
-            'optional and defaults to 47811.',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _address,
-            autofocus: true,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(labelText: 'Address or host:port'),
-            onSubmitted: (value) => Navigator.of(context).pop(value),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(_address.text.trim()),
-            icon: Icon(AppIcons.link, size: 17),
-            label: const Text('Connect'),
-          ),
-        ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.connectByAddress, style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              l10n.manualConnectBody,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _address,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(labelText: l10n.addressOrHost),
+              onSubmitted: (value) => Navigator.of(context).pop(value),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                Navigator.of(context).pop(_address.text.trim());
+              },
+              icon: Icon(AppIcons.link, size: 17),
+              label: Text(l10n.connect),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1069,50 +1431,61 @@ class _CodeSheetState extends State<_CodeSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Enter pairing code', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'On the sending device, tap Copy code under the QR code, then paste '
-            'it here. The code starts with freesend://',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _code,
-            autofocus: true,
-            minLines: 1,
-            maxLines: 3,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(
-              labelText: 'Pairing code',
-              hintText: 'freesend://pair?…',
-              suffixIcon: IconButton(
-                tooltip: 'Paste from clipboard',
-                onPressed: _pasteFromClipboard,
-                icon: Icon(AppIcons.paste, size: 17),
-              ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(l10n.pairingCodeSheetTitle, style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              l10n.pairingCodeHint,
+              style: theme.textTheme.bodySmall,
             ),
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton.icon(
-            onPressed: _submit,
-            icon: Icon(AppIcons.link, size: 17),
-            label: const Text('Connect'),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _code,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 3,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: l10n.pairingCodeLabel,
+                hintText: 'freesend://pair?…',
+                suffixIcon: IconButton(
+                  tooltip: l10n.pasteFromClipboard,
+                  mouseCursor: SystemMouseCursors.click,
+                  onPressed: () {
+                    context.read<AppState>().tick();
+                    _pasteFromClipboard();
+                  },
+                  icon: Icon(AppIcons.paste, size: 17),
+                ),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                _submit();
+              },
+              icon: Icon(AppIcons.link, size: 17),
+              label: Text(l10n.connect),
+            ),
+          ],
+        ),
       ),
     );
   }

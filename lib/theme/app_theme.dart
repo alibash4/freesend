@@ -7,6 +7,9 @@ export 'package:free_send/ui/kit/tokens.dart';
 extension AppSchemeColors on ColorScheme {
   bool get isLight => brightness == Brightness.light;
 
+  /// True only for the OLED variant — [surface] is the #121212 page.
+  bool get isBlackVariant => surface == AppColors.blackPage;
+
   /// Accent colour that stays readable as text on this brightness.
   Color get accentText => isLight ? AppColors.accentDeep : AppColors.accent;
 
@@ -51,8 +54,44 @@ abstract final class AppTheme {
     return _base(scheme, AppColors.page);
   }
 
-  static ThemeData dark() {
-    const scheme = ColorScheme(
+  static ThemeData dark() => _darkTheme(
+        page: AppColors.ink,
+        lowest: AppColors.surfaceRaised,
+        low: AppColors.surfaceRaised,
+        container: AppColors.surfaceRaised,
+        high: AppColors.surfaceRaised,
+        highest: AppColors.surfaceRaised,
+        secondaryContainer: AppColors.surfaceRaised,
+        outline: const Color(0xFF3A3A3A),
+        outlineVariant: const Color(0xFF2C2C2C),
+      );
+
+  /// The "black" variant: same flat surface treatment as [dark], two steps
+  /// darker — every surface role sits at #171717 against the #121212 page.
+  static ThemeData black() => _darkTheme(
+        page: AppColors.blackPage,
+        lowest: AppColors.neutral900,
+        low: AppColors.neutral900,
+        container: AppColors.neutral900,
+        high: AppColors.neutral900,
+        highest: AppColors.neutral900,
+        secondaryContainer: AppColors.neutral900,
+        outline: const Color(0xFF2A2A2A),
+        outlineVariant: const Color(0xFF1F1F1F),
+      );
+
+  static ThemeData _darkTheme({
+    required Color page,
+    required Color lowest,
+    required Color low,
+    required Color container,
+    required Color high,
+    required Color highest,
+    required Color secondaryContainer,
+    required Color outline,
+    required Color outlineVariant,
+  }) {
+    final scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: AppColors.accent,
       onPrimary: AppColors.neutral0,
@@ -60,28 +99,28 @@ abstract final class AppTheme {
       onPrimaryContainer: AppColors.accentInkDark,
       secondary: AppColors.neutral300,
       onSecondary: AppColors.neutral900,
-      secondaryContainer: AppColors.surfaceRaised,
+      secondaryContainer: secondaryContainer,
       onSecondaryContainer: AppColors.neutral100,
       tertiary: AppColors.accent,
       onTertiary: AppColors.neutral0,
       error: AppColors.danger,
       onError: AppColors.neutral0,
-      surface: AppColors.ink,
+      surface: page,
       onSurface: AppColors.neutral100,
-      surfaceContainerLowest: AppColors.surfaceRaised,
-      surfaceContainerLow: AppColors.surfaceRaised,
-      surfaceContainer: AppColors.surfaceRaised,
-      surfaceContainerHigh: AppColors.surfaceRaised,
-      surfaceContainerHighest: AppColors.surfaceRaised,
+      surfaceContainerLowest: lowest,
+      surfaceContainerLow: low,
+      surfaceContainer: container,
+      surfaceContainerHigh: high,
+      surfaceContainerHighest: highest,
       onSurfaceVariant: AppColors.neutral400,
-      outline: Color(0xFF3A3A3A),
-      outlineVariant: Color(0xFF2C2C2C),
+      outline: outline,
+      outlineVariant: outlineVariant,
       shadow: Color(0x66000000),
       scrim: Color(0x99000000),
       inverseSurface: AppColors.neutral100,
       onInverseSurface: AppColors.neutral900,
     );
-    return _base(scheme, AppColors.ink);
+    return _base(scheme, page);
   }
 
   static ThemeData _base(ColorScheme scheme, Color page) {
@@ -124,7 +163,7 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 48),
+          minimumSize: const Size(0, 45),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           textStyle: textTheme.labelLarge,
           shape: RoundedRectangleBorder(
@@ -135,7 +174,7 @@ abstract final class AppTheme {
       // The secondary button is a soft neutral fill rather than an outline.
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 45)),
           padding: const WidgetStatePropertyAll(
             EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           ),
@@ -163,6 +202,15 @@ abstract final class AppTheme {
           textStyle: textTheme.labelLarge,
           foregroundColor: scheme.accentText,
         ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: const WidgetStatePropertyAll(AppColors.neutral0),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.primary
+              : scheme.surfaceContainerHighest,
+        ),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -203,12 +251,20 @@ abstract final class AppTheme {
 
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: scheme.inverseSurface,
+        backgroundColor: scheme.brightness == Brightness.dark
+            ? AppColors.successWashDark
+            : AppColors.successWash,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
-          color: scheme.onInverseSurface,
+          color: scheme.brightness == Brightness.dark
+              ? AppColors.successInkDark
+              : AppColors.successInk,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.field),
+        ),
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
@@ -218,6 +274,16 @@ abstract final class AppTheme {
         modalBarrierColor: scheme.scrim,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        shadowColor: scheme.shadow.withValues(alpha: 0.18),
+        textStyle: textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
         ),
       ),
       dialogTheme: DialogThemeData(
@@ -276,10 +342,12 @@ abstract final class AppTheme {
         color: scheme.onSurface,
       ),
       bodyMedium: base.bodyMedium?.copyWith(
+        fontSize: 16,
         height: 1.45,
         color: scheme.onSurface,
       ),
       bodySmall: base.bodySmall?.copyWith(
+        fontSize: 14,
         height: 1.45,
         color: scheme.onSurfaceVariant,
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/l10n/app_localizations.dart';
 
 import 'package:free_send/services/update/update_info.dart';
 import 'package:free_send/services/update/update_installer.dart';
@@ -55,6 +56,9 @@ class UpdateController extends ChangeNotifier {
   UpdateInfo? update;
   String? message;
 
+  /// Localization key for [message]: 'upToDate' or 'failed'.
+  String messageKey = '';
+
   /// 0–1 while [UpdatePhase.downloading].
   double progress = 0;
 
@@ -104,7 +108,8 @@ class UpdateController extends ChangeNotifier {
       update = latest;
       if (latest == null) {
         phase = notifyWhenCurrent ? UpdatePhase.upToDate : UpdatePhase.idle;
-        message = notifyWhenCurrent ? 'You are on the latest version.' : null;
+        messageKey = notifyWhenCurrent ? 'upToDate' : '';
+        message = null;
         notifyListeners();
         return false;
       }
@@ -113,6 +118,7 @@ class UpdateController extends ChangeNotifier {
       return true;
     } on Object catch (error) {
       phase = UpdatePhase.failed;
+      messageKey = 'failed';
       message = _describe(error);
       notifyListeners();
       return false;
@@ -146,6 +152,7 @@ class UpdateController extends ChangeNotifier {
       notifyListeners();
     } on Object catch (error) {
       phase = UpdatePhase.failed;
+      messageKey = 'failed';
       message = _describe(error);
       notifyListeners();
     }
@@ -166,6 +173,7 @@ class UpdateController extends ChangeNotifier {
       await SystemNavigator.pop();
     } on Object catch (error) {
       phase = UpdatePhase.failed;
+      messageKey = 'failed';
       message = _describe(error);
       notifyListeners();
     }
@@ -176,6 +184,8 @@ class UpdateController extends ChangeNotifier {
     // pulling the asset again.
     if (phase != UpdatePhase.downloading && phase != UpdatePhase.installing) {
       phase = UpdatePhase.idle;
+      message = null;
+      messageKey = '';
       notifyListeners();
     }
   }
@@ -184,10 +194,20 @@ class UpdateController extends ChangeNotifier {
     phase = UpdatePhase.idle;
     update = null;
     message = null;
+    messageKey = '';
     progress = 0;
     downloadedFile = null;
     notifyListeners();
   }
+
+  /// Localized text for the status line under the update buttons.
+  String localizedMessage(AppLocalizations l10n) => switch (messageKey) {
+        'upToDate' => l10n.updateUpToDate,
+        'failed' => message == null || message!.isEmpty
+            ? l10n.updateFailed
+            : '${l10n.updateFailed}: $message',
+        _ => message ?? '',
+      };
 
   String _describe(Object error) => switch (error) {
         UpdateNotAvailableException(:final message) => message,

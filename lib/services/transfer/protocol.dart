@@ -32,6 +32,11 @@ abstract final class FrameType {
   static const helloConfirm = 16;
   /// Outer envelope for an encrypted frame. The payload is the sealed frame.
   static const secure = 17;
+  /// A sender asking a receiver to accept files. Carries identity, file count,
+  /// size, and the sender's file-server address so the receiver can dial back.
+  static const knock = 18;
+  /// The receiver's answer to a knock.
+  static const knockReply = 19;
 }
 
 class Frame {

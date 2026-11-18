@@ -12,5 +12,6 @@ class MainActivity : FlutterActivity() {
         TransferBridge(applicationContext, messenger)
         AppPackagesBridge(applicationContext, messenger)
         SafBridge(applicationContext, messenger)
+        NetworkProbeBridge(applicationContext, messenger)
     }
 }

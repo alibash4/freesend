@@ -6,16 +6,22 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
-import 'package:free_send/services/permissions/app_permissions.dart';
 import 'package:free_send/services/tray_controller.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_theme.dart';
-import 'package:free_send/ui/screens/permissions_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
+
+/// Picks the concrete [ThemeData] for the current choice. MaterialApp only
+/// understands light/dark/system, so the black variant is resolved here and
+/// the app is pinned to [ThemeMode.light] to keep it stable.
+ThemeData _resolveTheme(AppState state) {
+  if (!state.effectiveDark) return AppTheme.light();
+  return state.blackTheme ? AppTheme.black() : AppTheme.dark();
+}
 
 class FreeSendApp extends StatelessWidget {
   const FreeSendApp({super.key, required this.appState, required this.tray});
@@ -90,9 +96,8 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
         title: 'FreeSend',
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: state.themeMode,
+        theme: _resolveTheme(state),
+        themeMode: ThemeMode.light,
         locale: state.locale,
         localizationsDelegates: [
           AppLocalizations.delegate,
@@ -101,9 +106,7 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: const [Locale('ar'), Locale('en')],
-        home: state.permissionsPrompted || !AppPermissions.isMobile
-            ? const AppShell()
-            : const PermissionsScreen(),
+        home: const AppShell(),
       ),
     );
   }

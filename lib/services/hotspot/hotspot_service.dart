@@ -265,7 +265,21 @@ class LinuxHotspotService implements HotspotService {
   String _makeSsid(String deviceName) {
     final base = deviceName.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '').trim();
     final name = base.isEmpty ? 'FreeSend' : base;
-    return 'FreeSend-${name.replaceAll(' ', '-').substring(0, name.length > 14 ? 14 : name.length)}';
+    final short =
+        name.replaceAll(' ', '-').substring(0, name.length > 14 ? 14 : name.length);
+    // The suffix keeps two nearby devices with the same name apart, and gives
+    // the other side something stable to filter on.
+    return 'FreeSend-$short-${_hotspotSuffix(name)}';
+  }
+
+  /// Stable 4-hex tag derived from the device name (FNV-1a, lower 16 bits).
+  String _hotspotSuffix(String seed) {
+    var hash = 0x811c9dc5;
+    for (final unit in seed.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0xFFFFFFFF;
+    }
+    return (hash & 0xFFFF).toRadixString(16).padLeft(4, '0').toUpperCase();
   }
 
   String _makePassword() {

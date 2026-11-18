@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -30,14 +29,21 @@ class _AppShellState extends State<AppShell> {
   int _index = 0;
   late final PageController _pageController = PageController();
 
+  /// True only for the frame a tap-driven [_setIndex] runs, so the page
+  /// content fades on nav taps while physical swipes stay unanimated.
+  bool _animatePageSwap = false;
+
   void _setIndex(int index) {
-    if (index < 0 || index > 5) return;
+    // Valid pages: 0-3 are the nav tabs, 5-6 the send/receive overlays.
+    if (index < 0 || index > 6 || index == 4) return;
+    _animatePageSwap = true;
     if (index < 4) {
       _pageController.jumpToPage(index);
-      setState(() => _index = index);
-      return;
     }
     setState(() => _index = index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animatePageSwap = false;
+    });
   }
 
   void _selectImmediate(int index) => _setIndex(index);
@@ -81,10 +87,10 @@ class _AppShellState extends State<AppShell> {
           child: Stack(
             children: [
               Offstage(
-                offstage: _index >= 4,
+                offstage: _index >= 5,
                 child: FadeOnChange(
                   index: _index,
-                  animate: wide,
+                  animate: wide || _animatePageSwap,
                   child: PageView(
                     controller: _pageController,
                     physics: MediaQuery.sizeOf(context).width >= 840
@@ -97,8 +103,8 @@ class _AppShellState extends State<AppShell> {
                     },
                     children: [
                       HomeScreen(
-                        onOpenSend: () => _setIndex(4),
-                        onOpenReceive: () => _setIndex(5),
+                        onOpenSend: () => _setIndex(5),
+                        onOpenReceive: () => _setIndex(6),
                       ),
                       const TransfersScreen(),
                       const HistoryScreen(),
@@ -110,9 +116,9 @@ class _AppShellState extends State<AppShell> {
               Positioned.fill(
                 child: FadeOnChange(
                   index: _index,
-                  child: _index == 4
+                  child: _index == 5
                       ? SendScreen(onBack: () => _setIndex(0))
-                      : _index == 5
+                      : _index == 6
                           ? ReceiveScreen(onBack: () => _setIndex(0))
                           : const SizedBox.shrink(),
                 ),
@@ -143,9 +149,7 @@ class _AppShellState extends State<AppShell> {
               : AppBottomNav(
                   selectedIndex: _index < 4 ? _index : -1,
                   onSelected: (index) {
-                    if (context.read<AppState>().haptics) {
-                      HapticFeedback.selectionClick();
-                    }
+                    context.read<AppState>().tick();
                     _selectImmediate(index);
                   },
                   items: items,

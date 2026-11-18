@@ -1,3 +1,7 @@
+import 'package:intl/intl.dart';
+
+import 'package:free_send/l10n/app_localizations.dart';
+
 /// Small formatting helpers shared across the UI.
 String formatBytes(int bytes, {int decimals = 1}) {
   if (bytes <= 0) return '0 B';
@@ -31,49 +35,37 @@ String formatDuration(Duration duration) {
   return restMinutes == 0 ? '${hours}h' : '${hours}h ${restMinutes}m';
 }
 
-String formatEta(int remainingBytes, double bytesPerSecond) {
-  if (remainingBytes <= 0) return 'finishing';
-  if (bytesPerSecond <= 0) return 'estimating';
+String formatEta(
+  int remainingBytes,
+  double bytesPerSecond,
+  AppLocalizations l10n,
+) {
+  if (remainingBytes <= 0) return l10n.etaFinishing;
+  if (bytesPerSecond <= 0) return l10n.etaEstimating;
   final seconds = (remainingBytes / bytesPerSecond).round();
+  if (seconds < 1) return l10n.etaMoment;
   return formatDuration(Duration(seconds: seconds));
 }
 
-String formatCount(int count, String singular, [String? plural]) {
-  return '$count ${count == 1 ? singular : (plural ?? '${singular}s')}';
-}
-
-String formatTimestamp(DateTime time) {
+String formatTimestamp(DateTime time, AppLocalizations l10n) {
   final now = DateTime.now();
   final local = time.toLocal();
-  final sameDay =
-      now.year == local.year && now.month == local.month && now.day == local.day;
+  final sameDay = now.year == local.year &&
+      now.month == local.month &&
+      now.day == local.day;
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
-  if (sameDay) return 'Today, $hour:$minute';
+  if (sameDay) return l10n.todayAt('$hour:$minute');
   final yesterday = now.subtract(const Duration(days: 1));
   if (yesterday.year == local.year &&
       yesterday.month == local.month &&
       yesterday.day == local.day) {
-    return 'Yesterday, $hour:$minute';
+    return l10n.yesterdayAt('$hour:$minute');
   }
-  final month = _months[local.month - 1];
-  return '$month ${local.day}, $hour:$minute';
+  final month = DateFormat.MMM(l10n.localeName).format(local);
+  final separator = l10n.localeName.startsWith('ar') ? '، ' : ', ';
+  return '$month ${local.day}$separator$hour:$minute';
 }
-
-const _months = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
 
 /// `application/vnd.android.package-archive` style lookup is overkill here;
 /// the UI only needs a coarse icon family.

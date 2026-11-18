@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -17,7 +18,11 @@ class ScanScreen extends StatefulWidget {
   /// Windows and Linux offer the typed-in path instead of a dead button.
   static bool get isSupported => Platform.isAndroid || Platform.isMacOS;
 
-  static Future<PairingCode?> open(BuildContext context) {
+  static Future<PairingCode?> open(BuildContext context) async {
+    // The camera is asked for at the moment it is needed, not at app start.
+    // macOS raises its own prompt on first camera access.
+    if (Platform.isAndroid) await Permission.camera.request();
+    if (!context.mounted) return null;
     return Navigator.of(context).push<PairingCode>(
       MaterialPageRoute(
         builder: (_) => const ScanScreen(),
@@ -62,7 +67,7 @@ class _ScanScreenState extends State<ScanScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.neutral0,
-        title: const Text('Scan pairing code'),
+        title: Text(AppLocalizations.of(context).scanPairingCode),
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -116,9 +121,8 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                   child: Text(
                     _unrecognised
-                        ? 'That code is not from FreeSend. Point the camera at '
-                            'the code on the sending device.'
-                        : 'Point the camera at the code on the sending device.',
+                        ? AppLocalizations.of(context).scanWrongCode
+                        : AppLocalizations.of(context).scanHint,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.neutral0,
@@ -139,6 +143,7 @@ class _ScanScreenState extends State<ScanScreen> {
   ) {
     final denied = error.errorCode == MobileScannerErrorCode.permissionDenied;
     final detail = error.errorDetails?.message;
+    final l10n = AppLocalizations.of(context);
     return ColoredBox(
       color: AppColors.ink,
       child: Center(
@@ -154,7 +159,7 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                denied ? 'Camera access is off' : 'The camera could not start',
+                denied ? l10n.cameraOff : l10n.cameraFailed,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: AppColors.neutral0,
@@ -162,12 +167,7 @@ class _ScanScreenState extends State<ScanScreen> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                denied
-                    ? 'FreeSend needs the camera only to read the pairing code. '
-                        'Allow it in system settings, or type the code instead.'
-                    : detail ??
-                        'Another app may be using the camera. You can also type '
-                            'the code instead.',
+                denied ? l10n.cameraDeniedBody : detail ?? l10n.cameraBusyBody,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppColors.neutral300,
@@ -178,14 +178,14 @@ class _ScanScreenState extends State<ScanScreen> {
                 FilledButton.icon(
                   onPressed: openAppSettings,
                   icon: Icon(AppIcons.settings, size: 17),
-                  label: const Text('Open settings'),
+                  label: Text(l10n.openSettings),
                 ),
               ],
               const SizedBox(height: AppSpacing.sm),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).pop(),
                 icon: Icon(AppIcons.address, size: 16),
-                label: const Text('Enter the code instead'),
+                label: Text(l10n.enterCodeInstead),
               ),
             ],
           ),
