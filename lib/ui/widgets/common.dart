@@ -12,12 +12,21 @@ const clickCursorStyle = ButtonStyle(
   mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
 );
 
-/// The back arrow for the ambient text direction: points left in LTR and
-/// right in RTL.
-IconData backGlyph(BuildContext context) =>
+/// The back arrow, matching the AppBar's default [BackButtonIcon]: the iOS
+/// chevron on Apple platforms, the Material arrow elsewhere. Both carry
+/// `matchTextDirection`, so they mirror themselves in RTL.
+IconData get backGlyph {
+  final apple = PlatformEnv.kind == PlatformKind.ios ||
+      PlatformEnv.kind == PlatformKind.macOS;
+  return apple ? Icons.arrow_back_ios_new_rounded : Icons.arrow_back;
+}
+
+/// A "go deeper" chevron that points with the reading direction: right in LTR,
+/// left in RTL.
+IconData chevronGlyph(BuildContext context) =>
     Directionality.of(context) == TextDirection.rtl
-        ? AppIcons.forward
-        : AppIcons.back;
+        ? AppIcons.chevronLeft
+        : AppIcons.chevronRight;
 
 /// Lets the user pick the transport a session uses: the app's normal Wi-Fi
 /// path, or a cable between the two devices.

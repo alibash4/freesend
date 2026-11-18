@@ -284,7 +284,7 @@ class _SendScreenState extends State<SendScreen> {
         appBar: AppBar(
           title: Text(l10n.sendTitle),
           leading: IconButton(
-            icon: Icon(backGlyph(context)),
+            icon: Icon(backGlyph),
             onPressed: () async {
               final leave = await _confirmLeave(controller);
               if (leave && context.mounted) widget.onBack?.call();
@@ -1220,7 +1220,7 @@ class _CandidateRow extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  AppIcons.chevronRight,
+                  chevronGlyph(context),
                   size: 18,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

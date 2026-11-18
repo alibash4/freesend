@@ -217,7 +217,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            icon: Icon(backGlyph(context)),
+            icon: Icon(backGlyph),
             mouseCursor: SystemMouseCursors.click,
             onPressed: () {
               context.read<AppState>().tick();
@@ -515,7 +515,7 @@ class _ConnectOption extends StatelessWidget {
                 ),
               ),
               Icon(
-                AppIcons.chevronRight,
+                chevronGlyph(context),
                 size: 16,
                 color: scheme.onSurfaceVariant,
               ),

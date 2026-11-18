@@ -152,7 +152,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                     Navigator.of(context).pop(false);
                   }
                 },
-                icon: Icon(backGlyph(context)),
+                icon: Icon(backGlyph),
                 mouseCursor: SystemMouseCursors.click,
                 padding: EdgeInsets.zero,
                 alignment: Alignment.centerLeft,
