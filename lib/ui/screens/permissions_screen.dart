@@ -28,20 +28,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   int? _sdkInt;
   bool _requesting = false;
 
-  // TEMP: preview toggle for the granted vs first-launch look.
-  bool _previewGranted = false;
-
-  Map<Permission, PermissionStatus> get _shown => _previewGranted
-      ? {
-          Permission.locationWhenInUse: PermissionStatus.granted,
-          Permission.nearbyWifiDevices: PermissionStatus.granted,
-          Permission.notification: PermissionStatus.granted,
-          Permission.photos: PermissionStatus.granted,
-          Permission.videos: PermissionStatus.granted,
-          Permission.audio: PermissionStatus.granted,
-          Permission.camera: PermissionStatus.granted,
-        }
-      : _statuses;
 
   @override
   void initState() {
@@ -88,11 +74,11 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final android = Platform.isAndroid;
-    final allGranted = _shown.isNotEmpty &&
-        _shown.values.every(
+    final allGranted = _statuses.isNotEmpty &&
+        _statuses.values.every(
           (status) => status.isGranted || status.isLimited,
         );
-    final permanentlyDenied = _shown.values.any(
+    final permanentlyDenied = _statuses.values.any(
       (status) => status.isPermanentlyDenied || status.isRestricted,
     );
     final showApi33 = !Platform.isAndroid || (_sdkInt ?? 33) >= 33;
@@ -192,24 +178,6 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               ),
             ],
 
-
-            // TEMP: preview toggle — remove before release.
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Preview: all granted',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-                Switch(
-                  value: _previewGranted,
-                  onChanged: (value) =>
-                      setState(() => _previewGranted = value),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -217,7 +185,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
   }
 
   PermissionStatus? _statusFor(Permission permission) =>
-      _shown[permission];
+      _statuses[permission];
 }
 
 class _PermissionRow extends StatelessWidget {

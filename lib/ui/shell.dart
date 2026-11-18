@@ -10,7 +10,6 @@ import 'package:free_send/ui/kit/app_page_container.dart';
 import 'package:free_send/ui/kit/app_sidebar.dart';
 import 'package:free_send/ui/kit/fade_on_change.dart';
 import 'package:free_send/ui/screens/history_screen.dart';
-import 'package:free_send/ui/screens/permissions_screen.dart';
 import 'package:free_send/ui/screens/home_screen.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
@@ -36,9 +35,10 @@ class _AppShellState extends State<AppShell> {
   bool _animatePageSwap = false;
 
   void _setIndex(int index) {
-    if (index < 0 || index > 6) return;
+    // Valid pages: 0-3 are the nav tabs, 5-6 the send/receive overlays.
+    if (index < 0 || index > 6 || index == 4) return;
     _animatePageSwap = true;
-    if (index < 5) {
+    if (index < 4) {
       _pageController.jumpToPage(index);
     }
     setState(() => _index = index);
@@ -79,12 +79,6 @@ class _AppShellState extends State<AppShell> {
         icon: AppIcons.settings,
         activeIcon: AppIcons.settingsActive,
       ),
-      // Temporary: direct access to the permission gate for testing.
-      AppNavItem(
-        label: 'Permissions',
-        icon: AppIcons.lock,
-        activeIcon: AppIcons.lock,
-      ),
     ];
 
     return LayoutBuilder(
@@ -104,7 +98,7 @@ class _AppShellState extends State<AppShell> {
                         ? const NeverScrollableScrollPhysics()
                         : const _HeavyPageScrollPhysics(),
                     onPageChanged: (value) {
-                      if (_index < 5 && value != _index) {
+                      if (_index < 4 && value != _index) {
                         setState(() => _index = value);
                       }
                     },
@@ -116,7 +110,6 @@ class _AppShellState extends State<AppShell> {
                       const TransfersScreen(),
                       const HistoryScreen(),
                       const SettingsScreen(),
-                      const PermissionsScreen(),
                     ],
                   ),
                 ),
@@ -144,7 +137,7 @@ class _AppShellState extends State<AppShell> {
                     children: [
                       AppSidebar(
                         items: items,
-                        selectedIndex: _index < 5 ? _index : -1,
+                        selectedIndex: _index < 4 ? _index : -1,
                         onSelected: _selectImmediate,
                       ),
                       Expanded(child: content),
@@ -155,7 +148,7 @@ class _AppShellState extends State<AppShell> {
           bottomNavigationBar: wide
               ? null
               : AppBottomNav(
-                  selectedIndex: _index < 5 ? _index : -1,
+                  selectedIndex: _index < 4 ? _index : -1,
                   onSelected: (index) {
                     if (context.read<AppState>().haptics) {
                       HapticFeedback.selectionClick();
