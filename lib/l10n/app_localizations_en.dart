@@ -554,38 +554,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupIntro =>
-      'Turn these on in order. FreeSend stays on the local link, and it cannot start until the required ones are on.';
+      'FreeSend needs these device settings before a transfer. Turn them on, then come back - this screen checks again automatically.';
 
   @override
-  String get setupNearbyTitle => 'Nearby devices';
+  String get setupWifiTitle => 'Wi-Fi is on';
 
   @override
-  String get setupNearbyBody =>
-      'Lets FreeSend open or join the hotspot the transfer uses.';
+  String get setupWifiBody =>
+      'FreeSend shares over Wi-Fi or a hotspot it creates. Turn Wi-Fi on and come back - this check repeats automatically.';
 
   @override
-  String get setupNotificationsTitle => 'Notifications';
-
-  @override
-  String get setupNotificationsBody =>
-      'Keeps the transfer running when you leave the app.';
-
-  @override
-  String get setupCameraTitle => 'Camera';
-
-  @override
-  String get setupCameraBody =>
-      'Reads the pairing code shown on the other device. You can paste a code instead.';
-
-  @override
-  String get setupVpnTitle => 'VPN is on';
+  String get setupVpnTitle => 'VPN is off';
 
   @override
   String get setupVpnBody =>
       'FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.';
 
   @override
-  String get setupLocationTitle => 'Location is off';
+  String get setupLocationTitle => 'Location is on';
 
   @override
   String get setupLocationBody =>
@@ -595,10 +581,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupOptional => 'Optional';
 
   @override
-  String get setupEnable => 'Enable';
+  String get setupDone => 'Done';
 
   @override
-  String get setupSettings => 'Settings';
+  String get setupActionNeeded => 'Action needed';
+
+  @override
+  String get setupCheckAgain => 'Check again';
 
   @override
   String get permTitle => 'Please grant the following permissions';

@@ -566,38 +566,24 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get setupIntro =>
-      'فعّل هذه بالترتيب. يبقى FreeSend على الرابط المحلي، ولا يمكنه البدء حتى يتم تفعيل ما هو مطلوب.';
+      'يحتاج FreeSend إلى إعدادات الجهاز هذه قبل النقل. فعّلها ثم عُد إلى هنا، وتُعاد هذه الفحوص تلقائيًا.';
 
   @override
-  String get setupNearbyTitle => 'الأجهزة القريبة';
+  String get setupWifiTitle => 'الواي فاي مفعّل';
 
   @override
-  String get setupNearbyBody =>
-      'يتيح لـ FreeSend فتح نقطة الاتصال التي يستخدمها النقل أو الانضمام إليها.';
+  String get setupWifiBody =>
+      'يعمل FreeSend عبر الواي فاي، أو ينشئ نقطة اتصال خاصة به. فعّل الواي فاي ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
 
   @override
-  String get setupNotificationsTitle => 'الإشعارات';
-
-  @override
-  String get setupNotificationsBody =>
-      'يبقي عملية النقل تعمل عند مغادرة التطبيق.';
-
-  @override
-  String get setupCameraTitle => 'الكاميرا';
-
-  @override
-  String get setupCameraBody =>
-      'تقرأ رمز الإقران المعروض على الجهاز الآخر. يمكنك لصق الرمز بدلًا من ذلك.';
-
-  @override
-  String get setupVpnTitle => 'الشبكة الافتراضية الخاصة (VPN) مفعّلة';
+  String get setupVpnTitle => 'الشبكة الافتراضية الخاصة (VPN) متوقفة';
 
   @override
   String get setupVpnBody =>
       'يعمل FreeSend عبر الشبكة المحلية التي تخفيها الشبكة الافتراضية الخاصة. أوقفها ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
 
   @override
-  String get setupLocationTitle => 'الموقع غير مفعّل';
+  String get setupLocationTitle => 'الموقع مفعّل';
 
   @override
   String get setupLocationBody =>
@@ -607,10 +593,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get setupOptional => 'اختياري';
 
   @override
-  String get setupEnable => 'تفعيل';
+  String get setupDone => 'تم';
 
   @override
-  String get setupSettings => 'الإعدادات';
+  String get setupActionNeeded => 'يتطلب إجراءً';
+
+  @override
+  String get setupCheckAgain => 'تحقق مجددًا';
 
   @override
   String get permTitle => 'يرجى منح الأذونات التالية';

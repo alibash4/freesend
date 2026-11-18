@@ -18,22 +18,9 @@ void main() {
   final captureKey = GlobalKey();
 
   const steps = [
-    SetupStep(
-      index: 1,
-      granted: false,
-      needsSettings: false,
-    ),
-    SetupStep(
-      index: 2,
-      granted: false,
-      needsSettings: false,
-    ),
-    SetupStep(
-      index: 3,
-      granted: false,
-      needsSettings: false,
-      mustGrant: false,
-    ),
+    SetupStep(index: 1, granted: false),
+    SetupStep(index: 2, granted: false),
+    SetupStep(index: 3, granted: false, mustGrant: false),
   ];
 
   setUpAll(() async {
@@ -65,8 +52,9 @@ void main() {
     TransferSetup.debugLoad = null;
   });
 
-  Future<void> pump(WidgetTester tester, String title, {bool dark = false}) async {
-    tester.view.physicalSize = const Size(390, 844);
+  Future<void> pump(WidgetTester tester, String title,
+      {bool dark = false}) async {
+    tester.view.physicalSize = const Size(390, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final base = dark ? AppTheme.dark() : AppTheme.light();
@@ -99,19 +87,20 @@ void main() {
     });
   }
 
-  testWidgets('only the first missing step can be enabled', (tester) async {
+  testWidgets('every check shows its status', (tester) async {
     await pump(tester, 'Before you receive');
 
     expect(find.text('Before you receive'), findsOneWidget);
-    expect(find.text('Nearby devices'), findsOneWidget);
-    expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('Camera'), findsOneWidget);
+    expect(find.text('Wi-Fi is on'), findsOneWidget);
+    expect(find.text('VPN is off'), findsOneWidget);
+    expect(find.text('Location is on'), findsOneWidget);
 
-    // The nearby step and the optional camera are actionable. The
-    // notifications step is locked behind the nearby one, so it has no
-    // button of its own.
-    expect(find.text('Enable'), findsNWidgets(2));
+    // Nothing here can be toggled in-app: each unmet check says so, the
+    // optional one keeps its tag, and the only action is re-checking.
+    expect(find.text('Action needed'), findsNWidgets(3));
+    expect(find.text('Done'), findsNothing);
     expect(find.text('Optional'), findsOneWidget);
+    expect(find.text('Check again', skipOffstage: false), findsOneWidget);
 
     await capture(tester, '18-setup-receive');
   });
@@ -120,28 +109,23 @@ void main() {
     await pump(tester, 'Before you send', dark: true);
     expect(find.text('Before you send'), findsOneWidget);
     expect(find.text('Before you receive'), findsNothing);
-    expect(find.text('Enable'), findsNWidgets(2));
+    expect(find.text('Action needed'), findsNWidgets(3));
 
     await capture(tester, '19-setup-send-dark');
   });
 
-  test('the camera is optional, the other two are not', () async {
+  test('optional checks do not block, required ones do', () async {
     TransferSetup.debugLoad = () async => const [
-          SetupStep(index: 1, granted: true, needsSettings: false),
-          SetupStep(index: 2, granted: true, needsSettings: false),
-          SetupStep(
-            index: 3,
-            granted: false,
-            needsSettings: false,
-            mustGrant: false,
-          ),
+          SetupStep(index: 1, granted: true),
+          SetupStep(index: 2, granted: true),
+          SetupStep(index: 3, granted: false, mustGrant: false),
         ];
     expect(await TransferSetup.isReady, isTrue);
 
     TransferSetup.debugLoad = () async => const [
-          SetupStep(index: 1, granted: false, needsSettings: false),
-          SetupStep(index: 2, granted: true, needsSettings: false),
-          SetupStep(index: 3, granted: true, needsSettings: false),
+          SetupStep(index: 1, granted: false),
+          SetupStep(index: 2, granted: true),
+          SetupStep(index: 3, granted: true),
         ];
     expect(await TransferSetup.isReady, isFalse);
   });

@@ -75,6 +75,10 @@ abstract final class AppIcons {
   static final IconData moon = UIcons.regularRounded.moon;
   static final IconData auto = UIcons.regularRounded.screen;
 
+  // System states.
+  static final IconData shieldAlert = UIcons.regularRounded.shield_exclamation;
+  static final IconData locationPin = UIcons.regularRounded.location_alt;
+
   // Settings sections.
   static final IconData deviceMobile = UIcons.regularRounded.smartphone;
   static final IconData palette = UIcons.regularRounded.palette;

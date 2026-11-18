@@ -12,6 +12,13 @@ const clickCursorStyle = ButtonStyle(
   mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
 );
 
+/// The back arrow for the ambient text direction: points left in LTR and
+/// right in RTL.
+IconData backGlyph(BuildContext context) =>
+    Directionality.of(context) == TextDirection.rtl
+        ? AppIcons.forward
+        : AppIcons.back;
+
 /// Lets the user pick the transport a session uses: the app's normal Wi-Fi
 /// path, or a cable between the two devices.
 class LinkPicker extends StatelessWidget {
@@ -103,9 +110,9 @@ class ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final background =
-        highlighted ? scheme.primaryContainer : scheme.softFill;
-    final foreground = highlighted ? scheme.onPrimaryContainer : scheme.onSurface;
+    final background = highlighted ? scheme.primaryContainer : scheme.softFill;
+    final foreground =
+        highlighted ? scheme.onPrimaryContainer : scheme.onSurface;
     final muted = highlighted
         ? scheme.onPrimaryContainer.withValues(alpha: 0.72)
         : scheme.onSurfaceVariant;
@@ -136,9 +143,7 @@ class ActionCard extends StatelessWidget {
                     ),
                     child: Icon(
                       icon,
-                      color: highlighted
-                          ? scheme.onPrimary
-                          : scheme.accentText,
+                      color: highlighted ? scheme.onPrimary : scheme.accentText,
                       size: 20,
                     ),
                   ),
@@ -304,9 +309,8 @@ class DetailRow extends StatelessWidget {
             value,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              fontFeatures: monospace
-                  ? const [FontFeature.tabularFigures()]
-                  : null,
+              fontFeatures:
+                  monospace ? const [FontFeature.tabularFigures()] : null,
               letterSpacing: monospace ? 0.6 : null,
             ),
             overflow: TextOverflow.ellipsis,

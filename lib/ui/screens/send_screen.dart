@@ -282,7 +282,7 @@ class _SendScreenState extends State<SendScreen> {
         appBar: AppBar(
           title: Text(l10n.sendTitle),
           leading: IconButton(
-            icon: Icon(AppIcons.back),
+            icon: Icon(backGlyph(context)),
             onPressed: () async {
               final leave = await _confirmLeave(controller);
               if (leave && context.mounted) widget.onBack?.call();
@@ -398,7 +398,7 @@ class _PickView extends StatelessWidget {
             onChanged: onQueryChanged,
             decoration: InputDecoration(
               hintText: l10n.searchSelectedFiles,
-               prefixIcon: Icon(AppIcons.search, size: 18),
+              prefixIcon: Icon(AppIcons.search, size: 18),
               isDense: true,
             ),
           ),
@@ -644,9 +644,8 @@ class _SessionView extends StatelessWidget {
               ),
             const SizedBox(height: AppSpacing.sm),
             FilledButton.icon(
-              onPressed: controller.selected.isEmpty
-                  ? null
-                  : controller.knockSelected,
+              onPressed:
+                  controller.selected.isEmpty ? null : controller.knockSelected,
               icon: Icon(AppIcons.sendPlane, size: 17),
               label: Text(
                 controller.selected.isEmpty

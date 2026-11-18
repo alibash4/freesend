@@ -1025,49 +1025,25 @@ abstract class AppLocalizations {
   /// No description provided for @setupIntro.
   ///
   /// In en, this message translates to:
-  /// **'Turn these on in order. FreeSend stays on the local link, and it cannot start until the required ones are on.'**
+  /// **'FreeSend needs these device settings before a transfer. Turn them on, then come back - this screen checks again automatically.'**
   String get setupIntro;
 
-  /// No description provided for @setupNearbyTitle.
+  /// No description provided for @setupWifiTitle.
   ///
   /// In en, this message translates to:
-  /// **'Nearby devices'**
-  String get setupNearbyTitle;
+  /// **'Wi-Fi is on'**
+  String get setupWifiTitle;
 
-  /// No description provided for @setupNearbyBody.
+  /// No description provided for @setupWifiBody.
   ///
   /// In en, this message translates to:
-  /// **'Lets FreeSend open or join the hotspot the transfer uses.'**
-  String get setupNearbyBody;
-
-  /// No description provided for @setupNotificationsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Notifications'**
-  String get setupNotificationsTitle;
-
-  /// No description provided for @setupNotificationsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Keeps the transfer running when you leave the app.'**
-  String get setupNotificationsBody;
-
-  /// No description provided for @setupCameraTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Camera'**
-  String get setupCameraTitle;
-
-  /// No description provided for @setupCameraBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Reads the pairing code shown on the other device. You can paste a code instead.'**
-  String get setupCameraBody;
+  /// **'FreeSend shares over Wi-Fi or a hotspot it creates. Turn Wi-Fi on and come back - this check repeats automatically.'**
+  String get setupWifiBody;
 
   /// No description provided for @setupVpnTitle.
   ///
   /// In en, this message translates to:
-  /// **'VPN is on'**
+  /// **'VPN is off'**
   String get setupVpnTitle;
 
   /// No description provided for @setupVpnBody.
@@ -1079,7 +1055,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupLocationTitle.
   ///
   /// In en, this message translates to:
-  /// **'Location is off'**
+  /// **'Location is on'**
   String get setupLocationTitle;
 
   /// No description provided for @setupLocationBody.
@@ -1094,17 +1070,23 @@ abstract class AppLocalizations {
   /// **'Optional'**
   String get setupOptional;
 
-  /// No description provided for @setupEnable.
+  /// No description provided for @setupDone.
   ///
   /// In en, this message translates to:
-  /// **'Enable'**
-  String get setupEnable;
+  /// **'Done'**
+  String get setupDone;
 
-  /// No description provided for @setupSettings.
+  /// No description provided for @setupActionNeeded.
   ///
   /// In en, this message translates to:
-  /// **'Settings'**
-  String get setupSettings;
+  /// **'Action needed'**
+  String get setupActionNeeded;
+
+  /// No description provided for @setupCheckAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get setupCheckAgain;
 
   /// No description provided for @permTitle.
   ///

@@ -4,6 +4,7 @@ import android.content.Context
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -27,6 +28,7 @@ class NetworkProbeBridge(
         when (call.method) {
             "isVpnActive" -> result.success(isVpnActive())
             "isLocationEnabled" -> result.success(isLocationEnabled())
+            "isWifiEnabled" -> result.success(isWifiEnabled())
             else -> result.notImplemented()
         }
     }
@@ -39,6 +41,16 @@ class NetworkProbeBridge(
                 as? LocationManager ?: return true
         return manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
             manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }
+
+    /// Local sharing runs over Wi-Fi: the hotspot a phone creates and the
+    /// network two devices already share both need the radio on.
+    @Suppress("DEPRECATION")
+    private fun isWifiEnabled(): Boolean {
+        val wifi = context.applicationContext
+            .getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                ?: return true
+        return wifi.isWifiEnabled
     }
 
     private fun isVpnActive(): Boolean {

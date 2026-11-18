@@ -15,6 +15,10 @@ abstract final class NetworkProbe {
   /// Android 10+ refuses to run a local-only hotspot with location off.
   static Future<bool> get locationIsOn => _read('isLocationEnabled');
 
+  /// The Wi-Fi radio itself: the hotspot a phone creates and the shared
+  /// network a desktop joins both need it on.
+  static Future<bool> get wifiIsOn => _read('isWifiEnabled');
+
   static Future<bool> _read(String method) async {
     if (!Platform.isAndroid && !Platform.isIOS) return false;
     try {
