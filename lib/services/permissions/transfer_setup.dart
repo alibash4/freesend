@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:free_send/services/permissions/app_permissions.dart';
+import 'package:free_send/services/permissions/vpn_status.dart';
 
 /// One grant FreeSend needs before a transfer can start, in the order the
 /// user has to turn them on.
@@ -52,6 +53,8 @@ abstract final class TransferSetup {
         ? null
         : await Permission.notification.status;
     final camera = await Permission.camera.status;
+    // A VPN routes around the local link, so both sides become invisible.
+    final vpnOn = await VpnStatus.isOn;
     return [
       SetupStep(
         index: 1,
@@ -69,6 +72,11 @@ abstract final class TransferSetup {
         granted: _ok(camera),
         needsSettings: _blocked(camera),
         mustGrant: false,
+      ),
+      SetupStep(
+        index: 4,
+        granted: !vpnOn,
+        needsSettings: true,
       ),
     ];
   }
@@ -96,6 +104,10 @@ abstract final class TransferSetup {
       case 3:
         final status = await Permission.camera.request();
         if (_blocked(status)) await openAppSettings();
+        return;
+      case 4:
+        // A VPN belongs to another app or to the system settings; there is no
+        // in-app switch. Returning lets the screen re-check it.
         return;
     }
   }

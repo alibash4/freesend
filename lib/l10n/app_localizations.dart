@@ -1064,6 +1064,18 @@ abstract class AppLocalizations {
   /// **'Reads the pairing code shown on the other device. You can paste a code instead.'**
   String get setupCameraBody;
 
+  /// No description provided for @setupVpnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'VPN is on'**
+  String get setupVpnTitle;
+
+  /// No description provided for @setupVpnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.'**
+  String get setupVpnBody;
+
   /// No description provided for @setupOptional.
   ///
   /// In en, this message translates to:

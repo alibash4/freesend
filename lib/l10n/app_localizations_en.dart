@@ -578,6 +578,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reads the pairing code shown on the other device. You can paste a code instead.';
 
   @override
+  String get setupVpnTitle => 'VPN is on';
+
+  @override
+  String get setupVpnBody =>
+      'FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.';
+
+  @override
   String get setupOptional => 'Optional';
 
   @override

@@ -590,6 +590,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'تقرأ رمز الإقران المعروض على الجهاز الآخر. يمكنك لصق الرمز بدلًا من ذلك.';
 
   @override
+  String get setupVpnTitle => 'الشبكة الافتراضية الخاصة (VPN) مفعّلة';
+
+  @override
+  String get setupVpnBody =>
+      'يعمل FreeSend عبر الشبكة المحلية التي تخفيها الشبكة الافتراضية الخاصة. أوقفها ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
+
+  @override
   String get setupOptional => 'اختياري';
 
   @override
