@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 
 /// A sender asking a receiver to accept files.
@@ -105,6 +106,11 @@ class ConsentDoorbell {
           return;
         }
         _open[knock.requestId] = socket;
+        AppLog.info(
+          'knock',
+          '${knock.senderName} asks for ${knock.fileCount} files '
+          '(${knock.totalBytes} bytes)',
+        );
         onKnock?.call(knock);
       },
       onError: (_) => socket.destroy(),
@@ -121,7 +127,11 @@ class ConsentDoorbell {
   /// gone, so a late tap never crashes the sender.
   Future<bool> decide(String requestId, bool accepted) async {
     final socket = _open.remove(requestId);
-    if (socket == null) return false;
+    if (socket == null) {
+      AppLog.warn('consent', 'answer for unknown request $requestId');
+      return false;
+    }
+    AppLog.info('consent', 'answered $requestId: ${accepted ? 'accept' : 'decline'}');
     try {
       socket.add(
         FrameCodec.json(FrameType.knockReply, {
@@ -147,6 +157,7 @@ class ConsentDoorbell {
     }
     await _server?.close();
     _server = null;
+    AppLog.info('knock', 'doorbell stopped');
   }
 }
 
@@ -204,14 +215,18 @@ abstract final class KnockClient {
       await socket.flush();
       final frame = await answer.future.timeout(timeout);
       if (frame.type != FrameType.knockReply) return KnockOutcome.declined;
-      return frame.json()['ok'] == true
-          ? KnockOutcome.accepted
-          : KnockOutcome.declined;
-    } on SocketException {
+      final accepted = frame.json()['ok'] == true;
+      AppLog.info('consent', '$host:$port answered '
+          '${accepted ? 'accepted' : 'declined'}');
+      return accepted ? KnockOutcome.accepted : KnockOutcome.declined;
+    } on SocketException catch (error) {
+      AppLog.warn('knock', 'no answer from $host:$port ($error)');
       return KnockOutcome.timedOut;
     } on TimeoutException {
+      AppLog.warn('knock', 'timed out waiting for $host:$port');
       return KnockOutcome.timedOut;
-    } on Object {
+    } on Object catch (error) {
+      AppLog.error('knock', 'failed to knock $host:$port: $error');
       return KnockOutcome.timedOut;
     } finally {
       socket?.destroy();

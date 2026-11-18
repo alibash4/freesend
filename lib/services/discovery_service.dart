@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 
 /// A host session visible on the local link.
@@ -299,6 +300,7 @@ class SessionSeeker {
       'name': deviceName,
       'pf': platform,
     };
+    AppLog.info('seeker', 'seeking as "$deviceName" on port $_discoveryPort');
     _send();
     _timer = Timer.periodic(AppConstants.beaconInterval, (_) => _send());
     _pruneTimer = Timer.periodic(const Duration(seconds: 2), (_) => _prune());
@@ -354,6 +356,11 @@ class SessionSeeker {
         existing.lastSeen = candidate.lastSeen;
       } else {
         _candidates[candidate.id] = candidate;
+        AppLog.info(
+          'seeker',
+          'found ${candidate.deviceName} (${candidate.platform}) at '
+          '${candidate.ip}:${candidate.consentPort}',
+        );
       }
       _emit();
     } on Object {
@@ -369,7 +376,10 @@ class SessionSeeker {
         .toList();
     if (stale.isEmpty) return;
     for (final key in stale) {
-      _candidates.remove(key);
+      final lost = _candidates.remove(key);
+      if (lost != null) {
+        AppLog.debug('seeker', 'dropped ${lost.deviceName} (no answer)');
+      }
     }
     _emit();
   }
@@ -390,6 +400,7 @@ class SessionSeeker {
     _socket = null;
     _candidates.clear();
     _emit();
+    AppLog.info('seeker', 'stopped');
   }
 }
 
@@ -446,6 +457,8 @@ class PresenceResponder {
       },
       onError: (_) {},
     );
+    AppLog.info('responder', 'answering seekers as "$deviceName" '
+        '(doorbell :$consentPort)');
     return true;
   }
 
@@ -467,6 +480,7 @@ class PresenceResponder {
         return;
       }
       _lastReply[seeker] = now;
+      AppLog.debug('responder', 'answered seeker $seeker');
       _socket?.send(
         utf8.encode(jsonEncode(_payload)),
         datagram.address,

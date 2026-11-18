@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
+import 'package:free_send/ui/screens/logs_screen.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/l10n/app_localizations.dart';
@@ -302,7 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SectionHeader(title: l10n.thisDevice),
+              SectionHeader(title: l10n.general, icon: AppIcons.sliders),
               Row(
                 children: [
                   Expanded(
@@ -335,8 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xxl),
-              SectionHeader(title: l10n.receivedFiles),
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
                   Expanded(
@@ -376,6 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: PlatformEnv.isDesktop
                     ? l10n.appearance
                     : l10n.lookAndFeel,
+                icon: AppIcons.palette,
               ),
               Row(
                 children: [
@@ -483,6 +484,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.lg),
+              _UpdateRow(
+                label: l10n.black,
+                subtitle: l10n.blackThemeSubtitle,
+                value: appState.blackTheme,
+                enabled: appState.effectiveDark,
+                onChanged: (value) => appState.setBlackTheme(value),
+              ),
               if (PlatformEnv.kind == PlatformKind.android ||
                   PlatformEnv.kind == PlatformKind.ios) ...[
                 const SizedBox(height: AppSpacing.xl),
@@ -508,17 +517,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ],
               const SizedBox(height: AppSpacing.xxl),
+              SectionHeader(title: l10n.system, icon: AppIcons.apps),
               if (PlatformEnv.supportsTray) ...[
-                SectionHeader(title: l10n.systemTray),
                 _UpdateRow(
                   label: l10n.minimizeToTray,
                   subtitle: l10n.keepRunningInTray,
                   value: appState.minimizeToTray,
                   onChanged: (value) => appState.setMinimizeToTray(value),
                 ),
-                const SizedBox(height: AppSpacing.xxl),
+                const SizedBox(height: AppSpacing.lg),
               ],
-              SectionHeader(title: l10n.updates),
+              Text('Diagnostics', style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              Text(
+                'Inspect, copy or save everything the app logged this session.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const LogsScreen(),
+                    ),
+                  ),
+                  icon: Icon(AppIcons.info, size: 17),
+                  label: const Text('Open logs'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
               _UpdateRow(
                 label: l10n.checkAutomatically,
                 subtitle: l10n.lookForNewerRelease,
@@ -565,8 +593,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.xxl),
-              SectionHeader(title: l10n.data),
+              const SizedBox(height: AppSpacing.lg),
               Text(l10n.history, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
               Text(
@@ -593,7 +620,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xxl),
-              SectionHeader(title: l10n.about),
+              SectionHeader(title: l10n.about, icon: AppIcons.info),
               _AboutRow(
                 label: l10n.app,
                 value: '${AppConstants.appName} ${updateState.currentVersion}',
@@ -687,11 +714,13 @@ class _UpdateRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final String label;
   final String subtitle;
   final bool value;
+  final bool enabled;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -715,10 +744,12 @@ class _UpdateRow extends StatelessWidget {
             cursor: SystemMouseCursors.click,
             child: Switch(
               value: value,
-              onChanged: (next) {
-                context.read<AppState>().tick();
-                onChanged(next);
-              },
+              onChanged: enabled
+                  ? (next) {
+                      context.read<AppState>().tick();
+                      onChanged(next);
+                    }
+                  : null,
             ),
           ),
         ],

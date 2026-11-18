@@ -23,6 +23,7 @@ import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/update/update_service.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/ui/widgets/scan_radar.dart';
 import 'package:free_send/state/send_controller.dart';
@@ -31,6 +32,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/screens/logs_screen.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
@@ -462,6 +464,37 @@ void main() {
     expect(find.byType(QrImageView), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '19-receive-local-wifi');
+  });
+
+  testWidgets('the logs screen shows entries and can copy them', (
+    tester,
+  ) async {
+    // Start from an empty buffer: earlier tests fill it, and a ListView only
+    // builds what is on screen.
+    await AppLog.clear();
+    AppLog.info('test', 'a line from the test');
+    AppLog.warn('test', 'a warning from the test');
+    await tester.pumpWidget(
+      harness(home: const LogsScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Logs'), findsOneWidget);
+    expect(find.textContaining('a line from the test'), findsOneWidget);
+    expect(find.textContaining('a warning from the test'), findsOneWidget);
+
+    // Filtering narrows to warnings only.
+    await tester.tap(find.text('warn'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('a line from the test'), findsNothing);
+    expect(find.textContaining('a warning from the test'), findsOneWidget);
+
+    await tester.tap(find.text('all'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(AppIcons.copy), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '20-logs');
+    await AppLog.clear();
   });
 
   testWidgets('narrow screens do not overflow', (tester) async {

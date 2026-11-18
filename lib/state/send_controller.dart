@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -325,6 +326,11 @@ class SendController extends ChangeNotifier {
         deviceName: appState.deviceName,
         platform: PlatformEnv.label,
       );
+      AppLog.info(
+        'send',
+        'session up on ${_sessionAddress ?? 'unknown'}:$port with '
+        '${items.length} files (${formatBytes(totalBytes)})',
+      );
       _candidateSub ??= _seeker.candidates.listen((list) {
         candidates = list;
         notifyListeners();
@@ -557,6 +563,7 @@ class SendController extends ChangeNotifier {
     if (address == null || port <= 0) return;
     peerStates[id] = AuthState.pending;
     notifyListeners();
+    AppLog.info('send', 'asking $ip:$consentPort');
     final outcome = await KnockClient.send(
       host: ip,
       port: consentPort,

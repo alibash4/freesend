@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -196,6 +197,8 @@ class ReceiveController extends ChangeNotifier {
       platform: PlatformEnv.label,
       consentPort: _doorbell.port ?? 0,
     );
+    AppLog.info('receive', 'waiting (presence: ${presence.name}, '
+        'doorbell :${_doorbell.port})');
     notifyListeners();
   }
 
@@ -205,6 +208,7 @@ class ReceiveController extends ChangeNotifier {
     try {
       await ensureHotspotPermissions();
       final info = await _hotspotService.start(deviceName: appState.deviceName);
+      AppLog.info('hotspot', 'started "${info.ssid}" (${info.ip})');
       hotspotNotice = info.note;
       final address = info.ip ?? await localIpv4();
       if (address == null) return null;
@@ -217,12 +221,14 @@ class ReceiveController extends ChangeNotifier {
         senderPlatform: PlatformEnv.label,
       ).encode();
     } on HotspotException catch (error) {
+      AppLog.error('hotspot', 'could not start hotspot: ${error.message}');
       errorMessage = error.message;
       return null;
     }
   }
 
   void _onKnock(Knock knock) {
+    AppLog.info('consent', 'knock from ${knock.senderName}');
     activeKnock = knock;
     notifyListeners();
     if (!_knocks.isClosed) _knocks.add(knock);
@@ -236,7 +242,11 @@ class ReceiveController extends ChangeNotifier {
     activeKnock = null;
     await _doorbell.decide(knock.requestId, accepted);
     notifyListeners();
-    if (!accepted) return;
+    if (!accepted) {
+      AppLog.info('consent', 'declined ${knock.senderName}');
+      return;
+    }
+    AppLog.info('host', 'connecting back to ${knock.senderHost}:${knock.senderPort}');
     await connectToAddress(
       knock.senderHost,
       knock.senderPort,
