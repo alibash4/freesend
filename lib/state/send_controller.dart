@@ -92,8 +92,41 @@ class SendController extends ChangeNotifier {
   /// the code just points at the address.
   bool _disposed = false;
 
+  List<SeekCandidate> _candidates = const [];
+
   /// Receivers that answered the sender's signal.
-  List<SeekCandidate> candidates = const [];
+  List<SeekCandidate> get candidates => _candidates;
+
+  set candidates(List<SeekCandidate> value) {
+    _candidates = value;
+    notifyListeners();
+  }
+
+  /// The entry the user picked from the send control.
+  SendMode mode = SendMode.nearby;
+
+  /// Receivers ticked in group mode.
+  final Set<String> selected = {};
+
+  void setMode(SendMode value) {
+    if (mode == value) return;
+    mode = value;
+    selected.clear();
+    notifyListeners();
+  }
+
+  void toggleSelected(String id) {
+    if (!selected.remove(id)) selected.add(id);
+    notifyListeners();
+  }
+
+  /// Asks every ticked receiver, one independent request each.
+  Future<void> knockSelected() async {
+    final targets = candidates
+        .where((candidate) => selected.contains(candidate.id))
+        .toList(growable: false);
+    await Future.wait(targets.map(knock));
+  }
 
   /// Per-receiver consent state, keyed by [SeekCandidate.id].
   final Map<String, AuthState> peerStates = {};
@@ -502,14 +535,31 @@ class SendController extends ChangeNotifier {
   /// Asks a receiver to accept. The receiver dials back our file server once
   /// it agrees, so the transfer itself needs no further work here.
   Future<void> knock(SeekCandidate candidate) async {
+    await _knock(
+      id: candidate.id,
+      ip: candidate.ip,
+      consentPort: candidate.consentPort,
+    );
+  }
+
+  /// Knocks a scanned address, whose QR carries the receiver's doorbell port.
+  Future<void> knockAddress(String host, int doorbellPort) async {
+    await _knock(id: 'scanned@$host:$doorbellPort', ip: host, consentPort: doorbellPort);
+  }
+
+  Future<void> _knock({
+    required String id,
+    required String ip,
+    required int consentPort,
+  }) async {
     if (phase != SendPhase.waitingForPeer) return;
     final address = _sessionAddress;
     if (address == null || port <= 0) return;
-    peerStates[candidate.id] = AuthState.pending;
+    peerStates[id] = AuthState.pending;
     notifyListeners();
     final outcome = await KnockClient.send(
-      host: candidate.ip,
-      port: candidate.consentPort,
+      host: ip,
+      port: consentPort,
       senderInstanceId: appState.instanceId,
       senderName: appState.deviceName,
       platform: PlatformEnv.label,
@@ -518,7 +568,7 @@ class SendController extends ChangeNotifier {
       fileServerHost: address,
       fileServerPort: port,
     );
-    peerStates[candidate.id] = switch (outcome) {
+    peerStates[id] = switch (outcome) {
       KnockOutcome.accepted => AuthState.accepted,
       KnockOutcome.declined => AuthState.declined,
       KnockOutcome.timedOut => AuthState.offline,
@@ -533,6 +583,7 @@ class SendController extends ChangeNotifier {
     await _seeker.stop();
     candidates = const [];
     peerStates.clear();
+    selected.clear();
     await _host?.dispose();
     _host = null;
     await _hotspotService.stop();

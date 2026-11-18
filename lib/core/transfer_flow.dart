@@ -33,6 +33,9 @@ enum ReceiverPresence {
   joinPrompt,
 }
 
+/// What the sender chose from the send control.
+enum SendMode { nearby, scanCode, group }
+
 /// Which side runs the hotspot in a pairing.
 enum HotspotOwner { sender, receiver, none }
 

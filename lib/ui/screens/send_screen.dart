@@ -16,6 +16,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
+import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
@@ -38,6 +39,46 @@ enum _SourceKind { any, media, photos, videos, audio, docs, apps, folder }
 class _SendScreenState extends State<SendScreen> {
   bool _picking = false;
   String _query = '';
+  bool _chooserShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _chooseMode());
+  }
+
+  /// The send control: nearby, scan a code, or a group. A sheet on mobile, a
+  /// dialog on desktop, and the camera entry only exists where it can work.
+  Future<void> _chooseMode() async {
+    if (_chooserShown) return;
+    _chooserShown = true;
+    final controller = context.read<SendController>();
+    final mode = PlatformEnv.isDesktop
+        ? await showDialog<SendMode>(
+            context: context,
+            builder: (context) => const _SendChooserDialog(),
+          )
+        : await showModalBottomSheet<SendMode>(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => const _SendChooserSheet(),
+          );
+    if (!mounted) return;
+    if (mode == null) {
+      widget.onBack?.call();
+      return;
+    }
+    controller.setMode(mode);
+  }
+
+  /// Scanning a receiver's QR hands us its doorbell address.
+  Future<void> _scanReceiver(SendController controller) async {
+    final code = await ScanScreen.open(context);
+    if (code == null || !mounted) return;
+    final host = code.host;
+    if (host == null) return;
+    await controller.knockAddress(host, code.port);
+  }
 
   late final ScrollController _scrollController = AnimatedScrollController(
     animationFactory: const ChromiumEaseInOut(),
@@ -273,6 +314,7 @@ class _SendScreenState extends State<SendScreen> {
                         key: const ValueKey('session'),
                         controller: controller,
                         onCopy: _copy,
+                        onScanReceiver: () => _scanReceiver(controller),
                       ),
                     SendPhase.completed => _CompletedView(
                         key: const ValueKey('done'),
@@ -521,10 +563,12 @@ class _SessionView extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onCopy,
+    required this.onScanReceiver,
   });
 
   final SendController controller;
   final Future<void> Function(String value, String label) onCopy;
+  final VoidCallback onScanReceiver;
 
   @override
   Widget build(BuildContext context) {
@@ -562,7 +606,11 @@ class _SessionView extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         if (!transferring) ...[
           Text(
-            'Looking for a device to receive these',
+            switch (controller.mode) {
+              SendMode.group => 'Choose who receives these',
+              SendMode.scanCode => 'Scan the receiver\'s code',
+              SendMode.nearby => 'Looking for a device to receive these',
+            },
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -584,6 +632,34 @@ class _SessionView extends StatelessWidget {
               'tap Receive.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall,
+            )
+          else if (controller.mode == SendMode.group) ...[
+            for (final candidate in controller.candidates)
+              _CandidateRow(
+                candidate: candidate,
+                state: controller.stateOf(candidate),
+                groupMode: true,
+                selected: controller.selected.contains(candidate.id),
+                onTap: () => controller.toggleSelected(candidate.id),
+              ),
+            const SizedBox(height: AppSpacing.sm),
+            FilledButton.icon(
+              onPressed: controller.selected.isEmpty
+                  ? null
+                  : controller.knockSelected,
+              icon: Icon(AppIcons.sendPlane, size: 17),
+              label: Text(
+                controller.selected.isEmpty
+                    ? 'Select a device'
+                    : 'Ask ${controller.selected.length} '
+                        'device${controller.selected.length == 1 ? '' : 's'}',
+              ),
+            ),
+          ] else if (controller.mode == SendMode.scanCode)
+            OutlinedButton.icon(
+              onPressed: onScanReceiver,
+              icon: Icon(AppIcons.qr, size: 17),
+              label: const Text('Scan a QR code'),
             )
           else
             for (final candidate in controller.candidates)
@@ -1057,11 +1133,15 @@ class _CandidateRow extends StatelessWidget {
     required this.candidate,
     required this.state,
     required this.onTap,
+    this.groupMode = false,
+    this.selected = false,
   });
 
   final SeekCandidate candidate;
   final AuthState? state;
   final VoidCallback onTap;
+  final bool groupMode;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -1085,19 +1165,29 @@ class _CandidateRow extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(10),
+                if (groupMode)
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: selected,
+                      onChanged: (_) => onTap(),
+                    ),
+                  )
+                else
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      AppIcons.device,
+                      size: 17,
+                      color: theme.colorScheme.accentText,
+                    ),
                   ),
-                  child: Icon(
-                    AppIcons.device,
-                    size: 17,
-                    color: theme.colorScheme.accentText,
-                  ),
-                ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
@@ -1126,6 +1216,110 @@ class _CandidateRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The three ways to start sending: nearby, by scanning a code, or to a group.
+/// The camera entry is absent on desktops because the app never offers a
+/// scanner there.
+class _SendChooserBody extends StatelessWidget {
+  const _SendChooserBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final entries = <(SendMode, String, String, IconData)>[
+      (
+        SendMode.nearby,
+        'Share to nearby',
+        'Find devices that are waiting to receive.',
+        AppIcons.radar,
+      ),
+      if (showScanEntry(PlatformEnv.kind))
+        (
+          SendMode.scanCode,
+          'Scan a QR code',
+          'Read a receiver\'s code instead of waiting for it to appear.',
+          AppIcons.qr,
+        ),
+      (
+        SendMode.group,
+        'Send to a group',
+        'Pick several devices; each one accepts on its own.',
+        AppIcons.device,
+      ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('How do you want to send?', style: theme.textTheme.titleLarge),
+        const SizedBox(height: AppSpacing.md),
+        for (final (mode, title, body, icon) in entries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).pop(mode),
+                icon: Icon(icon, size: 18),
+                label: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title),
+                      Text(
+                        body,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Mobile: a bottom sheet that opens at half height and drags taller.
+class _SendChooserSheet extends StatelessWidget {
+  const _SendChooserSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
+        child: _SendChooserBody(),
+      ),
+    );
+  }
+}
+
+/// Desktop: a centered modal with a Close control.
+class _SendChooserDialog extends StatelessWidget {
+  const _SendChooserDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Send'),
+      content: SizedBox(width: 380, child: _SendChooserBody()),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
     );
   }
 }

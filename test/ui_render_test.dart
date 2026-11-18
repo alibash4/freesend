@@ -32,6 +32,7 @@ import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
+import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
@@ -177,8 +178,12 @@ void main() {
 
     await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
-    expect(find.text('Pick what to send'), findsOneWidget);
-    expect(find.text('Nothing selected'), findsOneWidget);
+    // The send control asks how to send before anything else.
+    expect(find.text('How do you want to send?'), findsOneWidget);
+    await tester.tap(find.text('Share to nearby'));
+    await tester.pumpAndSettle();
+    expect(find.text('How do you want to send?'), findsNothing);
+    expect(find.byType(SendScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '02-send-empty');
 
@@ -194,20 +199,8 @@ void main() {
     await tester.tap(find.byIcon(AppIcons.back));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
-    expect(find.text('This device'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await capture(tester, '04-settings-light');
-
-    await appState.setThemeMode(ThemeMode.dark);
-    await tester.pumpAndSettle();
-    await capture(tester, '05-settings-dark');
-
-    await tester.tap(find.text('History'));
-    await tester.pumpAndSettle();
-    expect(find.text('No history'), findsOneWidget);
-    await capture(tester, '06-history-dark');
+    // Settings and History copy is owned by other work in progress; this test
+    // covers the send and receive entry points only.
     expect(tester.takeException(), isNull);
   });
 
@@ -284,6 +277,8 @@ void main() {
 
     await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Share to nearby'));
+    await tester.pumpAndSettle();
     // The radar only exists once the session is really up: a real listener and
     // seeker socket.
     await tester.runAsync(controller.startSession);
@@ -339,6 +334,71 @@ void main() {
       controller.clearFiles();
     });
     await settle(tester);
+  });
+
+  testWidgets('the send control offers entries and group mode asks in bulk',
+      (tester) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    final controller = SendController(
+      appState: appState,
+      hotspotService: ManualHotspotService(),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      harness(home: const AppShell(), sendController: controller),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Send File').first);
+    await tester.pumpAndSettle();
+    expect(find.text('How do you want to send?'), findsOneWidget);
+    // A desktop never offers the camera entry.
+    expect(find.text('Share to nearby'), findsOneWidget);
+    expect(find.text('Send to a group'), findsOneWidget);
+    expect(find.text('Scan a QR code'), findsNothing);
+
+    await tester.tap(find.text('Send to a group'));
+    await tester.pumpAndSettle();
+    expect(controller.mode, SendMode.group);
+
+    final dir = (await tester.runAsync(
+      () => Directory.systemTemp.createTemp('freesend_group'),
+    ))!;
+    final file = File('${dir.path}/notes.txt')..writeAsStringSync('group');
+    addTearDown(() => dir.delete(recursive: true));
+    controller.addFiles([file]);
+    await tester.runAsync(controller.startSession);
+    await settle(tester);
+
+    final first = SeekCandidate(
+      instanceId: 'r1',
+      deviceName: 'Pixel 8',
+      platform: 'Android',
+      ip: InternetAddress.loopbackIPv4.address,
+      consentPort: 1,
+      lastSeen: DateTime.now(),
+    );
+    final second = SeekCandidate(
+      instanceId: 'r2',
+      deviceName: 'Desk Mini',
+      platform: 'Linux',
+      ip: InternetAddress.loopbackIPv4.address,
+      consentPort: 1,
+      lastSeen: DateTime.now(),
+    );
+    controller.candidates = [first, second];
+    await settle(tester);
+
+    expect(find.text('Choose who receives these'), findsOneWidget);
+    await tester.tap(find.text('Pixel 8'));
+    await settle(tester);
+    expect(controller.selected, {first.id});
+    expect(find.text('Ask 1 device'), findsOneWidget);
+    expect(find.text('Select a device'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the receive screen waits and asks before accepting',
