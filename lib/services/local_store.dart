@@ -26,6 +26,7 @@ class LocalStore {
   static const _kMinimizeToTray = 'minimize_to_tray';
   static const _kPermissionsPrompted = 'permissions_prompted';
   static const _kHaptics = 'haptics';
+  static const _kHapticIntensity = 'haptic_intensity';
 
   late SharedPreferences _prefs;
 
@@ -84,6 +85,14 @@ class LocalStore {
 
   Future<void> setHaptics(bool value) async {
     await _prefs.setBool(_kHaptics, value);
+  }
+
+  /// Motor intensity for haptic ticks, 0.0 (light) to 1.0 (heavy).
+  double get hapticIntensity =>
+      _prefs.getDouble(_kHapticIntensity) ?? 0.5;
+
+  Future<void> setHapticIntensity(double value) async {
+    await _prefs.setDouble(_kHapticIntensity, value);
   }
 
   /// Whether the mobile permission gate has been shown at least once.

@@ -473,6 +473,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Feel a light tap when you switch sections.';
 
   @override
+  String get hapticIntensity => 'Intensity';
+
+  @override
   String get data => 'Data';
 
   @override

@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -150,9 +149,7 @@ class _AppShellState extends State<AppShell> {
               : AppBottomNav(
                   selectedIndex: _index < 4 ? _index : -1,
                   onSelected: (index) {
-                    if (context.read<AppState>().haptics) {
-                      HapticFeedback.selectionClick();
-                    }
+                    context.read<AppState>().tick();
                     _selectImmediate(index);
                   },
                   items: items,

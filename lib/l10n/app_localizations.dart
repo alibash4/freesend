@@ -872,6 +872,12 @@ abstract class AppLocalizations {
   /// **'Feel a light tap when you switch sections.'**
   String get hapticFeedbackSubtitle;
 
+  /// No description provided for @hapticIntensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Intensity'**
+  String get hapticIntensity;
+
   /// No description provided for @data.
   ///
   /// In en, this message translates to:

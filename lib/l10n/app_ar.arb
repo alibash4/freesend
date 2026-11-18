@@ -129,6 +129,7 @@
   "keepRunningInTray": "إبقاء FreeSend يعمل في منطقة النظام عند إغلاق النافذة.",
   "hapticFeedback": "الاستجابة عند اللمس",
   "hapticFeedbackSubtitle": "شعور بنقرة خفيفة عند التنقل بين الأقسام.",
+  "hapticIntensity": "الشدة",
   "data": "البيانات",
   "localDataExplanation": "يحتفظ FreeSend بقائمة محلية بالتحويلات السابقة فقط. لا يتم رفع الملفات أبدًا — يتحدث الجهازان مباشرة عبر رابط نقطة الاتصال.",
   "clearTransferHistory": "مسح سجل التحويلات",

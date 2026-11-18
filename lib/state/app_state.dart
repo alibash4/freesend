@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' show PlatformDispatcher;
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/models/transfer_record.dart';
@@ -31,6 +32,9 @@ class AppState extends ChangeNotifier {
 
   /// Whether taps produce a light haptic tick on devices that support it.
   bool haptics = true;
+
+  /// Motor intensity for haptic ticks, 0.0 (light) to 1.0 (heavy).
+  double hapticIntensity = 0.5;
 
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
@@ -66,6 +70,7 @@ class AppState extends ChangeNotifier {
     minimizeToTray = store.minimizeToTray;
     permissionsPrompted = store.permissionsPrompted;
     haptics = store.haptics;
+    hapticIntensity = store.hapticIntensity;
     _ready = true;
     notifyListeners();
   }
@@ -86,6 +91,25 @@ class AppState extends ChangeNotifier {
     haptics = value;
     notifyListeners();
     await store.setHaptics(value);
+  }
+
+  Future<void> setHapticIntensity(double value) async {
+    hapticIntensity = value;
+    notifyListeners();
+    await store.setHapticIntensity(value);
+  }
+
+  /// Fires the configured haptic tick when feedback is enabled. Flutter
+  /// exposes no motor amplitude, so intensity selects the impact strength.
+  void tick() {
+    if (!haptics) return;
+    if (hapticIntensity < 0.25) {
+      HapticFeedback.lightImpact();
+    } else if (hapticIntensity < 0.75) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.heavyImpact();
+    }
   }
 
   Future<void> setPermissionsPrompted(bool value) async {

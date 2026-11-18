@@ -129,6 +129,7 @@
   "keepRunningInTray": "Keep FreeSend running in the tray when the window is closed.",
   "hapticFeedback": "Tap feedback",
   "hapticFeedbackSubtitle": "Feel a light tap when you switch sections.",
+  "hapticIntensity": "Intensity",
   "data": "Data",
   "localDataExplanation": "FreeSend keeps a local list of past transfers and nothing else. Files are never uploaded — the two devices talk directly over the hotspot link.",
   "clearTransferHistory": "Clear transfer history",

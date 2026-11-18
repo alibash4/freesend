@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
@@ -139,9 +138,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : const SizedBox(width: 18),
                 title: Text(label),
                 onTap: () {
-                  if (sheetContext.read<AppState>().haptics) {
-                    HapticFeedback.selectionClick();
-                  }
+                  sheetContext.read<AppState>().tick();
                   Navigator.of(sheetContext).pop(code);
                 },
               ),
@@ -188,9 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               onPressed: () {
-                if (context.read<AppState>().haptics) {
-                  HapticFeedback.selectionClick();
-                }
+                context.read<AppState>().tick();
                 _saveNameAndClose();
               },
               child: Text(l10n.save),
@@ -325,9 +320,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       onPressed: () {
-                        if (appState.haptics) {
-                          HapticFeedback.selectionClick();
-                        }
+                        appState.tick();
                         _renameDevice();
                       },
                       child: Text(
@@ -361,9 +354,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       onPressed: () {
-                        if (appState.haptics) {
-                          HapticFeedback.selectionClick();
-                        }
+                        appState.tick();
                         _chooseFolder();
                       },
                       child: Text(
@@ -404,9 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         onPressed: () async {
-                          if (appState.haptics) {
-                            HapticFeedback.selectionClick();
-                          }
+                          appState.tick();
                           final value = PlatformEnv.isDesktop
                               ? await _pickLocaleDesktop(
                                   context,
@@ -503,6 +492,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: appState.haptics,
                   onChanged: (value) => appState.setHaptics(value),
                 ),
+                if (appState.haptics) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    l10n.hapticIntensity,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  Slider(
+                    value: appState.hapticIntensity,
+                    min: 0,
+                    max: 1,
+                    divisions: 2,
+                    onChanged: appState.setHapticIntensity,
+                  ),
+                ],
               ],
               const SizedBox(height: AppSpacing.xxl),
               if (PlatformEnv.supportsTray) ...[
@@ -713,9 +716,7 @@ class _UpdateRow extends StatelessWidget {
             child: Switch(
               value: value,
               onChanged: (next) {
-                if (context.read<AppState>().haptics) {
-                  HapticFeedback.selectionClick();
-                }
+                context.read<AppState>().tick();
                 onChanged(next);
               },
             ),
@@ -837,9 +838,7 @@ class _MenuItemState extends State<_MenuItem> {
           mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(AppRadii.field),
           onTap: () {
-            if (context.read<AppState>().haptics) {
-              HapticFeedback.selectionClick();
-            }
+            context.read<AppState>().tick();
             Navigator.pop(context, widget.value);
           },
           child: SizedBox(

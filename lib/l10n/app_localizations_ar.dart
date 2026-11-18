@@ -485,6 +485,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'شعور بنقرة خفيفة عند التنقل بين الأقسام.';
 
   @override
+  String get hapticIntensity => 'الشدة';
+
+  @override
   String get data => 'البيانات';
 
   @override
