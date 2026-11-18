@@ -37,23 +37,63 @@ abstract final class AppLog {
   /// In-memory snapshot, oldest first.
   static List<LogEntry> get entries => List.unmodifiable(_entries);
 
+  /// The log survives restarts until the user clears it, so a failure can be
+  /// inspected after the app has been reopened. Only the size is bounded.
+  static const int maxFileBytes = 4 * 1024 * 1024;
+
   static Future<void> init() async {
     if (_initialised) return;
     _initialised = true;
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/freesend.log');
-      // Keep the previous run rather than growing without bound.
-      if (await file.exists()) {
+      if (await file.exists() && await file.length() > maxFileBytes) {
+        // One rotation only; an older copy would only be noise.
         await file.rename('${dir.path}/freesend.previous.log');
       }
       await file.create(recursive: true);
       _file = file;
-      await _append('--- FreeSend log opened ${DateTime.now().toIso8601String()} ---');
+      await _loadHistory(file);
+      await _append('--- FreeSend session started '
+          '${DateTime.now().toIso8601String()} ---');
     } on Object catch (error) {
       // Logging must never break a transfer.
       debugPrint('FreeSend: log file unavailable ($error)');
     }
+  }
+
+  /// Puts the tail of the previous sessions in the viewer, newest last, so
+  /// opening Settings after a failed transfer shows what happened.
+  static Future<void> _loadHistory(File file) async {
+    if (_entries.isNotEmpty) return;
+    try {
+      final lines = await file.readAsLines();
+      for (final line in lines.reversed.take(maxEntries)) {
+        final entry = _parse(line);
+        if (entry != null) _entries.insert(0, entry);
+      }
+    } on Object {
+      // A half-written line must not stop the log from working.
+    }
+  }
+
+  static LogEntry? _parse(String line) {
+    final match = RegExp(
+      r'^\[(?<time>.+?)\]\s+(?<level>[A-Z]+)\s+(?<tag>[^:]+):\s?(?<message>.*)$',
+    ).firstMatch(line);
+    if (match == null) return null;
+    final level = switch (match.namedGroup('level')) {
+      'DEBUG' => LogLevel.debug,
+      'WARN' => LogLevel.warn,
+      'ERROR' => LogLevel.error,
+      _ => LogLevel.info,
+    };
+    return LogEntry(
+      DateTime.tryParse(match.namedGroup('time') ?? '') ?? DateTime.now(),
+      level,
+      match.namedGroup('tag') ?? '',
+      match.namedGroup('message') ?? '',
+    );
   }
 
   static void log(LogLevel level, String tag, String message) {
@@ -106,6 +146,14 @@ abstract final class AppLog {
   static Future<void> clear() async {
     _entries.clear();
     revision.value++;
+    final file = _file;
+    if (file != null) {
+      try {
+        await file.writeAsString('');
+      } on Object {
+        // Fall through to the marker below; the buffer is already empty.
+      }
+    }
     await _append('--- cleared ${DateTime.now().toIso8601String()} ---');
   }
 }

@@ -11,6 +11,7 @@ import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/services/saf_folders.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -285,7 +286,9 @@ class _SendScreenState extends State<SendScreen> {
           title: Text(l10n.sendTitle),
           leading: IconButton(
             icon: Icon(backGlyph),
+            mouseCursor: SystemMouseCursors.click,
             onPressed: () async {
+              context.read<AppState>().tick();
               final leave = await _confirmLeave(controller);
               if (leave && context.mounted) widget.onBack?.call();
             },
