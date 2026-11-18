@@ -1,11 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/widgets/common.dart';
 
 /// Shows everything the app logged this session, with copy and dump actions.
 ///
@@ -67,11 +70,19 @@ class _LogsScreenState extends State<LogsScreen> {
         content: Text(l10n.clearLogsBody),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Navigator.of(context).pop(false);
+            },
             child: Text(l10n.cancel),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Navigator.of(context).pop(true);
+            },
             child: Text(l10n.clear),
           ),
         ],
@@ -95,17 +106,29 @@ class _LogsScreenState extends State<LogsScreen> {
         actions: [
           IconButton(
             tooltip: l10n.copyAll,
-            onPressed: _copyAll,
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              _copyAll();
+            },
             icon: Icon(AppIcons.copy),
           ),
           IconButton(
             tooltip: l10n.saveToFile,
-            onPressed: _saveToFile,
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              _saveToFile();
+            },
             icon: Icon(AppIcons.folder),
           ),
           IconButton(
             tooltip: l10n.clear,
-            onPressed: _clear,
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              _clear();
+            },
             icon: Icon(AppIcons.trash),
           ),
         ],
@@ -119,16 +142,22 @@ class _LogsScreenState extends State<LogsScreen> {
                 spacing: AppSpacing.sm,
                 children: [
                   for (final level in [null, ...LogLevel.values])
-                    FilterChip(
-                      label: Text(switch (level) {
-                        null => l10n.allFilter,
-                        LogLevel.debug => l10n.logLevelDebug,
-                        LogLevel.info => l10n.logLevelInfo,
-                        LogLevel.warn => l10n.logLevelWarn,
-                        LogLevel.error => l10n.logLevelError,
-                      }),
-                      selected: _filter == level,
-                      onSelected: (_) => setState(() => _filter = level),
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: FilterChip(
+                        label: Text(switch (level) {
+                          null => l10n.allFilter,
+                          LogLevel.debug => l10n.logLevelDebug,
+                          LogLevel.info => l10n.logLevelInfo,
+                          LogLevel.warn => l10n.logLevelWarn,
+                          LogLevel.error => l10n.logLevelError,
+                        }),
+                        selected: _filter == level,
+                        onSelected: (_) {
+                          context.read<AppState>().tick();
+                          setState(() => _filter = level);
+                        },
+                      ),
                     ),
                 ],
               ),
@@ -141,31 +170,37 @@ class _LogsScreenState extends State<LogsScreen> {
                         style: theme.textTheme.bodySmall,
                       ),
                     )
-                  : ListView.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        final color = switch (entry.level) {
-                          LogLevel.error => theme.colorScheme.error,
-                          LogLevel.warn => Colors.orange,
-                          LogLevel.info => theme.colorScheme.onSurface,
-                          LogLevel.debug => theme.colorScheme.onSurfaceVariant,
-                        };
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: 4,
-                          ),
-                          child: Text(
-                            entry.format(),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              color: color,
+                  : Directionality(
+                      // Log lines are protocol output (timestamps, paths,
+                      // key=value pairs) — always LTR even in Arabic UI.
+                      textDirection: TextDirection.ltr,
+                      child: ListView.builder(
+                        itemCount: entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          final color = switch (entry.level) {
+                            LogLevel.error => theme.colorScheme.error,
+                            LogLevel.warn => Colors.orange,
+                            LogLevel.info => theme.colorScheme.onSurface,
+                            LogLevel.debug =>
+                              theme.colorScheme.onSurfaceVariant,
+                          };
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: 4,
                             ),
-                          ),
-                        );
-                      },
+                            child: Text(
+                              entry.format(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                color: color,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
             ),
           ],

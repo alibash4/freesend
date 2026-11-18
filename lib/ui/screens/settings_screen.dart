@@ -556,11 +556,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const LogsScreen(),
-                        ),
-                      ),
+                      style: clickCursorStyle,
+                      onPressed: () {
+                        context.read<AppState>().tick();
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const LogsScreen(),
+                          ),
+                        );
+                      },
                       icon: Icon(AppIcons.info, size: 17),
                       label: Text(l10n.openLogs),
                     ),
