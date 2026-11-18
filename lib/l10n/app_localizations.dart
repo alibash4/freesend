@@ -1025,8 +1025,32 @@ abstract class AppLocalizations {
   /// No description provided for @setupIntro.
   ///
   /// In en, this message translates to:
-  /// **'FreeSend needs these device settings before a transfer. Turn them on, then come back - this screen checks again automatically.'**
+  /// **'FreeSend needs these permissions and device settings before a transfer. Allow the prompts, turn on the settings, then come back - this screen updates itself.'**
   String get setupIntro;
+
+  /// No description provided for @setupNearbyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby devices'**
+  String get setupNearbyTitle;
+
+  /// No description provided for @setupNearbyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets FreeSend find the other device and run the hotspot the transfer uses.'**
+  String get setupNearbyBody;
+
+  /// No description provided for @setupNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get setupNotificationsTitle;
+
+  /// No description provided for @setupNotificationsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps the transfer running when you leave the app.'**
+  String get setupNotificationsBody;
 
   /// No description provided for @setupWifiTitle.
   ///
@@ -1070,6 +1094,18 @@ abstract class AppLocalizations {
   /// **'Optional'**
   String get setupOptional;
 
+  /// No description provided for @setupEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get setupEnable;
+
+  /// No description provided for @setupSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get setupSettings;
+
   /// No description provided for @setupDone.
   ///
   /// In en, this message translates to:
@@ -1088,114 +1124,6 @@ abstract class AppLocalizations {
   /// **'Check again'**
   String get setupCheckAgain;
 
-  /// No description provided for @permTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Please grant the following permissions'**
-  String get permTitle;
-
-  /// No description provided for @permIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'FreeSend needs access to the local link and camera to find nearby devices and scan pairing codes. Nothing leaves your network.'**
-  String get permIntro;
-
-  /// No description provided for @permSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Permissions'**
-  String get permSection;
-
-  /// No description provided for @permLocationTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Location / nearby devices'**
-  String get permLocationTitle;
-
-  /// No description provided for @permLocationBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Required by Android to create or join a hotspot and discover other FreeSend devices.'**
-  String get permLocationBody;
-
-  /// No description provided for @permNearbyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Nearby Wi-Fi devices'**
-  String get permNearbyTitle;
-
-  /// No description provided for @permNearbyBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Used on Android 13 and newer for device discovery.'**
-  String get permNearbyBody;
-
-  /// No description provided for @permLocalNetworkTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Local network'**
-  String get permLocalNetworkTitle;
-
-  /// No description provided for @permNotificationsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Notifications'**
-  String get permNotificationsTitle;
-
-  /// No description provided for @permNotificationsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Shows transfer progress while FreeSend is in the background.'**
-  String get permNotificationsBody;
-
-  /// No description provided for @permMediaTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Photos, videos, and audio'**
-  String get permMediaTitle;
-
-  /// No description provided for @permMediaBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Used by the media browser to show thumbnails and let you pick files.'**
-  String get permMediaBody;
-
-  /// No description provided for @permCameraTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Camera'**
-  String get permCameraTitle;
-
-  /// No description provided for @permCameraBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Only used to scan a pairing QR code. You can still pair by typing or pasting the code.'**
-  String get permCameraBody;
-
-  /// No description provided for @permAllowed.
-  ///
-  /// In en, this message translates to:
-  /// **'Allowed'**
-  String get permAllowed;
-
-  /// No description provided for @permBlocked.
-  ///
-  /// In en, this message translates to:
-  /// **'Blocked'**
-  String get permBlocked;
-
-  /// No description provided for @permNotAsked.
-  ///
-  /// In en, this message translates to:
-  /// **'Not asked'**
-  String get permNotAsked;
-
-  /// No description provided for @permAllSet.
-  ///
-  /// In en, this message translates to:
-  /// **'FreeSend is ready.'**
-  String get permAllSet;
-
   /// No description provided for @updateUpToDate.
   ///
   /// In en, this message translates to:
@@ -1207,36 +1135,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update failed'**
   String get updateFailed;
-
-  /// No description provided for @permChangeLater.
-  ///
-  /// In en, this message translates to:
-  /// **'You can change these later in the system settings.'**
-  String get permChangeLater;
-
-  /// No description provided for @permRequesting.
-  ///
-  /// In en, this message translates to:
-  /// **'Requesting…'**
-  String get permRequesting;
-
-  /// No description provided for @permContinue.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue'**
-  String get permContinue;
-
-  /// No description provided for @permAllow.
-  ///
-  /// In en, this message translates to:
-  /// **'Allow permissions'**
-  String get permAllow;
-
-  /// No description provided for @permOpenSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Open system settings'**
-  String get permOpenSettings;
 }
 
 class _AppLocalizationsDelegate

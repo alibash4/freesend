@@ -17,7 +17,11 @@ class ScanScreen extends StatefulWidget {
   /// Windows and Linux offer the typed-in path instead of a dead button.
   static bool get isSupported => Platform.isAndroid || Platform.isMacOS;
 
-  static Future<PairingCode?> open(BuildContext context) {
+  static Future<PairingCode?> open(BuildContext context) async {
+    // The camera is asked for at the moment it is needed, not at app start.
+    // macOS raises its own prompt on first camera access.
+    if (Platform.isAndroid) await Permission.camera.request();
+    if (!context.mounted) return null;
     return Navigator.of(context).push<PairingCode>(
       MaterialPageRoute(
         builder: (_) => const ScanScreen(),

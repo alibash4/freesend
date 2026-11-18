@@ -554,7 +554,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupIntro =>
-      'FreeSend needs these device settings before a transfer. Turn them on, then come back - this screen checks again automatically.';
+      'FreeSend needs these permissions and device settings before a transfer. Allow the prompts, turn on the settings, then come back - this screen updates itself.';
+
+  @override
+  String get setupNearbyTitle => 'Nearby devices';
+
+  @override
+  String get setupNearbyBody =>
+      'Lets FreeSend find the other device and run the hotspot the transfer uses.';
+
+  @override
+  String get setupNotificationsTitle => 'Notifications';
+
+  @override
+  String get setupNotificationsBody =>
+      'Keeps the transfer running when you leave the app.';
 
   @override
   String get setupWifiTitle => 'Wi-Fi is on';
@@ -581,6 +595,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupOptional => 'Optional';
 
   @override
+  String get setupEnable => 'Allow';
+
+  @override
+  String get setupSettings => 'Settings';
+
+  @override
   String get setupDone => 'Done';
 
   @override
@@ -590,84 +610,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupCheckAgain => 'Check again';
 
   @override
-  String get permTitle => 'Please grant the following permissions';
-
-  @override
-  String get permIntro =>
-      'FreeSend needs access to the local link and camera to find nearby devices and scan pairing codes. Nothing leaves your network.';
-
-  @override
-  String get permSection => 'Permissions';
-
-  @override
-  String get permLocationTitle => 'Location / nearby devices';
-
-  @override
-  String get permLocationBody =>
-      'Required by Android to create or join a hotspot and discover other FreeSend devices.';
-
-  @override
-  String get permNearbyTitle => 'Nearby Wi-Fi devices';
-
-  @override
-  String get permNearbyBody =>
-      'Used on Android 13 and newer for device discovery.';
-
-  @override
-  String get permLocalNetworkTitle => 'Local network';
-
-  @override
-  String get permNotificationsTitle => 'Notifications';
-
-  @override
-  String get permNotificationsBody =>
-      'Shows transfer progress while FreeSend is in the background.';
-
-  @override
-  String get permMediaTitle => 'Photos, videos, and audio';
-
-  @override
-  String get permMediaBody =>
-      'Used by the media browser to show thumbnails and let you pick files.';
-
-  @override
-  String get permCameraTitle => 'Camera';
-
-  @override
-  String get permCameraBody =>
-      'Only used to scan a pairing QR code. You can still pair by typing or pasting the code.';
-
-  @override
-  String get permAllowed => 'Allowed';
-
-  @override
-  String get permBlocked => 'Blocked';
-
-  @override
-  String get permNotAsked => 'Not asked';
-
-  @override
-  String get permAllSet => 'FreeSend is ready.';
-
-  @override
   String get updateUpToDate => 'You\'re on the latest version.';
 
   @override
   String get updateFailed => 'Update failed';
-
-  @override
-  String get permChangeLater =>
-      'You can change these later in the system settings.';
-
-  @override
-  String get permRequesting => 'Requesting…';
-
-  @override
-  String get permContinue => 'Continue';
-
-  @override
-  String get permAllow => 'Allow permissions';
-
-  @override
-  String get permOpenSettings => 'Open system settings';
 }

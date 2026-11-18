@@ -24,7 +24,6 @@ class LocalStore {
   static const _kTrustedDevices = 'trusted_devices';
   static const _kAutoUpdate = 'auto_update';
   static const _kMinimizeToTray = 'minimize_to_tray';
-  static const _kPermissionsPrompted = 'permissions_prompted';
   static const _kHaptics = 'haptics';
   static const _kHapticIntensity = 'haptic_intensity';
   static const _kBlackTheme = 'black_theme';
@@ -89,8 +88,7 @@ class LocalStore {
   }
 
   /// Motor intensity for haptic ticks, 0.0 (light) to 1.0 (heavy).
-  double get hapticIntensity =>
-      _prefs.getDouble(_kHapticIntensity) ?? 0.5;
+  double get hapticIntensity => _prefs.getDouble(_kHapticIntensity) ?? 0.5;
 
   Future<void> setHapticIntensity(double value) async {
     await _prefs.setDouble(_kHapticIntensity, value);
@@ -104,11 +102,6 @@ class LocalStore {
   }
 
   /// Whether the mobile permission gate has been shown at least once.
-  bool get permissionsPrompted => _prefs.getBool(_kPermissionsPrompted) ?? false;
-
-  Future<void> setPermissionsPrompted(bool value) async {
-    await _prefs.setBool(_kPermissionsPrompted, value);
-  }
 
   /// Where received files land. Android keeps them inside app-owned storage so
   /// no extra storage permission is needed; desktops use Downloads.
@@ -226,7 +219,8 @@ class LocalStore {
         // Skip a corrupt entry.
       }
     }
-    devices.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    devices
+        .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return devices;
   }
 

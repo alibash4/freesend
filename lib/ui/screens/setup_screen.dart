@@ -8,10 +8,10 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
-/// Full-screen gate shown before a send or a receive while a required device
-/// setting is still off. [title] is the only copy that changes between the
-/// two. None of the checks can be toggled from inside the app, so the screen
-/// is a status list that re-checks when the user comes back.
+/// Full-screen gate shown before a send or a receive while a required grant
+/// is still off. [title] is the only copy that changes between the two.
+/// Permission rows can be granted here, in context; device settings that
+/// only the user can flip are status rows that re-check on return.
 class SetupScreen extends StatefulWidget {
   const SetupScreen({
     super.key,
@@ -29,8 +29,8 @@ class SetupScreen extends StatefulWidget {
   /// Called from the back control. When null, the route pops with `false`.
   final VoidCallback? onLeave;
 
-  /// Pushes the gate when Android is missing a required setting. Returns
-  /// true once they are on, or when this platform has nothing to ask for.
+  /// Pushes the gate when Android is missing a required grant. Returns true
+  /// once they are on, or when this platform has nothing to ask for.
   static Future<bool> ensure(BuildContext context,
       {required String title}) async {
     if (!TransferSetup.applies || await TransferSetup.isReady) return true;
@@ -49,6 +49,9 @@ class SetupScreen extends StatefulWidget {
 
 class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
   List<SetupStep> _steps = const [];
+
+  /// The step whose system dialog is open. Null when nothing is in flight.
+  int? _busyIndex;
 
   @override
   void initState() {
@@ -84,29 +87,40 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     setState(() => _steps = steps);
   }
 
+  Future<void> _enable(SetupStep step) async {
+    if (_busyIndex != null) return;
+    setState(() => _busyIndex = step.index);
+    await TransferSetup.enable(step);
+    if (!mounted) return;
+    setState(() => _busyIndex = null);
+    await _reload();
+  }
+
   /// The copy for a step. The check itself carries no text so the service
   /// stays free of any localization.
   String _titleFor(AppLocalizations l10n, SetupStep step) =>
-      switch (step.index) {
-        1 => l10n.setupWifiTitle,
-        2 => l10n.setupVpnTitle,
-        3 => l10n.setupLocationTitle,
-        _ => '',
+      switch (step.kind) {
+        SetupKind.nearby => l10n.setupNearbyTitle,
+        SetupKind.notifications => l10n.setupNotificationsTitle,
+        SetupKind.wifi => l10n.setupWifiTitle,
+        SetupKind.vpn => l10n.setupVpnTitle,
+        SetupKind.location => l10n.setupLocationTitle,
       };
 
-  String _bodyFor(AppLocalizations l10n, SetupStep step) =>
-      switch (step.index) {
-        1 => l10n.setupWifiBody,
-        2 => l10n.setupVpnBody,
-        3 => l10n.setupLocationBody,
-        _ => '',
+  String _bodyFor(AppLocalizations l10n, SetupStep step) => switch (step.kind) {
+        SetupKind.nearby => l10n.setupNearbyBody,
+        SetupKind.notifications => l10n.setupNotificationsBody,
+        SetupKind.wifi => l10n.setupWifiBody,
+        SetupKind.vpn => l10n.setupVpnBody,
+        SetupKind.location => l10n.setupLocationBody,
       };
 
-  IconData _iconFor(SetupStep step) => switch (step.index) {
-        1 => AppIcons.wifi,
-        2 => AppIcons.shieldAlert,
-        3 => AppIcons.locationPin,
-        _ => AppIcons.info,
+  IconData _iconFor(SetupStep step) => switch (step.kind) {
+        SetupKind.nearby => AppIcons.hotspot,
+        SetupKind.notifications => AppIcons.bell,
+        SetupKind.wifi => AppIcons.wifi,
+        SetupKind.vpn => AppIcons.shieldAlert,
+        SetupKind.location => AppIcons.locationPin,
       };
 
   @override
@@ -114,6 +128,10 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
+    final active = _steps.cast<SetupStep?>().firstWhere(
+          (step) => step != null && !step.granted && step.mustGrant,
+          orElse: () => null,
+        );
 
     return Scaffold(
       backgroundColor: scheme.surface,
@@ -166,6 +184,9 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                 title: _titleFor(l10n, step),
                 body: _bodyFor(l10n, step),
                 optionalLabel: l10n.setupOptional,
+                locked: active != null &&
+                    step.mustGrant &&
+                    step.index > active.index,
               ),
               if (step != _steps.last)
                 Padding(
@@ -173,7 +194,23 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
                   child: Container(height: 1, color: scheme.hairline),
                 ),
             ],
-            const SizedBox(height: AppSpacing.xl),
+            if (active != null && active.isActionable) ...[
+              const SizedBox(height: AppSpacing.xl),
+              Center(
+                child: FilledButton(
+                  style: clickCursorStyle,
+                  onPressed: _busyIndex == null ? () => _enable(active) : null,
+                  child: _busyIndex == active.index
+                      ? const SpinnerIcon(size: 16)
+                      : Text(
+                          active.needsSettings
+                              ? l10n.setupSettings
+                              : l10n.setupEnable,
+                        ),
+                ),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
             Center(
               child: TextButton.icon(
                 style: clickCursorStyle,
@@ -192,8 +229,8 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
   }
 }
 
-/// One check in the gate list, styled like the permission rows: muted icon,
-/// title, explanatory body, and a status label on the trailing edge.
+/// One requirement in the gate list, styled like the permission rows: muted
+/// icon, title, explanatory body, and a status label on the trailing edge.
 class _SetupRow extends StatelessWidget {
   const _SetupRow({
     required this.icon,
@@ -201,6 +238,7 @@ class _SetupRow extends StatelessWidget {
     required this.title,
     required this.body,
     required this.optionalLabel,
+    required this.locked,
   });
 
   final IconData icon;
@@ -210,6 +248,7 @@ class _SetupRow extends StatelessWidget {
 
   /// The tag shown next to a check the transfer does not depend on.
   final String optionalLabel;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +256,7 @@ class _SetupRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final tint = step.granted ? AppColors.success : scheme.error;
-    return Row(
+    final row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
@@ -280,5 +319,6 @@ class _SetupRow extends StatelessWidget {
         ),
       ],
     );
+    return Opacity(opacity: locked ? 0.45 : 1, child: row);
   }
 }

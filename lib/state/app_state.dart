@@ -28,7 +28,6 @@ class AppState extends ChangeNotifier {
   bool minimizeToTray = false;
 
   /// Whether the mobile permission gate has already been shown.
-  bool permissionsPrompted = false;
 
   /// Whether taps produce a light haptic tick on devices that support it.
   bool haptics = true;
@@ -72,7 +71,6 @@ class AppState extends ChangeNotifier {
     history = store.history;
     autoUpdate = store.autoUpdate;
     minimizeToTray = store.minimizeToTray;
-    permissionsPrompted = store.permissionsPrompted;
     haptics = store.haptics;
     hapticIntensity = store.hapticIntensity;
     blackTheme = store.blackTheme;
@@ -127,12 +125,6 @@ class AppState extends ChangeNotifier {
     } else {
       HapticFeedback.heavyImpact();
     }
-  }
-
-  Future<void> setPermissionsPrompted(bool value) async {
-    permissionsPrompted = value;
-    notifyListeners();
-    await store.setPermissionsPrompted(value);
   }
 
   Future<void> setDeviceName(String value) async {

@@ -18,9 +18,9 @@ void main() {
   final captureKey = GlobalKey();
 
   const steps = [
-    SetupStep(index: 1, granted: false),
-    SetupStep(index: 2, granted: false),
-    SetupStep(index: 3, granted: false, mustGrant: false),
+    SetupStep(index: 1, kind: SetupKind.nearby, granted: false),
+    SetupStep(index: 2, kind: SetupKind.wifi, granted: false),
+    SetupStep(index: 3, kind: SetupKind.vpn, granted: false, mustGrant: false),
   ];
 
   setUpAll(() async {
@@ -91,15 +91,16 @@ void main() {
     await pump(tester, 'Before you receive');
 
     expect(find.text('Before you receive'), findsOneWidget);
+    expect(find.text('Nearby devices'), findsOneWidget);
     expect(find.text('Wi-Fi is on'), findsOneWidget);
     expect(find.text('VPN is off'), findsOneWidget);
-    expect(find.text('Location is on'), findsOneWidget);
 
-    // Nothing here can be toggled in-app: each unmet check says so, the
-    // optional one keeps its tag, and the only action is re-checking.
+    // Permission rows can be granted in place; system rows only report.
+    // The first unmet required step owns the single action button.
     expect(find.text('Action needed'), findsNWidgets(3));
     expect(find.text('Done'), findsNothing);
     expect(find.text('Optional'), findsOneWidget);
+    expect(find.text('Allow', skipOffstage: false), findsOneWidget);
     expect(find.text('Check again', skipOffstage: false), findsOneWidget);
 
     await capture(tester, '18-setup-receive');
@@ -110,22 +111,28 @@ void main() {
     expect(find.text('Before you send'), findsOneWidget);
     expect(find.text('Before you receive'), findsNothing);
     expect(find.text('Action needed'), findsNWidgets(3));
+    expect(find.text('Allow', skipOffstage: false), findsOneWidget);
 
     await capture(tester, '19-setup-send-dark');
   });
 
   test('optional checks do not block, required ones do', () async {
     TransferSetup.debugLoad = () async => const [
-          SetupStep(index: 1, granted: true),
-          SetupStep(index: 2, granted: true),
-          SetupStep(index: 3, granted: false, mustGrant: false),
+          SetupStep(index: 1, kind: SetupKind.nearby, granted: true),
+          SetupStep(index: 2, kind: SetupKind.wifi, granted: true),
+          SetupStep(
+            index: 3,
+            kind: SetupKind.vpn,
+            granted: false,
+            mustGrant: false,
+          ),
         ];
     expect(await TransferSetup.isReady, isTrue);
 
     TransferSetup.debugLoad = () async => const [
-          SetupStep(index: 1, granted: false),
-          SetupStep(index: 2, granted: true),
-          SetupStep(index: 3, granted: true),
+          SetupStep(index: 1, kind: SetupKind.nearby, granted: false),
+          SetupStep(index: 2, kind: SetupKind.wifi, granted: true),
+          SetupStep(index: 3, kind: SetupKind.vpn, granted: true),
         ];
     expect(await TransferSetup.isReady, isFalse);
   });
