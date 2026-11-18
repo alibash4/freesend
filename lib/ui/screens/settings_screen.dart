@@ -34,9 +34,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController(text: context.read<AppState>().deviceName);
   final _focusNode = FocusNode();
 
+  /// 0 -> 1 as the page title scrolls away; drives the collapsing title.
+  double _titleFade = 0;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(() {
+      final fade = (_scrollController.offset / 56).clamp(0.0, 1.0);
+      if (fade != _titleFade) setState(() => _titleFade = fade);
+    });
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus) _saveName();
     });
@@ -72,8 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ) async {
     final overlayBox =
         Overlay.of(context).context.findRenderObject()! as RenderBox;
-    final buttonBox =
-        buttonContext.findRenderObject()! as RenderBox;
+    final buttonBox = buttonContext.findRenderObject()! as RenderBox;
     final position = RelativeRect.fromRect(
       buttonBox.localToGlobal(Offset.zero, ancestor: overlayBox) &
           buttonBox.size,
@@ -107,9 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Last path segment of a directory path, tolerating both separators and a
   /// trailing slash. Returns the input unchanged when it has no segments.
   String _dirName(String path) {
-    final parts = path
-        .split(RegExp(r'[\\/]'))
-        .where((part) => part.isNotEmpty);
+    final parts = path.split(RegExp(r'[\\/]')).where((part) => part.isNotEmpty);
     return parts.isEmpty ? path : parts.last;
   }
 
@@ -289,350 +293,395 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final updateState = context.watch<UpdateController>();
     final l10n = AppLocalizations.of(context);
 
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+    return Stack(
       children: [
-        Padding(
-          padding: kPagePadding.copyWith(top: AppSpacing.md),
-          child: AppPageTitle(l10n.settings),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Padding(
-          padding: kPagePadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(title: l10n.general, icon: AppIcons.sliders),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.deviceName,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 168,
-                    child: OutlinedButton(
-                      style: ButtonStyle(
-                        mouseCursor: WidgetStatePropertyAll(
-                          SystemMouseCursors.click,
-                        ),
-                      ),
-                      onPressed: () {
-                        appState.tick();
-                        _renameDevice();
-                      },
-                      child: Text(
-                        appState.deviceName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+        ListView(
+          controller: _scrollController,
+          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+          children: [
+            Padding(
+              padding: kPagePadding.copyWith(top: AppSpacing.md),
+              child: Opacity(
+                opacity: 1 - _titleFade,
+                child: AppPageTitle(l10n.settings),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Padding(
+              padding: kPagePadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      l10n.saveLocation,
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 168,
-                    child: OutlinedButton(
-                      style: ButtonStyle(
-                        mouseCursor: WidgetStatePropertyAll(
-                          SystemMouseCursors.click,
+                  SectionHeader(title: l10n.general, icon: AppIcons.sliders),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.deviceName,
+                          style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                      onPressed: () {
-                        appState.tick();
-                        _chooseFolder();
-                      },
-                      child: Text(
-                        appState.downloadDir.isEmpty
-                            ? l10n.notSetYet
-                            : _dirName(appState.downloadDir),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w400,
+                      SizedBox(
+                        width: 168,
+                        child: OutlinedButton(
+                          style: ButtonStyle(
+                            mouseCursor: WidgetStatePropertyAll(
+                              SystemMouseCursors.click,
+                            ),
+                          ),
+                          onPressed: () {
+                            appState.tick();
+                            _renameDevice();
+                          },
+                          child: Text(
+                            appState.deviceName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.saveLocation,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 168,
+                        child: OutlinedButton(
+                          style: ButtonStyle(
+                            mouseCursor: WidgetStatePropertyAll(
+                              SystemMouseCursors.click,
+                            ),
+                          ),
+                          onPressed: () {
+                            appState.tick();
+                            _chooseFolder();
+                          },
+                          child: Text(
+                            appState.downloadDir.isEmpty
+                                ? l10n.notSetYet
+                                : _dirName(appState.downloadDir),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  SectionHeader(
+                    title: PlatformEnv.isDesktop
+                        ? l10n.appearance
+                        : l10n.lookAndFeel,
+                    icon: AppIcons.palette,
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.language,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 168,
+                        child: Builder(
+                          builder: (buttonContext) => OutlinedButton(
+                            style: ButtonStyle(
+                              mouseCursor: WidgetStatePropertyAll(
+                                SystemMouseCursors.click,
+                              ),
+                            ),
+                            onPressed: () async {
+                              appState.tick();
+                              final value = PlatformEnv.isDesktop
+                                  ? await _pickLocaleDesktop(
+                                      context,
+                                      buttonContext,
+                                      l10n,
+                                    )
+                                  : await _pickLocaleSheet(context, l10n);
+                              if (value != null) {
+                                // Let the popup/sheet finish its dismiss
+                                // animation before flipping directionality,
+                                // otherwise the exiting menu jumps position.
+                                await Future<void>.delayed(
+                                  const Duration(milliseconds: 300),
+                                );
+                                if (!mounted) return;
+                                appState.setLocale(Locale(value));
+                              }
+                            },
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    appState.locale.languageCode == 'ar'
+                                        ? l10n.arabic
+                                        : l10n.english,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.keyboard_arrow_down,
+                                  size: 17,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  Text(l10n.theme, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 6),
+                  // Three choices in one soft track, so the control reads as a
+                  // single object on the page.
+                  Container(
+                    height: 45,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(AppRadii.field),
+                    ),
+                    child: _SlidingPill(
+                      selectedIndex: [
+                        ThemeMode.light,
+                        ThemeMode.dark,
+                        ThemeMode.system,
+                      ].indexOf(appState.themeMode),
+                      count: 3,
+                      child: Row(
+                        spacing: 4,
+                        children: [
+                          for (final (mode, label, icon) in [
+                            (ThemeMode.light, l10n.light, AppIcons.sun),
+                            (ThemeMode.dark, l10n.dark, AppIcons.moon),
+                            (
+                              ThemeMode.system,
+                              l10n.auto,
+                              PlatformEnv.isDesktop
+                                  ? AppIcons.auto
+                                  : AppIcons.deviceMobile
+                            ),
+                          ])
+                            Expanded(
+                              child: _ThemeChoice(
+                                label: label,
+                                icon: icon,
+                                selected: appState.themeMode == mode,
+                                onTap: () => appState.setThemeMode(mode),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              SectionHeader(
-                title: PlatformEnv.isDesktop
-                    ? l10n.appearance
-                    : l10n.lookAndFeel,
-                icon: AppIcons.palette,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l10n.language,
-                      style: theme.textTheme.bodyMedium,
+                  const SizedBox(height: AppSpacing.lg),
+                  _UpdateRow(
+                    label: l10n.black,
+                    subtitle: l10n.blackThemeSubtitle,
+                    value: appState.blackTheme,
+                    onChanged: (value) => appState.setBlackTheme(value),
+                  ),
+                  if (PlatformEnv.kind == PlatformKind.android ||
+                      PlatformEnv.kind == PlatformKind.ios) ...[
+                    const SizedBox(height: AppSpacing.xl),
+                    _UpdateRow(
+                      label: l10n.hapticFeedback,
+                      subtitle: l10n.hapticFeedbackSubtitle,
+                      value: appState.haptics,
+                      onChanged: (value) => appState.setHaptics(value),
+                    ),
+                    if (appState.haptics) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        l10n.hapticIntensity,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      Slider(
+                        value: appState.hapticIntensity,
+                        min: 0,
+                        max: 1,
+                        divisions: 2,
+                        onChanged: appState.setHapticIntensity,
+                      ),
+                    ],
+                  ],
+                  const SizedBox(height: AppSpacing.xxl),
+                  SectionHeader(title: l10n.system, icon: AppIcons.apps),
+                  if (PlatformEnv.supportsTray) ...[
+                    _UpdateRow(
+                      label: l10n.minimizeToTray,
+                      subtitle: l10n.keepRunningInTray,
+                      value: appState.minimizeToTray,
+                      onChanged: (value) => appState.setMinimizeToTray(value),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                  Text('Diagnostics', style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Inspect, copy or save everything the app logged this session.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const LogsScreen(),
+                        ),
+                      ),
+                      icon: Icon(AppIcons.info, size: 17),
+                      label: const Text('Open logs'),
                     ),
                   ),
-                  SizedBox(
-                    width: 168,
-                    child: Builder(
-                      builder: (buttonContext) => OutlinedButton(
+                  const SizedBox(height: AppSpacing.lg),
+                  _UpdateRow(
+                    label: l10n.checkAutomatically,
+                    subtitle: l10n.lookForNewerRelease,
+                    value: appState.autoUpdate,
+                    onChanged: (value) async {
+                      await appState.setAutoUpdate(value);
+                      if (!context.mounted) return;
+                      context.read<UpdateController>().setAutoCheck(value);
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: OutlinedButton.icon(
                         style: ButtonStyle(
                           mouseCursor: WidgetStatePropertyAll(
                             SystemMouseCursors.click,
                           ),
                         ),
-                        onPressed: () async {
-                          appState.tick();
-                          final value = PlatformEnv.isDesktop
-                              ? await _pickLocaleDesktop(
-                                  context,
-                                  buttonContext,
-                                  l10n,
-                                )
-                              : await _pickLocaleSheet(context, l10n);
-                          if (value != null) {
-                            // Let the popup/sheet finish its dismiss
-                            // animation before flipping directionality,
-                            // otherwise the exiting menu jumps position.
-                            await Future<void>.delayed(
-                              const Duration(milliseconds: 300),
-                            );
-                            if (!mounted) return;
-                            appState.setLocale(Locale(value));
-                          }
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                appState.locale.languageCode == 'ar'
-                                    ? l10n.arabic
-                                    : l10n.english,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              Icons.keyboard_arrow_down,
-                              size: 17,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ],
+                        onPressed: updateState.phase == UpdatePhase.checking
+                            ? null
+                            : _checkNow,
+                        icon: updateState.phase == UpdatePhase.checking
+                            ? const SpinnerIcon(size: 16)
+                            : Icon(AppIcons.refresh, size: 17),
+                        label: Text(
+                          updateState.phase == UpdatePhase.checking
+                              ? l10n.checkingUpdates
+                              : l10n.checkForUpdates,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(l10n.theme, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              // Three choices in one soft track, so the control reads as a
-              // single object on the page.
-              Container(
-                height: 45,
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppRadii.field),
-                ),
-                child: _SlidingPill(
-                  selectedIndex: [
-                    ThemeMode.light,
-                    ThemeMode.dark,
-                    ThemeMode.system,
-                  ].indexOf(appState.themeMode),
-                  count: 3,
-                  child: Row(
-                  spacing: 4,
-                  children: [
-                    for (final (mode, label, icon) in [
-                      (ThemeMode.light, l10n.light, AppIcons.sun),
-                      (ThemeMode.dark, l10n.dark, AppIcons.moon),
-                      (ThemeMode.system, l10n.auto,
-                        PlatformEnv.isDesktop
-                            ? AppIcons.auto
-                            : AppIcons.deviceMobile),
-                    ])
-                      Expanded(
-                        child: _ThemeChoice(
-                          label: label,
-                          icon: icon,
-                          selected: appState.themeMode == mode,
-                          onTap: () => appState.setThemeMode(mode),
-                        ),
+                  if (updateState.localizedMessage(l10n).isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      updateState.localizedMessage(l10n),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: updateState.phase == UpdatePhase.failed
+                            ? theme.colorScheme.error
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
+                    ),
                   ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _UpdateRow(
-                label: l10n.black,
-                subtitle: l10n.blackThemeSubtitle,
-                value: appState.blackTheme,
-                enabled: appState.effectiveDark,
-                onChanged: (value) => appState.setBlackTheme(value),
-              ),
-              if (PlatformEnv.kind == PlatformKind.android ||
-                  PlatformEnv.kind == PlatformKind.ios) ...[
-                const SizedBox(height: AppSpacing.xl),
-                _UpdateRow(
-                  label: l10n.hapticFeedback,
-                  subtitle: l10n.hapticFeedbackSubtitle,
-                  value: appState.haptics,
-                  onChanged: (value) => appState.setHaptics(value),
-                ),
-                if (appState.haptics) ...[
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(l10n.history, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 6),
                   Text(
-                    l10n.hapticIntensity,
+                    l10n.localDataExplanation,
                     style: theme.textTheme.bodySmall,
                   ),
-                  Slider(
-                    value: appState.hapticIntensity,
-                    min: 0,
-                    max: 1,
-                    divisions: 2,
-                    onChanged: appState.setHapticIntensity,
+                  const SizedBox(height: AppSpacing.sm),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: OutlinedButton.icon(
+                        style: ButtonStyle(
+                          mouseCursor: WidgetStatePropertyAll(
+                            SystemMouseCursors.click,
+                          ),
+                        ),
+                        onPressed: appState.history.isEmpty
+                            ? null
+                            : () => _clearHistory(appState),
+                        icon: Icon(AppIcons.trash, size: 17),
+                        label: Text(l10n.clearTransferHistory),
+                      ),
+                    ),
                   ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  SectionHeader(title: l10n.about, icon: AppIcons.info),
+                  _AboutRow(
+                    label: l10n.app,
+                    value:
+                        '${AppConstants.appName} ${updateState.currentVersion}',
+                  ),
+                  Divider(
+                      height: AppSpacing.lg, color: theme.colorScheme.hairline),
+                  _AboutRow(
+                    label: l10n.protocol,
+                    value: 'v${AppConstants.protocolVersion}',
+                  ),
+                  Divider(
+                      height: AppSpacing.lg, color: theme.colorScheme.hairline),
+                  _AboutRow(label: l10n.platform, value: PlatformEnv.label),
                 ],
-              ],
-              const SizedBox(height: AppSpacing.xxl),
-              SectionHeader(title: l10n.system, icon: AppIcons.apps),
-              if (PlatformEnv.supportsTray) ...[
-                _UpdateRow(
-                  label: l10n.minimizeToTray,
-                  subtitle: l10n.keepRunningInTray,
-                  value: appState.minimizeToTray,
-                  onChanged: (value) => appState.setMinimizeToTray(value),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
-              Text('Diagnostics', style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Text(
-                'Inspect, copy or save everything the app logged this session.',
-                style: theme.textTheme.bodySmall,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const LogsScreen(),
+            ),
+          ],
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            child: ExcludeSemantics(
+              child: Opacity(
+                opacity: _titleFade,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    border: Border(
+                      bottom: BorderSide(color: theme.colorScheme.hairline),
                     ),
                   ),
-                  icon: Icon(AppIcons.info, size: 17),
-                  label: const Text('Open logs'),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _UpdateRow(
-                label: l10n.checkAutomatically,
-                subtitle: l10n.lookForNewerRelease,
-                value: appState.autoUpdate,
-                onChanged: (value) async {
-                  await appState.setAutoUpdate(value);
-                  if (!context.mounted) return;
-                  context.read<UpdateController>().setAutoCheck(value);
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: OutlinedButton.icon(
-                    style: ButtonStyle(
-                      mouseCursor: WidgetStatePropertyAll(
-                        SystemMouseCursors.click,
-                      ),
-                    ),
-                    onPressed: updateState.phase == UpdatePhase.checking
-                        ? null
-                        : _checkNow,
-                    icon: updateState.phase == UpdatePhase.checking
-                        ? const SpinnerIcon(size: 16)
-                        : Icon(AppIcons.refresh, size: 17),
-                    label: Text(
-                      updateState.phase == UpdatePhase.checking
-                          ? l10n.checkingUpdates
-                          : l10n.checkForUpdates,
+                  child: Text(
+                    l10n.settings,
+                    style: AppTypography.pageTitle.copyWith(
+                      fontSize: 20,
+                      color: theme.brightness == Brightness.dark
+                          ? AppColors.neutral200
+                          : AppColors.neutral800,
                     ),
                   ),
                 ),
               ),
-              if (updateState.localizedMessage(l10n).isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  updateState.localizedMessage(l10n),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: updateState.phase == UpdatePhase.failed
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              const SizedBox(height: AppSpacing.lg),
-              Text(l10n.history, style: theme.textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Text(
-                l10n.localDataExplanation,
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: OutlinedButton.icon(
-                    style: ButtonStyle(
-                      mouseCursor: WidgetStatePropertyAll(
-                        SystemMouseCursors.click,
-                      ),
-                    ),
-                    onPressed: appState.history.isEmpty
-                        ? null
-                        : () => _clearHistory(appState),
-                    icon: Icon(AppIcons.trash, size: 17),
-                    label: Text(l10n.clearTransferHistory),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              SectionHeader(title: l10n.about, icon: AppIcons.info),
-              _AboutRow(
-                label: l10n.app,
-                value: '${AppConstants.appName} ${updateState.currentVersion}',
-              ),
-              Divider(height: AppSpacing.lg, color: theme.colorScheme.hairline),
-              _AboutRow(
-                label: l10n.protocol,
-                value: 'v${AppConstants.protocolVersion}',
-              ),
-              Divider(height: AppSpacing.lg, color: theme.colorScheme.hairline),
-              _AboutRow(label: l10n.platform, value: PlatformEnv.label),
-            ],
+            ),
           ),
         ),
       ],
@@ -707,20 +756,17 @@ class _ThemeChoice extends StatelessWidget {
   }
 }
 
-
 class _UpdateRow extends StatelessWidget {
   const _UpdateRow({
     required this.label,
     required this.subtitle,
     required this.value,
     required this.onChanged,
-    this.enabled = true,
   });
 
   final String label;
   final String subtitle;
   final bool value;
-  final bool enabled;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -744,12 +790,10 @@ class _UpdateRow extends StatelessWidget {
             cursor: SystemMouseCursors.click,
             child: Switch(
               value: value,
-              onChanged: enabled
-                  ? (next) {
-                      context.read<AppState>().tick();
-                      onChanged(next);
-                    }
-                  : null,
+              onChanged: (next) {
+                context.read<AppState>().tick();
+                onChanged(next);
+              },
             ),
           ),
         ],
