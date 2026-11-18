@@ -13,7 +13,9 @@ import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/services/pairing_code.dart';
+import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/services/transfer/transfer_foreground.dart';
 import 'package:free_send/services/transfer/transfer_host.dart';
 import 'package:free_send/state/app_state.dart';
@@ -35,7 +37,8 @@ class SendController extends ChangeNotifier {
 
   final AppState appState;
   final HotspotService _hotspotService;
-  final SessionBroadcaster _broadcaster = SessionBroadcaster();
+  final SessionSeeker _seeker = SessionSeeker();
+  StreamSubscription<List<SeekCandidate>>? _candidateSub;
 
   final List<TransferItem> items = [];
 
@@ -87,6 +90,18 @@ class SendController extends ChangeNotifier {
   /// listener is up, and only carries a hotspot when this app created one:
   /// on Windows and macOS the session runs over a network the user picked, so
   /// the code just points at the address.
+  bool _disposed = false;
+
+  /// Receivers that answered the sender's signal.
+  List<SeekCandidate> candidates = const [];
+
+  /// Per-receiver consent state, keyed by [SeekCandidate.id].
+  final Map<String, AuthState> peerStates = {};
+
+  bool get isHunting => _seeker.isSeeking;
+
+  AuthState? stateOf(SeekCandidate candidate) => peerStates[candidate.id];
+
   PairingCode? get pairingCode {
     final address = sessionAddress;
     if (address == null || port <= 0) return null;
@@ -272,15 +287,15 @@ class SendController extends ChangeNotifier {
         text: '${items.length} file${items.length == 1 ? '' : 's'} · waiting for a receiver',
       );
 
-      await _broadcaster.start(
-        instanceId: appState.instanceId,
+      await _seeker.start(
+        ownInstanceId: appState.instanceId,
         deviceName: appState.deviceName,
         platform: PlatformEnv.label,
-        port: port,
-        fileCount: items.length,
-        totalBytes: totalBytes,
-        bindAddress: bindAddress,
       );
+      _candidateSub ??= _seeker.candidates.listen((list) {
+        candidates = list;
+        notifyListeners();
+      });
 
       phase = SendPhase.waitingForPeer;
       notifyListeners();
@@ -484,9 +499,40 @@ class SendController extends ChangeNotifier {
     await appState.recordTransfer(record);
   }
 
+  /// Asks a receiver to accept. The receiver dials back our file server once
+  /// it agrees, so the transfer itself needs no further work here.
+  Future<void> knock(SeekCandidate candidate) async {
+    if (phase != SendPhase.waitingForPeer) return;
+    final address = _sessionAddress;
+    if (address == null || port <= 0) return;
+    peerStates[candidate.id] = AuthState.pending;
+    notifyListeners();
+    final outcome = await KnockClient.send(
+      host: candidate.ip,
+      port: candidate.consentPort,
+      senderInstanceId: appState.instanceId,
+      senderName: appState.deviceName,
+      platform: PlatformEnv.label,
+      fileCount: items.length,
+      totalBytes: totalBytes,
+      fileServerHost: address,
+      fileServerPort: port,
+    );
+    peerStates[candidate.id] = switch (outcome) {
+      KnockOutcome.accepted => AuthState.accepted,
+      KnockOutcome.declined => AuthState.declined,
+      KnockOutcome.timedOut => AuthState.offline,
+    };
+    notifyListeners();
+  }
+
   Future<void> _teardown() async {
     await _foreground.stop();
-    await _broadcaster.stop();
+    await _candidateSub?.cancel();
+    _candidateSub = null;
+    await _seeker.stop();
+    candidates = const [];
+    peerStates.clear();
     await _host?.dispose();
     _host = null;
     await _hotspotService.stop();
@@ -520,7 +566,16 @@ class SendController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     unawaited(_teardown());
     super.dispose();
+  }
+
+  /// Teardown can finish after [dispose] returns, and the host notifies as it
+  /// closes; a late notification must not assert.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
   }
 }

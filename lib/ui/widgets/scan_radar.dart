@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-import 'package:free_send/services/discovery_service.dart';
 
 /// A sonar-style sweep: the ring, the rotating beam, and one blip per session
 /// that fades back into the dark as it ages out.
@@ -13,7 +12,7 @@ import 'package:free_send/services/discovery_service.dart';
 class ScanRadar extends StatefulWidget {
   const ScanRadar({
     super.key,
-    required this.sessions,
+    required this.blips,
     required this.active,
     required this.sweepColor,
     required this.ringColor,
@@ -22,8 +21,9 @@ class ScanRadar extends StatefulWidget {
     required this.seed,
   });
 
-  /// The discovered sessions. Empty is the normal state while waiting.
-  final List<DiscoveredSession> sessions;
+  /// How many devices are on the radar. Empty is the normal state while
+  /// waiting for a receiver to open its screen.
+  final int blips;
 
   /// Whether the sweep should turn. False while joining or paused.
   final bool active;
@@ -87,8 +87,8 @@ class _ScanRadarState extends State<ScanRadar>
             ringColor: widget.ringColor,
             blipColor: widget.blipColor,
             blips: [
-              for (final session in widget.sessions)
-                _Blip.of(session, widget.seed),
+              for (var i = 0; i < widget.blips; i++)
+                _Blip.forIndex(i, widget.seed),
             ],
           ),
         ),
@@ -97,8 +97,8 @@ class _ScanRadarState extends State<ScanRadar>
   }
 }
 
-/// A blip's fixed place on the dial, derived from the session id so it never
-/// jumps while the same device stays in range.
+/// A blip's fixed place on the dial, derived from its index and the transport
+/// seed so it never jumps while the same set of devices stays in range.
 class _Blip {
   const _Blip({
     required this.angle,
@@ -106,8 +106,8 @@ class _Blip {
     required this.size,
   });
 
-  factory _Blip.of(DiscoveredSession session, int seed) {
-    final random = math.Random('${session.id}:$seed'.hashCode);
+  factory _Blip.forIndex(int index, int seed) {
+    final random = math.Random('$seed:$index'.hashCode);
     return _Blip(
       angle: random.nextDouble() * math.pi * 2,
       // A hair off the rim and a hair off the centre reads as "in range"

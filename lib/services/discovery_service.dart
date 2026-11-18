@@ -232,7 +232,9 @@ class SeekCandidate {
   final int consentPort;
   DateTime lastSeen;
 
-  String get id => '$instanceId@$ip:$consentPort';
+  /// Identity is the instance id: a device that answers on two
+  /// interfaces must still appear once.
+  String get id => instanceId;
 }
 
 /// Sender side of discovery.
@@ -256,14 +258,18 @@ class SessionSeeker {
   /// How long a candidate stays on the radar without a fresh answer.
   final Duration ttl;
 
+  int _discoveryPort = AppConstants.discoveryPort;
+
   SessionSeeker({this.ttl = const Duration(seconds: 6)});
 
   Future<bool> start({
     required String ownInstanceId,
     required String deviceName,
     required String platform,
+    int? discoveryPort,
   }) async {
     if (_socket != null) return true;
+    _discoveryPort = discoveryPort ?? AppConstants.discoveryPort;
     try {
       _socket = await RawDatagramSocket.bind(
         InternetAddress.anyIPv4,
@@ -304,26 +310,23 @@ class SessionSeeker {
   void _send() {
     final socket = _socket;
     if (socket == null) return;
-    try {
-      final data = utf8.encode(jsonEncode(_payload));
-      // Loopback is included so the mechanism works when both roles run on one
-      // machine; on real hardware it only reaches the device itself, which
-      // ignores its own packets.
-      for (final target in const [
-        '255.255.255.255',
-        '192.168.43.255',
-        '192.168.49.255',
-        '10.42.0.255',
-        '127.0.0.1',
-      ]) {
-        socket.send(
-          data,
-          InternetAddress(target),
-          AppConstants.discoveryPort,
-        );
+    final data = utf8.encode(jsonEncode(_payload));
+    // Loopback is included so the mechanism works when both roles run on one
+    // machine; on real hardware it only reaches the device itself, which
+    // ignores its own packets. Each target is independent: an unreachable
+    // broadcast address must not stop the others.
+    for (final target in const [
+      '255.255.255.255',
+      '192.168.43.255',
+      '192.168.49.255',
+      '10.42.0.255',
+      '127.0.0.1',
+    ]) {
+      try {
+        socket.send(data, InternetAddress(target), _discoveryPort);
+      } on Object {
+        // Transient network errors are expected while a hotspot settles.
       }
-    } on Object {
-      // Transient network errors are expected while a hotspot settles.
     }
   }
 
@@ -344,7 +347,14 @@ class SessionSeeker {
         consentPort: port,
         lastSeen: DateTime.now(),
       );
-      _candidates[candidate.id] = candidate;
+      final existing = _candidates[candidate.id];
+      if (existing != null) {
+        // Keep the first address we saw rather than flapping between
+        // interfaces.
+        existing.lastSeen = candidate.lastSeen;
+      } else {
+        _candidates[candidate.id] = candidate;
+      }
       _emit();
     } on Object {
       // Ignore malformed packets from unrelated broadcast traffic.
@@ -395,12 +405,14 @@ class PresenceResponder {
     required String deviceName,
     required String platform,
     required int consentPort,
+    int? discoveryPort,
   }) async {
     if (_socket != null) return true;
+    final port = discoveryPort ?? AppConstants.discoveryPort;
     try {
       _socket = await RawDatagramSocket.bind(
         InternetAddress.anyIPv4,
-        AppConstants.discoveryPort,
+        port,
         reuseAddress: true,
         reusePort: true,
       );
@@ -408,7 +420,7 @@ class PresenceResponder {
       try {
         _socket = await RawDatagramSocket.bind(
           InternetAddress.anyIPv4,
-          AppConstants.discoveryPort,
+          port,
           reuseAddress: true,
         );
       } on SocketException {

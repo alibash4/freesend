@@ -5,182 +5,226 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/services/transfer/doorbell.dart';
 
+/// A private port: a FreeSend instance running on the same machine would
+/// otherwise answer the test's intent packets.
+const testDiscoveryPort = 47821;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('sender-driven discovery', () {
-    test('a seeker finds a responder that is sitting in Receive', () async {
+    testWidgets('a seeker finds a responder that is sitting in Receive', (
+      tester,
+    ) async {
       final responder = PresenceResponder();
-      await responder.start(
-        ownInstanceId: 'receiver-1',
-        deviceName: 'Pixel 8',
-        platform: 'Android',
-        consentPort: 47811,
+      final listening = await tester.runAsync(
+        () => responder.start(
+          ownInstanceId: 'receiver-1',
+          deviceName: 'Pixel 8',
+          platform: 'Android',
+          consentPort: 47811,
+          discoveryPort: testDiscoveryPort,
+        ),
       );
+      expect(listening, isTrue, reason: 'responder must bind the test port');
       addTearDown(responder.stop);
 
       final seeker = SessionSeeker();
-      await seeker.start(
-        ownInstanceId: 'sender-1',
-        deviceName: 'Desk Mini',
-        platform: 'Linux',
+      await tester.runAsync(
+        () => seeker.start(
+          ownInstanceId: 'sender-1',
+          deviceName: 'Desk Mini',
+          platform: 'Linux',
+          discoveryPort: testDiscoveryPort,
+        ),
       );
       addTearDown(seeker.stop);
 
-      final found = await _waitFor(
-        () => seeker.current,
-        predicate: (candidates) => candidates.isNotEmpty,
+      final found = await tester.runAsync(
+        () => _waitFor(
+          () => seeker.current,
+          predicate: (candidates) => candidates.isNotEmpty,
+        ),
       );
 
-      expect(found, hasLength(1));
-      expect(found.first.deviceName, 'Pixel 8');
-      expect(found.first.platform, 'Android');
-      expect(found.first.consentPort, 47811);
-      expect(found.first.instanceId, 'receiver-1');
+      final candidate = found!.single;
+      expect(candidate.deviceName, 'Pixel 8');
+      expect(candidate.platform, 'Android');
+      expect(candidate.consentPort, 47811);
+      expect(candidate.instanceId, 'receiver-1');
       // The answer arrives from whichever interface the packet used, so only
       // the presence of an address matters here.
-      expect(found.first.ip, isNotEmpty);
+      expect(candidate.ip, isNotEmpty);
     });
 
-    test('the seeker never reports its own answers', () async {
+    testWidgets('the seeker never reports its own answers', (tester) async {
       final seeker = SessionSeeker();
-      await seeker.start(
-        ownInstanceId: 'same-device',
-        deviceName: 'Desk Mini',
-        platform: 'Linux',
+      await tester.runAsync(
+        () => seeker.start(
+          ownInstanceId: 'same-device',
+          deviceName: 'Desk Mini',
+          platform: 'Linux',
+          discoveryPort: testDiscoveryPort,
+        ),
       );
       addTearDown(seeker.stop);
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
       expect(seeker.current, isEmpty);
     });
 
-    test('a candidate drops off after it stops answering', () async {
+    testWidgets('a candidate drops off after it stops answering', (tester) async {
       final responder = PresenceResponder();
-      await responder.start(
-        ownInstanceId: 'receiver-2',
-        deviceName: 'MacBook',
-        platform: 'macOS',
-        consentPort: 47811,
+      await tester.runAsync(
+        () => responder.start(
+          ownInstanceId: 'receiver-2',
+          deviceName: 'MacBook',
+          platform: 'macOS',
+          consentPort: 47811,
+          discoveryPort: testDiscoveryPort,
+        ),
       );
 
       final seeker = SessionSeeker(ttl: const Duration(milliseconds: 200));
-      await seeker.start(
-        ownInstanceId: 'sender-2',
-        deviceName: 'Desk Mini',
-        platform: 'Linux',
+      await tester.runAsync(
+        () => seeker.start(
+          ownInstanceId: 'sender-2',
+          deviceName: 'Desk Mini',
+          platform: 'Linux',
+          discoveryPort: testDiscoveryPort,
+        ),
       );
       addTearDown(seeker.stop);
 
-      await _waitFor(
-        () => seeker.current,
-        predicate: (candidates) => candidates.isNotEmpty,
+      await tester.runAsync(
+        () => _waitFor(
+          () => seeker.current,
+          predicate: (candidates) => candidates.isNotEmpty,
+        ),
       );
-      await responder.stop();
-      final pruned = await _waitFor(
-        () => seeker.current.length,
-        predicate: (count) => count == 0,
-        timeout: const Duration(seconds: 5),
+      await tester.runAsync(responder.stop);
+      final pruned = await tester.runAsync(
+        () => _waitFor(
+          () => seeker.current.length,
+          predicate: (count) => count == 0,
+          timeout: const Duration(seconds: 5),
+        ),
       );
       expect(pruned, 0);
     });
   });
 
   group('doorbell', () {
-    test('a knock is delivered with the sender details and accepted',
-        () async {
+    testWidgets('a knock is delivered with the sender details and accepted', (
+      tester,
+    ) async {
       final doorbell = ConsentDoorbell();
-      await doorbell.start();
+      await tester.runAsync(doorbell.start);
+      final port = doorbell.port!;
       addTearDown(doorbell.stop);
 
       Knock? received;
       doorbell.onKnock = (knock) => received = knock;
 
-      final answer = KnockClient.send(
-        host: InternetAddress.loopbackIPv4.address,
-        port: doorbell.port!,
-        senderInstanceId: 'sender-1',
-        senderName: 'Desk Mini',
-        platform: 'Linux',
-        fileCount: 12,
-        totalBytes: 640 * 1024 * 1024,
-        fileServerHost: InternetAddress.loopbackIPv4.address,
-        fileServerPort: 47811,
-      );
+      // One real-async window: the knock must be in flight before we can answer.
+      final answer = await tester.runAsync(() async {
+        final pending = KnockClient.send(
+          host: InternetAddress.loopbackIPv4.address,
+          port: port,
+          senderInstanceId: 'sender-1',
+          senderName: 'Desk Mini',
+          platform: 'Linux',
+          fileCount: 12,
+          totalBytes: 640 * 1024 * 1024,
+          fileServerHost: InternetAddress.loopbackIPv4.address,
+          fileServerPort: 47811,
+        );
+        await _waitFor(() => received, predicate: (knock) => knock != null);
+        await doorbell.decide(received!.requestId, true);
+        return pending;
+      });
 
-      await _waitFor(() => received, predicate: (knock) => knock != null);
       expect(received!.senderName, 'Desk Mini');
       expect(received!.fileCount, 12);
       expect(received!.totalBytes, 640 * 1024 * 1024);
       expect(received!.senderPort, 47811);
       expect(received!.requestId, isNotEmpty);
-
-      await doorbell.decide(received!.requestId, true);
-      expect(await answer, KnockOutcome.accepted);
+      expect(answer, KnockOutcome.accepted);
     });
 
-    test('a decline reaches the sender as a decline', () async {
+    testWidgets('a decline reaches the sender as a decline', (tester) async {
       final doorbell = ConsentDoorbell();
-      await doorbell.start();
+      await tester.runAsync(doorbell.start);
+      final port = doorbell.port!;
       addTearDown(doorbell.stop);
 
       Knock? received;
       doorbell.onKnock = (knock) => received = knock;
 
-      final answer = KnockClient.send(
-        host: InternetAddress.loopbackIPv4.address,
-        port: doorbell.port!,
-        senderInstanceId: 'sender-2',
-        senderName: 'Pixel 8',
-        platform: 'Android',
-        fileCount: 1,
-        totalBytes: 1024,
-        fileServerHost: InternetAddress.loopbackIPv4.address,
-        fileServerPort: 47811,
-      );
-
-      await _waitFor(() => received, predicate: (knock) => knock != null);
-      await doorbell.decide(received!.requestId, false);
-      expect(await answer, KnockOutcome.declined);
+      final answer = await tester.runAsync(() async {
+        final pending = KnockClient.send(
+          host: InternetAddress.loopbackIPv4.address,
+          port: port,
+          senderInstanceId: 'sender-2',
+          senderName: 'Pixel 8',
+          platform: 'Android',
+          fileCount: 1,
+          totalBytes: 1024,
+          fileServerHost: InternetAddress.loopbackIPv4.address,
+          fileServerPort: 47811,
+        );
+        await _waitFor(() => received, predicate: (knock) => knock != null);
+        await doorbell.decide(received!.requestId, false);
+        return pending;
+      });
+      expect(answer, KnockOutcome.declined);
     });
 
-    test('an unanswered knock never blocks a later decision', () async {
+    testWidgets('an unanswered knock never blocks a later decision', (
+      tester,
+    ) async {
       final doorbell = ConsentDoorbell();
-      await doorbell.start();
+      await tester.runAsync(doorbell.start);
       addTearDown(doorbell.stop);
       var knocks = 0;
       doorbell.onKnock = (_) => knocks++;
 
-      final lost = KnockClient.send(
-        host: InternetAddress.loopbackIPv4.address,
-        port: doorbell.port!,
-        senderInstanceId: 'sender-3',
-        senderName: 'Pixel 8',
-        platform: 'Android',
-        fileCount: 1,
-        totalBytes: 1024,
-        fileServerHost: InternetAddress.loopbackIPv4.address,
-        fileServerPort: 47811,
-        timeout: const Duration(milliseconds: 200),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      expect(knocks, 1);
-      // Deciding after the sender gave up must not throw.
-      expect(await doorbell.decide('missing-request', true), isFalse);
-      expect(await lost, anyOf(KnockOutcome.accepted, KnockOutcome.timedOut));
+      await tester.runAsync(() async {
+        final lost = KnockClient.send(
+          host: InternetAddress.loopbackIPv4.address,
+          port: doorbell.port!,
+          senderInstanceId: 'sender-3',
+          senderName: 'Pixel 8',
+          platform: 'Android',
+          fileCount: 1,
+          totalBytes: 1024,
+          fileServerHost: InternetAddress.loopbackIPv4.address,
+          fileServerPort: 47811,
+          timeout: const Duration(milliseconds: 200),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        expect(knocks, 1);
+        // Deciding after the sender gave up must not throw.
+        expect(await doorbell.decide('missing', true), isFalse);
+        await lost;
+      });
     });
 
-    test('a knock to a closed port times out', () async {
-      final outcome = await KnockClient.send(
-        host: InternetAddress.loopbackIPv4.address,
-        port: 1,
-        senderInstanceId: 'sender-4',
-        senderName: 'Pixel 8',
-        platform: 'Android',
-        fileCount: 1,
-        totalBytes: 1,
-        fileServerHost: InternetAddress.loopbackIPv4.address,
-        fileServerPort: 47811,
-        timeout: const Duration(milliseconds: 300),
+    testWidgets('a knock to a closed port times out', (tester) async {
+      final outcome = await tester.runAsync(
+        () => KnockClient.send(
+          host: InternetAddress.loopbackIPv4.address,
+          port: 1,
+          senderInstanceId: 'sender-4',
+          senderName: 'Pixel 8',
+          platform: 'Android',
+          fileCount: 1,
+          totalBytes: 1,
+          fileServerHost: InternetAddress.loopbackIPv4.address,
+          fileServerPort: 47811,
+          timeout: const Duration(milliseconds: 300),
+        ),
       );
       expect(outcome, KnockOutcome.timedOut);
     });

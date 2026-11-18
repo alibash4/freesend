@@ -20,7 +20,9 @@ import 'package:free_send/ui/screens/setup_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
-import 'package:free_send/ui/widgets/pairing_card.dart';
+import 'package:free_send/core/transfer_flow.dart';
+import 'package:free_send/services/discovery_service.dart';
+import 'package:free_send/ui/widgets/scan_radar.dart';
 
 class SendScreen extends StatefulWidget {
   const SendScreen({super.key, this.onBack});
@@ -558,12 +560,38 @@ class _SessionView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
-        if (!transferring && controller.pairingCode != null) ...[
-          PairingCard(
-            code: controller.pairingCode!,
-            onCopy: () =>
-                onCopy(controller.pairingCode!.encode(), 'Pairing code'),
+        if (!transferring) ...[
+          Text(
+            'Looking for a device to receive these',
+            style: theme.textTheme.titleMedium,
           ),
+          const SizedBox(height: AppSpacing.md),
+          Center(
+            child: ScanRadar(
+              blips: controller.candidates.length,
+              active: controller.isHunting,
+              sweepColor: theme.colorScheme.primary,
+              ringColor: theme.colorScheme.surfaceContainerHigh,
+              blipColor: theme.colorScheme.primary,
+              size: 220,
+              seed: controller.link.index,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (controller.candidates.isEmpty)
+            Text(
+              'Nobody is ready yet - on the other device, open FreeSend and '
+              'tap Receive.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            )
+          else
+            for (final candidate in controller.candidates)
+              _CandidateRow(
+                candidate: candidate,
+                state: controller.stateOf(candidate),
+                onTap: () => controller.knock(candidate),
+              ),
           const SizedBox(height: AppSpacing.lg),
         ],
         if (transferring) ...[
@@ -1017,6 +1045,85 @@ class _SourceSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One receiver on the sender's radar. Tapping asks it to accept.
+class _CandidateRow extends StatelessWidget {
+  const _CandidateRow({
+    required this.candidate,
+    required this.state,
+    required this.onTap,
+  });
+
+  final SeekCandidate candidate;
+  final AuthState? state;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = switch (state) {
+      AuthState.pending => 'Waiting for an answer',
+      AuthState.accepted => 'Accepted',
+      AuthState.declined => 'Declined',
+      AuthState.offline => 'Unreachable',
+      null => candidate.platform,
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Material(
+        color: theme.colorScheme.softFill,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    AppIcons.device,
+                    size: 17,
+                    color: theme.colorScheme.accentText,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        candidate.deviceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(label, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Icon(
+                  AppIcons.chevronRight,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

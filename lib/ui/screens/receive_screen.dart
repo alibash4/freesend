@@ -205,10 +205,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
               onPressed: () => _openScanner(controller),
               icon: Icon(AppIcons.scan),
             ),
-          if (controller.phase == ReceivePhase.scanning)
+          if (controller.isWaiting)
             IconButton(
               tooltip: l10n.rescan,
-              onPressed: controller.startScanning,
+              onPressed: controller.startWaiting,
               icon: Icon(AppIcons.refresh),
             ),
         ],
@@ -255,7 +255,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                       controller: controller,
                       onRetry: () async {
                         await controller.reset();
-                        if (context.mounted) await controller.startScanning();
+                        if (context.mounted) await controller.startWaiting();
                       },
                     ),
                 },
@@ -847,7 +847,7 @@ class _DoneView extends StatelessWidget {
           onPressed: () async {
             await controller.reset();
             if (!context.mounted) return;
-            await controller.startScanning();
+            await controller.startWaiting();
           },
           child: const Text('Receive more'),
         ),

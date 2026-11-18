@@ -23,6 +23,8 @@ import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/update/update_service.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
+import 'package:free_send/services/discovery_service.dart';
+import 'package:free_send/ui/widgets/scan_radar.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -256,7 +258,7 @@ void main() {
     await capture(tester, '09-pairing-card');
   });
 
-  testWidgets('a live session shows the pairing code', (tester) async {
+  testWidgets('a live session hunts for a receiver', (tester) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.reset);
@@ -276,28 +278,59 @@ void main() {
       () => Directory.systemTemp.createTemp('freesend_test'),
     ))!;
     final file = File('${dir.path}/notes.txt')
-      ..writeAsStringSync('pairing render test');
+      ..writeAsStringSync('hunting render test');
     addTearDown(() => dir.delete(recursive: true));
     controller.addFiles([file]);
 
     await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
-    // The card only exists once the session is really up, so start one: a real
-    // listener and beacon socket on loopback.
+    // The radar only exists once the session is really up: a real listener and
+    // seeker socket.
     await tester.runAsync(controller.startSession);
     await settle(tester);
 
-    expect(find.text('Scan to pair'), findsOneWidget);
-    expect(find.byType(QrImageView), findsOneWidget);
-    expect(find.text('Waiting for a device'), findsOneWidget);
+    expect(find.text('Looking for a device to receive these'), findsOneWidget);
+    expect(find.byType(ScanRadar), findsOneWidget);
+    expect(
+      find.text(
+        'Nobody is ready yet - on the other device, open FreeSend and tap '
+        'Receive.',
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
-    await capture(tester, '10-send-pairing');
+    await capture(tester, '10-send-hunting');
+
+    // A receiver opens its screen, answers the sender's signal, and appears.
+    final candidate = SeekCandidate(
+      instanceId: 'receiver-1',
+      deviceName: 'Pixel 8',
+      platform: 'Android',
+      ip: InternetAddress.loopbackIPv4.address,
+      consentPort: 1,
+      lastSeen: DateTime.now(),
+    );
+    controller.candidates = [candidate];
+    await settle(tester);
+    expect(find.text('Pixel 8'), findsOneWidget);
+    await capture(tester, '12-send-candidate');
+
+    // Asking a dead doorbell ends in an unreachable state, not a hang. The
+    // knock uses a real socket, so its completion needs a real-async window.
+    await tester.tap(find.text('Pixel 8'));
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 600)),
+    );
+    await settle(tester);
+    expect(controller.stateOf(candidate), AuthState.offline);
+    expect(tester.takeException(), isNull);
 
     await appState.setThemeMode(ThemeMode.dark);
     await settle(tester);
-    expect(find.byType(QrImageView), findsOneWidget);
+    expect(find.byType(ScanRadar), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await capture(tester, '13-send-pairing-dark');
+    await capture(tester, '13-send-hunting-dark');
     await appState.setThemeMode(ThemeMode.light);
     await settle(tester);
 
