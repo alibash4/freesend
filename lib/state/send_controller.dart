@@ -289,15 +289,17 @@ class SendController extends ChangeNotifier {
         }
         bindAddress = wired;
       } else {
+        // Nobody hosts on the sender's side: phones host whenever one is
+        // involved (R4) and desktop pairs share a network (R5). The sender
+        // advertises whatever address this device already has, and joins the
+        // receiver's hotspot when the user scans its code.
         await ensureHotspotPermissions();
-
-        hotspot = await _hotspotService.start(deviceName: appState.deviceName);
-        if (hotspot!.note != null) {
-          // Surfaced in the connection panel, not as an error.
-          debugPrint('FreeSend: ${hotspot!.note}');
+        bindAddress = await localIpv4();
+        if (bindAddress == null) {
+          _fail('FreeSend could not find a local address. Connect to a Wi-Fi '
+              'network, or use a cable.');
+          return;
         }
-
-        bindAddress = hotspot?.ip ?? await localIpv4();
       }
       _sessionAddress = bindAddress;
       final host = TransferHost(
@@ -546,6 +548,73 @@ class SendController extends ChangeNotifier {
       ip: candidate.ip,
       consentPort: candidate.consentPort,
     );
+  }
+
+  /// Follows a scanned receiver code: joins the receiver's hotspot when the
+  /// code carries one, moves this session onto that link, then asks.
+  Future<void> knockScanned(PairingCode code) async {
+    final host = code.host;
+    if (host == null) return;
+    if (code.hasHotspot) {
+      final joined = await _joinReceiverHotspot(code);
+      if (!joined) return;
+    }
+    await knockAddress(host, code.port);
+  }
+
+  Future<bool> _joinReceiverHotspot(PairingCode code) async {
+    if (!_hotspotService.canJoin) {
+      errorMessage = 'This device cannot join a hotspot. Use a shared Wi-Fi '
+          'network instead.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      await ensureHotspotPermissions();
+      final info = await _hotspotService.join(code.ssid!, code.password);
+      AppLog.info('hotspot', 'joined "${info.ssid}" (${info.ip})');
+      await _rebindSession();
+      return true;
+    } on HotspotException catch (error) {
+      AppLog.error('hotspot', 'could not join "${code.ssid}": '
+          '${error.message}');
+      errorMessage = error.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Moves the file server and the seeker onto the current interface after the
+  /// Wi-Fi changed, so the receiver can dial back on a reachable address.
+  Future<void> _rebindSession() async {
+    final address = await localIpv4();
+    if (address == null || address == _sessionAddress) return;
+    await _seeker.stop();
+    await _host?.dispose();
+    _host = null;
+    final host = TransferHost(
+      items: items,
+      deviceName: appState.deviceName,
+      instanceId: appState.instanceId,
+      identityStore: appState.store,
+      events: HostEvents(
+        onPeersChanged: _onPeersChanged,
+        onPeerFinished: _onPeerFinished,
+        onPeerError: _onPeerError,
+        onProgress: _onProgress,
+        onFinished: _onFinished,
+        onError: _onHostError,
+      ),
+    );
+    port = await host.start();
+    _host = host;
+    _sessionAddress = address;
+    await _seeker.start(
+      ownInstanceId: appState.instanceId,
+      deviceName: appState.deviceName,
+      platform: PlatformEnv.label,
+    );
+    AppLog.info('send', 're-bound the session on $address:$port');
   }
 
   /// Knocks a scanned address, whose QR carries the receiver's doorbell port.

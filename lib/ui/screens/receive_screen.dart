@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 
+import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
@@ -68,7 +69,11 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   void _beginWaiting() {
     final controller = context.read<ReceiveController>();
     if (controller.phase == ReceivePhase.idle) {
-      controller.startWaiting();
+      // A phone hosts whenever one is involved (R3/R4), so an Android
+      // receiver brings its link up straight away.
+      controller.startWaiting(
+        host: PlatformEnv.kind == PlatformKind.android,
+      );
     }
   }
 
@@ -220,7 +225,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           if (controller.isWaiting)
             IconButton(
               tooltip: l10n.rescan,
-              onPressed: controller.startWaiting,
+              onPressed: () => controller.startWaiting(
+                host: PlatformEnv.kind == PlatformKind.android,
+              ),
               icon: Icon(AppIcons.refresh),
             ),
         ],
@@ -267,7 +274,11 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                       controller: controller,
                       onRetry: () async {
                         await controller.reset();
-                        if (context.mounted) await controller.startWaiting();
+                        if (context.mounted) {
+                          await controller.startWaiting(
+                            host: PlatformEnv.kind == PlatformKind.android,
+                          );
+                        }
                       },
                     ),
                 },
@@ -890,7 +901,9 @@ class _DoneView extends StatelessWidget {
           onPressed: () async {
             await controller.reset();
             if (!context.mounted) return;
-            await controller.startWaiting();
+            await controller.startWaiting(
+              host: PlatformEnv.kind == PlatformKind.android,
+            );
           },
           child: const Text('Receive more'),
         ),

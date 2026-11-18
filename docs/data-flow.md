@@ -390,3 +390,38 @@ Phase 7  Ship: full suite, real-device matrix, artifacts for visual review.
 - Internet over the hotspot. Local-only by design (R12).
 - iOS implementation.
 - Rooms / shared-space group model. Chosen model is multi-recipient select.
+
+--------------------------------------------------------------------------------
+11. Implementation status
+--------------------------------------------------------------------------------
+
+Phases 1-5 are complete and committed. Phase 6 is partial, Phase 7 needs
+hardware.
+
+What runs today:
+- Sender-driven discovery: the sender broadcasts intent, receivers sitting in
+  Receive answer once with name and consent port.
+- Receiver doorbell: consent modal on the receiver, dial-back on accept, group
+  asks per device, remembered devices accepted without the modal (trust pinned
+  by the encrypted handshake).
+- Sender radar with per-receiver states; send control as sheet/dialog; group
+  multi-select.
+- The Android receiver hosts its hotspot automatically and produces the QR the
+  sending phone scans.
+- Scanning a code that carries a hotspot joins it and moves the session onto
+  that interface before knocking, so the receiver can dial back.
+- Desktop receivers cannot host by rule (R4/R5); their waiting view carries the
+  local-Wi-Fi fallback link and shows the desktop's own address QR when used.
+- Flow logging (debug and release) with Settings > System > Diagnostics.
+- Window opens at 900x625 on desktop.
+
+Still missing or unverified:
+- Windows cannot join a hotspot programmatically; a Windows peer therefore
+  relies on the local-Wi-Fi path. There is no OS Wi-Fi enumeration yet, so a
+  desktop has no in-app list of nearby FreeSend hotspots.
+- Hotspot keep-alive under backgrounding is not proven on Android: the
+  LocalOnlyHotspot reservation is held, but no foreground service keeps it for
+  the whole session and no test covers it.
+- Error copy is partly generic; the "hotspot stopped" and client-isolation
+  states are not distinctly worded.
+- No real-device run and no CI build yet. docs/qa-checklist.md is the matrix.

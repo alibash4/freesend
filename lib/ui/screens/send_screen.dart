@@ -77,7 +77,7 @@ class _SendScreenState extends State<SendScreen> {
     if (code == null || !mounted) return;
     final host = code.host;
     if (host == null) return;
-    await controller.knockAddress(host, code.port);
+    await controller.knockScanned(code);
   }
 
   late final ScrollController _scrollController = AnimatedScrollController(
