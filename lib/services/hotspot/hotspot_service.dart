@@ -46,6 +46,12 @@ abstract class HotspotService {
   /// Whether this app can join a hotspot with SSID + password.
   bool get canJoin;
 
+  /// Nearby network names worth offering as the other side's hotspot.
+  ///
+  /// Only Linux can enumerate; every other platform answers empty and the UI
+  /// falls back to the manual code path.
+  Future<List<String>> survey();
+
   Future<HotspotInfo> start({required String deviceName});
   Future<void> stop();
 
@@ -87,6 +93,9 @@ class ManualHotspotService implements HotspotService {
               'the other device to it.',
     );
   }
+
+  @override
+  Future<List<String>> survey() async => const [];
 
   @override
   Future<void> stop() async {}
@@ -217,6 +226,30 @@ class LinuxHotspotService implements HotspotService {
     }
     await Future<void>.delayed(const Duration(milliseconds: 900));
     return HotspotInfo(ssid: ssid, ip: await localIpv4());
+  }
+
+  @override
+  Future<List<String>> survey() async {
+    // Phone hotspots carry the vendor prefix, so those are what we offer; a
+    // FreeSend-named network is ours from a Linux host.
+    const markers = ['AndroidShare', 'FreeSend-', 'AndroidAP', 'Direct-'];
+    final result = await _run([
+      'nmcli',
+      '-t',
+      '-f',
+      'SSID',
+      'device',
+      'wifi',
+      'list',
+    ], timeout: const Duration(seconds: 12));
+    if (result.$1 != 0) return const [];
+    final matches = <String>[];
+    for (final line in result.$2.split('\n')) {
+      final ssid = line.trim();
+      if (ssid.isEmpty || matches.contains(ssid)) continue;
+      if (markers.any(ssid.contains)) matches.add(ssid);
+    }
+    return matches;
   }
 
   @override
@@ -366,6 +399,9 @@ class AndroidHotspotService implements HotspotService {
       // Ignore.
     }
   }
+
+  @override
+  Future<List<String>> survey() async => const [];
 
   @override
   Future<void> dispose() async {

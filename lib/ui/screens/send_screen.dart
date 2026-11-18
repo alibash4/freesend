@@ -620,6 +620,13 @@ class _SessionView extends StatelessWidget {
             },
             style: theme.textTheme.titleMedium,
           ),
+          if (controller.hotspot != null) ...[
+            _HostedLinkCard(
+              ssid: controller.hotspot!.ssid,
+              password: controller.hotspot!.password,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           const SizedBox(height: AppSpacing.md),
           Center(
             child: ScanRadar(
@@ -1303,6 +1310,87 @@ class _SendChooserBody extends StatelessWidget {
 }
 
 /// Mobile: a bottom sheet that opens at half height and drags taller.
+
+/// Shows the link this phone is hosting so a device with no camera can join.
+class _HostedLinkCard extends StatelessWidget {
+  const _HostedLinkCard({required this.ssid, required this.password});
+
+  final String ssid;
+  final String? password;
+
+  Future<void> _copy(BuildContext context, String value, String label) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('$label copied')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(AppIcons.wifi, size: 16, color: theme.colorScheme.accentText),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Your hotspot is on',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'On the other device, join this network '
+            '${password == null ? '' : 'with the password below'} '
+            'and look for this name.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _credentialRow(context, 'Name', ssid),
+          if (password != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _credentialRow(context, 'Password', password!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _credentialRow(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        SizedBox(
+          width: 74,
+          child: Text(label, style: theme.textTheme.bodySmall),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Copy $label',
+          onPressed: () => _copy(context, value, label),
+          icon: Icon(AppIcons.copy, size: 16),
+        ),
+      ],
+    );
+  }
+}
+
 class _SendChooserSheet extends StatelessWidget {
   const _SendChooserSheet();
 

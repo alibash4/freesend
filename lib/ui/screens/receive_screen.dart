@@ -622,6 +622,50 @@ class _NoCameraPanel extends StatelessWidget {
   }
 }
 
+
+/// Asks for the hotspot password the phone shows, then joins it.
+Future<void> _askHotspotPassword(BuildContext context, String ssid) async {
+  final controller = context.read<ReceiveController>();
+  final password = await showDialog<String>(
+    context: context,
+    builder: (context) {
+      final field = TextEditingController();
+      return AlertDialog(
+        title: Text('Join "$ssid"?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the password shown on the other device.',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: field,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Password'),
+              onSubmitted: (value) => Navigator.of(context).pop(value),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(field.text),
+            child: const Text('Join'),
+          ),
+        ],
+      );
+    },
+  );
+  if (password == null || !context.mounted) return;
+  await controller.joinSurveyed(ssid, password.trim());
+}
+
 class _JoinPromptPanel extends StatelessWidget {
   const _JoinPromptPanel({required this.controller, required this.onJoin});
 
@@ -668,6 +712,40 @@ class _JoinPromptPanel extends StatelessWidget {
             },
             child: Text(l10n.joinHotspot),
           ),
+          if (!controller.showLocalWifiQr) ...[
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton.icon(
+              style: clickCursorStyle,
+              onPressed: controller.surveyingHotspots
+                  ? null
+                  : controller.surveyHotspots,
+              icon: controller.surveyingHotspots
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(AppIcons.search, size: 17),
+              label: Text(
+                controller.hotspotCandidates.isEmpty
+                    ? 'Look for the other device\'s hotspot'
+                    : 'Look again',
+              ),
+            ),
+            for (final ssid in controller.hotspotCandidates)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton.icon(
+                    style: clickCursorStyle,
+                    onPressed: () => _askHotspotPassword(context, ssid),
+                    icon: Icon(AppIcons.wifi, size: 16),
+                    label: Text(ssid),
+                  ),
+                ),
+              ),
+          ],
           const SizedBox(height: AppSpacing.xs),
           Align(
             alignment: AlignmentDirectional.centerStart,

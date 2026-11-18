@@ -312,6 +312,36 @@ class ReceiveController extends ChangeNotifier {
   }
 
   /// Joins the host's hotspot (Android/Linux/macOS) and then looks for it.
+  /// Hotspot names this device can see that may belong to the other side.
+  List<String> hotspotCandidates = const [];
+
+  bool surveyingHotspots = false;
+
+  /// Looks for the phone's link on this network list.
+  ///
+  /// Only Linux can enumerate Wi-Fi; everywhere else this answers empty and the
+  /// user falls back to the pairing code.
+  Future<void> surveyHotspots() async {
+    if (surveyingHotspots) return;
+    surveyingHotspots = true;
+    notifyListeners();
+    try {
+      final found = await _hotspotService.survey();
+      AppLog.info('hotspot', 'survey found ${found.length}: $found');
+      hotspotCandidates = found;
+    } on Object catch (error) {
+      AppLog.warn('hotspot', 'survey failed: $error');
+      hotspotCandidates = const [];
+    } finally {
+      surveyingHotspots = false;
+      notifyListeners();
+    }
+  }
+
+  /// Joins the chosen hotspot and then hunts on that link.
+  Future<void> joinSurveyed(String ssid, String password) =>
+      joinHotspot(ssid, password);
+
   Future<void> joinHotspot(String ssid, String password) async {
     if (ssid.trim().isEmpty) return;
     phase = ReceivePhase.joining;

@@ -293,12 +293,33 @@ class SendController extends ChangeNotifier {
           return;
         }
         bindAddress = wired;
-      } else {
-        // Nobody hosts on the sender's side: phones host whenever one is
-        // involved (R4) and desktop pairs share a network (R5). The sender
-        // advertises whatever address this device already has, and joins the
-        // receiver's hotspot when the user scans its code.
+      } else if (PlatformEnv.kind == PlatformKind.android) {
+        // A phone hosts its own link: the other device - usually a desktop
+        // with no camera - joins it instead of scanning anything. The name and
+        // password are shown on the hunting screen for that side to use.
         await ensureHotspotPermissions();
+        try {
+          hotspot = await _hotspotService.start(
+            deviceName: appState.deviceName,
+          );
+          AppLog.info('hotspot', 'sender hosting "${hotspot!.ssid}"');
+          if (hotspot!.note != null) {
+            debugPrint('FreeSend: ${hotspot!.note}');
+          }
+        } on HotspotException catch (error) {
+          // Hosting is the fast path, not the only one: stay on the shared
+          // network so the radar keeps working.
+          AppLog.warn('hotspot', 'could not host, staying on Wi-Fi: '
+              '${error.message}');
+          errorMessage = error.message;
+        }
+        bindAddress = hotspot?.ip ?? await localIpv4();
+        if (bindAddress == null) {
+          _fail(_l10n.noLocalAddressSend);
+          return;
+        }
+      } else {
+        // Desktops share an existing network (R5) and never host for a phone.
         bindAddress = await localIpv4();
         if (bindAddress == null) {
           _fail(_l10n.noLocalAddressSend);
