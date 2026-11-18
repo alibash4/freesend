@@ -227,8 +227,22 @@ class ReceiveController extends ChangeNotifier {
     }
   }
 
-  void _onKnock(Knock knock) {
+  /// Devices already pinned during an earlier encrypted session are trusted
+  /// from then on, so they do not get asked again. Everyone else gets the
+  /// modal exactly once.
+  bool isRemembered(String instanceId) => appState.store.trustedDevices
+      .any((device) => device.instanceId == instanceId);
+
+  Future<void> _onKnock(Knock knock) async {
     AppLog.info('consent', 'knock from ${knock.senderName}');
+    if (isRemembered(knock.senderInstanceId)) {
+      AppLog.info(
+        'consent',
+        '${knock.senderName} is a remembered device - accepting directly',
+      );
+      await answerKnock(true);
+      return;
+    }
     activeKnock = knock;
     notifyListeners();
     if (!_knocks.isClosed) _knocks.add(knock);

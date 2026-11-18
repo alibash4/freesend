@@ -261,9 +261,10 @@ Group without a phone: WF. Radar or typed code. Per-device consent.
     Body: "<count> files · <size>"
     Actions: Decline / Accept.
     Never expires. Stays until answered, cancelled, or the peer goes offline.
-    The "Remember this device" checkbox is NOT in Phase 3: pinning needs the
-    Ed25519 fingerprint that only exists after the encrypted handshake, so it
-    lands in Phase 6 once the accept path has a manifest in hand.
+    Remembering is not a checkbox: the client pins the peer's Ed25519 identity
+    during the first encrypted handshake (trust on first use), and the receiver
+    checks that pin against the knock's instance id. A remembered device is
+    accepted without the modal; every other device is asked exactly once.
 
 6.6 Sender, group view
     Multi-select on the radar. "Send to N devices". Per-person states.

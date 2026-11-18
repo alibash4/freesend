@@ -23,6 +23,7 @@ import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/update/update_service.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
+import 'package:free_send/models/trusted_device.dart';
 import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/ui/widgets/scan_radar.dart';
@@ -464,6 +465,30 @@ void main() {
     expect(find.byType(QrImageView), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '19-receive-local-wifi');
+
+    // A device pinned by an earlier encrypted session is not asked again.
+    await tester.runAsync(() => appState.store.trustDevice(TrustedDevice(
+      instanceId: 'sender-test',
+      name: 'Desk Mini',
+      publicKey: 'pin-key',
+      fingerprint: 'pin-fingerprint',
+      addedAt: DateTime.now(),
+    )));
+    await tester.runAsync(() => KnockClient.send(
+      host: InternetAddress.loopbackIPv4.address,
+      port: controller.doorbellPort!,
+      senderInstanceId: 'sender-test',
+      senderName: 'Desk Mini',
+      platform: 'Linux',
+      fileCount: 12,
+      totalBytes: 1024,
+      fileServerHost: InternetAddress.loopbackIPv4.address,
+      fileServerPort: 47811,
+      timeout: const Duration(seconds: 5),
+    ));
+    await settle(tester);
+    expect(find.text('Accept files from Desk Mini?'), findsNothing);
+    expect(controller.activeKnock, isNull);
   });
 
   testWidgets('the logs screen shows entries and can copy them', (

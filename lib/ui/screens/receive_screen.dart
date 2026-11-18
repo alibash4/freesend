@@ -79,9 +79,21 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Text('Accept files from ${knock.senderName}?'),
-        content: Text(
-          '${formatCount(knock.fileCount, 'file')} · '
-          '${formatBytes(knock.totalBytes)}',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${formatCount(knock.fileCount, 'file')} · '
+              '${formatBytes(knock.totalBytes)}',
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'You are asked once per device; known devices connect '
+              'automatically.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
         ),
         actions: [
           TextButton(
