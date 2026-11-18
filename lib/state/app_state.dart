@@ -36,6 +36,10 @@ class AppState extends ChangeNotifier {
   /// Motor intensity for haptic ticks, 0.0 (light) to 1.0 (heavy).
   double hapticIntensity = 0.5;
 
+  /// Whether the dark theme uses the softened near-black variant. Only
+  /// meaningful while the effective theme is dark.
+  bool blackTheme = false;
+
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
 
@@ -71,6 +75,7 @@ class AppState extends ChangeNotifier {
     permissionsPrompted = store.permissionsPrompted;
     haptics = store.haptics;
     hapticIntensity = store.hapticIntensity;
+    blackTheme = store.blackTheme;
     _ready = true;
     notifyListeners();
   }
@@ -98,6 +103,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     await store.setHapticIntensity(value);
   }
+
+  Future<void> setBlackTheme(bool value) async {
+    blackTheme = value;
+    notifyListeners();
+    await store.setBlackTheme(value);
+  }
+
+  /// True when the resolved theme is a dark variant, including system mode
+  /// on a dark platform. Drives whether the black variant can apply.
+  bool get effectiveDark =>
+      themeMode == ThemeMode.dark ||
+      (themeMode == ThemeMode.system &&
+          PlatformDispatcher.instance.platformBrightness == Brightness.dark);
 
   /// Fires the configured haptic tick when feedback is enabled. Flutter
   /// exposes no motor amplitude, so intensity selects the impact strength.

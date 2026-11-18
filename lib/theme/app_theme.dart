@@ -7,6 +7,9 @@ export 'package:free_send/ui/kit/tokens.dart';
 extension AppSchemeColors on ColorScheme {
   bool get isLight => brightness == Brightness.light;
 
+  /// True only for the OLED variant — [surface] is the #121212 page.
+  bool get isBlackVariant => surface == AppColors.blackPage;
+
   /// Accent colour that stays readable as text on this brightness.
   Color get accentText => isLight ? AppColors.accentDeep : AppColors.accent;
 
@@ -51,8 +54,44 @@ abstract final class AppTheme {
     return _base(scheme, AppColors.page);
   }
 
-  static ThemeData dark() {
-    const scheme = ColorScheme(
+  static ThemeData dark() => _darkTheme(
+        page: AppColors.ink,
+        lowest: AppColors.surfaceRaised,
+        low: AppColors.surfaceRaised,
+        container: AppColors.surfaceRaised,
+        high: AppColors.surfaceRaised,
+        highest: AppColors.surfaceRaised,
+        secondaryContainer: AppColors.surfaceRaised,
+        outline: const Color(0xFF3A3A3A),
+        outlineVariant: const Color(0xFF2C2C2C),
+      );
+
+  /// The "black" variant: same flat surface treatment as [dark], two steps
+  /// darker — every surface role sits at #171717 against the #121212 page.
+  static ThemeData black() => _darkTheme(
+        page: AppColors.blackPage,
+        lowest: AppColors.neutral900,
+        low: AppColors.neutral900,
+        container: AppColors.neutral900,
+        high: AppColors.neutral900,
+        highest: AppColors.neutral900,
+        secondaryContainer: AppColors.neutral900,
+        outline: const Color(0xFF2A2A2A),
+        outlineVariant: const Color(0xFF1F1F1F),
+      );
+
+  static ThemeData _darkTheme({
+    required Color page,
+    required Color lowest,
+    required Color low,
+    required Color container,
+    required Color high,
+    required Color highest,
+    required Color secondaryContainer,
+    required Color outline,
+    required Color outlineVariant,
+  }) {
+    final scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: AppColors.accent,
       onPrimary: AppColors.neutral0,
@@ -60,28 +99,28 @@ abstract final class AppTheme {
       onPrimaryContainer: AppColors.accentInkDark,
       secondary: AppColors.neutral300,
       onSecondary: AppColors.neutral900,
-      secondaryContainer: AppColors.surfaceRaised,
+      secondaryContainer: secondaryContainer,
       onSecondaryContainer: AppColors.neutral100,
       tertiary: AppColors.accent,
       onTertiary: AppColors.neutral0,
       error: AppColors.danger,
       onError: AppColors.neutral0,
-      surface: AppColors.ink,
+      surface: page,
       onSurface: AppColors.neutral100,
-      surfaceContainerLowest: AppColors.surfaceRaised,
-      surfaceContainerLow: AppColors.surfaceRaised,
-      surfaceContainer: AppColors.surfaceRaised,
-      surfaceContainerHigh: AppColors.surfaceRaised,
-      surfaceContainerHighest: AppColors.surfaceRaised,
+      surfaceContainerLowest: lowest,
+      surfaceContainerLow: low,
+      surfaceContainer: container,
+      surfaceContainerHigh: high,
+      surfaceContainerHighest: highest,
       onSurfaceVariant: AppColors.neutral400,
-      outline: Color(0xFF3A3A3A),
-      outlineVariant: Color(0xFF2C2C2C),
+      outline: outline,
+      outlineVariant: outlineVariant,
       shadow: Color(0x66000000),
       scrim: Color(0x99000000),
       inverseSurface: AppColors.neutral100,
       onInverseSurface: AppColors.neutral900,
     );
-    return _base(scheme, AppColors.ink);
+    return _base(scheme, page);
   }
 
   static ThemeData _base(ColorScheme scheme, Color page) {

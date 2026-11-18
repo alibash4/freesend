@@ -740,6 +740,18 @@ abstract class AppLocalizations {
   /// **'This device'**
   String get thisDevice;
 
+  /// No description provided for @general.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get general;
+
+  /// No description provided for @system.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get system;
+
   /// No description provided for @deviceName.
   ///
   /// In en, this message translates to:
@@ -842,12 +854,6 @@ abstract class AppLocalizations {
   /// **'Auto'**
   String get auto;
 
-  /// No description provided for @systemTray.
-  ///
-  /// In en, this message translates to:
-  /// **'System tray'**
-  String get systemTray;
-
   /// No description provided for @minimizeToTray.
   ///
   /// In en, this message translates to:
@@ -859,6 +865,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep FreeSend running in the tray when the window is closed.'**
   String get keepRunningInTray;
+
+  /// No description provided for @black.
+  ///
+  /// In en, this message translates to:
+  /// **'OLED Mode'**
+  String get black;
+
+  /// No description provided for @blackThemeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A deeper dark made for OLED screens: easy on the eyes, easy on battery.'**
+  String get blackThemeSubtitle;
 
   /// No description provided for @hapticFeedback.
   ///
@@ -878,12 +896,6 @@ abstract class AppLocalizations {
   /// **'Intensity'**
   String get hapticIntensity;
 
-  /// No description provided for @data.
-  ///
-  /// In en, this message translates to:
-  /// **'Data'**
-  String get data;
-
   /// No description provided for @localDataExplanation.
   ///
   /// In en, this message translates to:
@@ -895,12 +907,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear transfer history'**
   String get clearTransferHistory;
-
-  /// No description provided for @updates.
-  ///
-  /// In en, this message translates to:
-  /// **'Updates'**
-  String get updates;
 
   /// No description provided for @checkAutomatically.
   ///

@@ -401,6 +401,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get thisDevice => 'This device';
 
   @override
+  String get general => 'General';
+
+  @override
+  String get system => 'System';
+
+  @override
   String get deviceName => 'Device name';
 
   @override
@@ -456,14 +462,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auto => 'Auto';
 
   @override
-  String get systemTray => 'System tray';
-
-  @override
   String get minimizeToTray => 'Minimize to tray on close';
 
   @override
   String get keepRunningInTray =>
       'Keep FreeSend running in the tray when the window is closed.';
+
+  @override
+  String get black => 'OLED Mode';
+
+  @override
+  String get blackThemeSubtitle =>
+      'A deeper dark made for OLED screens: easy on the eyes, easy on battery.';
 
   @override
   String get hapticFeedback => 'Tap feedback';
@@ -476,17 +486,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hapticIntensity => 'Intensity';
 
   @override
-  String get data => 'Data';
-
-  @override
   String get localDataExplanation =>
       'FreeSend keeps a local list of past transfers and nothing else. Files are never uploaded — the two devices talk directly over the hotspot link.';
 
   @override
   String get clearTransferHistory => 'Clear transfer history';
-
-  @override
-  String get updates => 'Updates';
 
   @override
   String get checkAutomatically => 'Check automatically';

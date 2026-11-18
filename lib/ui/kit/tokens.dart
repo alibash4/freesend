@@ -14,6 +14,16 @@ abstract final class AppColors {
   static const ink = Color(0xFF1C1C1C);
   static const surfaceRaised = Color(0xFF242424);
 
+  /// The "black" dark variant: a softened near-black page with a real
+  /// elevation scale, friendlier on OLED than pure #000. Every surface step
+  /// sits below the old flat #242424 so cards and controls match the page.
+  static const blackPage = Color(0xFF121212);
+  static const blackLowest = Color(0xFF0A0A0A);
+  static const blackLow = Color(0xFF161616);
+  static const blackContainer = Color(0xFF1C1C1C);
+  static const blackHigh = Color(0xFF212121);
+  static const blackHighest = Color(0xFF282828);
+
   static const neutral0 = Color(0xFFFFFFFF);
   static const neutral50 = Color(0xFFFAFAFA);
   static const neutral100 = Color(0xFFF5F5F5);

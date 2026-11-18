@@ -81,6 +81,8 @@ abstract final class AppIcons {
   static final IconData compress = UIcons.regularRounded.compress;
   static final IconData database = UIcons.regularRounded.database;
   static final IconData update = UIcons.regularRounded.arrow_circle_up;
+  static final IconData sliders = UIcons.regularRounded.settings_sliders;
+  static final IconData apps = UIcons.regularRounded.apps;
 
   // Bottom navigation: regular when idle, solid when active.
   static final IconData homeActive = UIcons.solidRounded.home;

@@ -17,6 +17,14 @@ import 'package:free_send/ui/screens/permissions_screen.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
+/// Picks the concrete [ThemeData] for the current choice. MaterialApp only
+/// understands light/dark/system, so the black variant is resolved here and
+/// the app is pinned to [ThemeMode.light] to keep it stable.
+ThemeData _resolveTheme(AppState state) {
+  if (!state.effectiveDark) return AppTheme.light();
+  return state.blackTheme ? AppTheme.black() : AppTheme.dark();
+}
+
 class FreeSendApp extends StatelessWidget {
   const FreeSendApp({super.key, required this.appState, required this.tray});
 
@@ -90,9 +98,8 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
         title: 'FreeSend',
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: state.themeMode,
+        theme: _resolveTheme(state),
+        themeMode: ThemeMode.light,
         locale: state.locale,
         localizationsDelegates: [
           AppLocalizations.delegate,

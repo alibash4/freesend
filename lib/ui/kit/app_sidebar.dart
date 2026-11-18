@@ -28,7 +28,7 @@ class AppSidebar extends StatelessWidget {
         color: scheme.surface,
         border: BorderDirectional(
           end: BorderSide(
-            color: dark ? const Color(0xFF2C2C2C) : scheme.hairline,
+            color: scheme.hairline,
             width: 1,
           ),
         ),
@@ -131,7 +131,9 @@ class _SidebarItemView extends StatelessWidget {
               child: Material(
                 color: selected
                     ? (dark
-                        ? Colors.white.withValues(alpha: 0.08)
+                        ? Colors.white.withValues(
+                            alpha: scheme.isBlackVariant ? 0.05 : 0.08,
+                          )
                         : AppColors.neutral100)
                     : scheme.surface,
                 borderRadius: BorderRadius.circular(AppRadii.field),

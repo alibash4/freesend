@@ -413,6 +413,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get thisDevice => 'هذا الجهاز';
 
   @override
+  String get general => 'عام';
+
+  @override
+  String get system => 'النظام';
+
+  @override
   String get deviceName => 'اسم الجهاز';
 
   @override
@@ -468,14 +474,18 @@ class AppLocalizationsAr extends AppLocalizations {
   String get auto => 'تلقائي';
 
   @override
-  String get systemTray => 'منطقة النظام';
-
-  @override
   String get minimizeToTray => 'التصغير إلى منطقة النظام عند الإغلاق';
 
   @override
   String get keepRunningInTray =>
       'إبقاء FreeSend يعمل في منطقة النظام عند إغلاق النافذة.';
+
+  @override
+  String get black => 'وضع OLED';
+
+  @override
+  String get blackThemeSubtitle =>
+      'وضع داكن أعمق لشاشات OLED: مريح للعين ويوفّر البطارية.';
 
   @override
   String get hapticFeedback => 'الاستجابة عند اللمس';
@@ -488,17 +498,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get hapticIntensity => 'الشدة';
 
   @override
-  String get data => 'البيانات';
-
-  @override
   String get localDataExplanation =>
       'يحتفظ FreeSend بقائمة محلية بالتحويلات السابقة فقط. لا يتم رفع الملفات أبدًا — يتحدث الجهازان مباشرة عبر رابط نقطة الاتصال.';
 
   @override
   String get clearTransferHistory => 'مسح سجل التحويلات';
-
-  @override
-  String get updates => 'التحديثات';
 
   @override
   String get checkAutomatically => 'التحقق تلقائيًا';
