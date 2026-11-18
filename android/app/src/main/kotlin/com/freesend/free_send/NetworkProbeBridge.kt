@@ -1,6 +1,7 @@
 package com.freesend.free_send
 
 import android.content.Context
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import io.flutter.plugin.common.BinaryMessenger
@@ -25,8 +26,19 @@ class NetworkProbeBridge(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "isVpnActive" -> result.success(isVpnActive())
+            "isLocationEnabled" -> result.success(isLocationEnabled())
             else -> result.notImplemented()
         }
+    }
+
+    /// Android 10 and newer refuses LocalOnlyHotspot while location services are
+    /// off, which otherwise surfaces as a confusing SecurityException.
+    private fun isLocationEnabled(): Boolean {
+        val manager = context.applicationContext
+            .getSystemService(Context.LOCATION_SERVICE)
+                as? LocationManager ?: return true
+        return manager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     }
 
     private fun isVpnActive(): Boolean {

@@ -1076,6 +1076,18 @@ abstract class AppLocalizations {
   /// **'FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.'**
   String get setupVpnBody;
 
+  /// No description provided for @setupLocationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off'**
+  String get setupLocationTitle;
+
+  /// No description provided for @setupLocationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.'**
+  String get setupLocationBody;
+
   /// No description provided for @setupOptional.
   ///
   /// In en, this message translates to:

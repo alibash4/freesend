@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:free_send/services/permissions/app_permissions.dart';
-import 'package:free_send/services/permissions/vpn_status.dart';
+import 'package:free_send/services/permissions/network_probe.dart';
 
 /// One grant FreeSend needs before a transfer can start, in the order the
 /// user has to turn them on.
@@ -54,7 +54,9 @@ abstract final class TransferSetup {
         : await Permission.notification.status;
     final camera = await Permission.camera.status;
     // A VPN routes around the local link, so both sides become invisible.
-    final vpnOn = await VpnStatus.isOn;
+    final vpnOn = await NetworkProbe.vpnIsOn;
+    // Android 10+ will not run the hotspot at all with this off.
+    final locationOn = await NetworkProbe.locationIsOn;
     return [
       SetupStep(
         index: 1,
@@ -76,6 +78,11 @@ abstract final class TransferSetup {
       SetupStep(
         index: 4,
         granted: !vpnOn,
+        needsSettings: true,
+      ),
+      SetupStep(
+        index: 5,
+        granted: locationOn,
         needsSettings: true,
       ),
     ];
@@ -106,8 +113,10 @@ abstract final class TransferSetup {
         if (_blocked(status)) await openAppSettings();
         return;
       case 4:
-        // A VPN belongs to another app or to the system settings; there is no
-        // in-app switch. Returning lets the screen re-check it.
+      case 5:
+        // Both belong to the system, not to FreeSend: a VPN lives in another
+        // app and location services live in quick settings. Returning lets the
+        // screen re-check them when the user comes back.
         return;
     }
   }

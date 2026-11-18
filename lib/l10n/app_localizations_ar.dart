@@ -597,6 +597,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'يعمل FreeSend عبر الشبكة المحلية التي تخفيها الشبكة الافتراضية الخاصة. أوقفها ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
 
   @override
+  String get setupLocationTitle => 'الموقع غير مفعّل';
+
+  @override
+  String get setupLocationBody =>
+      'يحتاج أندرويد إلى خدمات الموقع مفعّلة لتشغيل نقطة الاتصال التي يستخدمها النقل. فعّل الموقع ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
+
+  @override
   String get setupOptional => 'اختياري';
 
   @override

@@ -585,6 +585,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.';
 
   @override
+  String get setupLocationTitle => 'Location is off';
+
+  @override
+  String get setupLocationBody =>
+      'Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.';
+
+  @override
   String get setupOptional => 'Optional';
 
   @override

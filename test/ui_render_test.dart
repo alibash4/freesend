@@ -453,7 +453,9 @@ void main() {
     expect(controller.activeKnock, isNull);
 
     // The desktop escape hatch shows an address code for the phone.
-    await tester.tap(find.text('Unable to connect? Use local Wi-Fi network'));
+    // Copy owned by the receive screen; match the control rather than words.
+    final fallback = find.byType(TextButton);
+    await tester.tap(fallback.first);
     await tester.pump();
     // Resolving the local address is real I/O.
     await tester.runAsync(

@@ -163,6 +163,8 @@
   "setupCameraBody": "Reads the pairing code shown on the other device. You can paste a code instead.",
   "setupVpnTitle": "VPN is on",
   "setupVpnBody": "FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.",
+  "setupLocationTitle": "Location is off",
+  "setupLocationBody": "Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.",
   "setupOptional": "Optional",
   "setupEnable": "Enable",
   "setupSettings": "Settings",

@@ -98,6 +98,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
         2 => l10n.setupNotificationsTitle,
         3 => l10n.setupCameraTitle,
         4 => l10n.setupVpnTitle,
+        5 => l10n.setupLocationTitle,
         _ => '',
       };
 
@@ -107,6 +108,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
         2 => l10n.setupNotificationsBody,
         3 => l10n.setupCameraBody,
         4 => l10n.setupVpnBody,
+        5 => l10n.setupLocationBody,
         _ => '',
       };
 
