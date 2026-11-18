@@ -138,7 +138,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       )
                     : const SizedBox(width: 18),
                 title: Text(label),
-                onTap: () => Navigator.of(sheetContext).pop(code),
+                onTap: () {
+                  if (sheetContext.read<AppState>().haptics) {
+                    HapticFeedback.selectionClick();
+                  }
+                  Navigator.of(sheetContext).pop(code);
+                },
               ),
           ],
         ),
@@ -319,7 +324,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           SystemMouseCursors.click,
                         ),
                       ),
-                      onPressed: _renameDevice,
+                      onPressed: () {
+                        if (appState.haptics) {
+                          HapticFeedback.selectionClick();
+                        }
+                        _renameDevice();
+                      },
                       child: Text(
                         appState.deviceName,
                         maxLines: 1,
@@ -350,7 +360,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           SystemMouseCursors.click,
                         ),
                       ),
-                      onPressed: _chooseFolder,
+                      onPressed: () {
+                        if (appState.haptics) {
+                          HapticFeedback.selectionClick();
+                        }
+                        _chooseFolder();
+                      },
                       child: Text(
                         appState.downloadDir.isEmpty
                             ? l10n.notSetYet
@@ -389,6 +404,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         onPressed: () async {
+                          if (appState.haptics) {
+                            HapticFeedback.selectionClick();
+                          }
                           final value = PlatformEnv.isDesktop
                               ? await _pickLocaleDesktop(
                                   context,
@@ -523,7 +541,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? null
                         : _checkNow,
                     icon: updateState.phase == UpdatePhase.checking
-                        ? const _SpinnerIcon(size: 16)
+                        ? const SpinnerIcon(size: 16)
                         : Icon(AppIcons.refresh, size: 17),
                     label: Text(
                       updateState.phase == UpdatePhase.checking
@@ -777,38 +795,6 @@ class _SlidingPill extends StatelessWidget {
   }
 }
 
-/// A continuously rotating uicons spinner glyph for inline loading states.
-class _SpinnerIcon extends StatefulWidget {
-  const _SpinnerIcon({required this.size});
-
-  final double size;
-
-  @override
-  State<_SpinnerIcon> createState() => _SpinnerIconState();
-}
-
-class _SpinnerIconState extends State<_SpinnerIcon>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RotationTransition(
-      turns: _controller,
-      child: Icon(AppIcons.loading, size: widget.size),
-    );
-  }
-}
-
 /// A popup-menu entry rendered as its own rounded, padded tile so the menu
 /// reads like the rest of the app's surfaces instead of a flat list.
 class _MenuItem extends PopupMenuEntry<String> {
@@ -850,7 +836,12 @@ class _MenuItemState extends State<_MenuItem> {
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(AppRadii.field),
-          onTap: () => Navigator.pop(context, widget.value),
+          onTap: () {
+            if (context.read<AppState>().haptics) {
+              HapticFeedback.selectionClick();
+            }
+            Navigator.pop(context, widget.value);
+          },
           child: SizedBox(
             width: widget.width,
             height: 40,

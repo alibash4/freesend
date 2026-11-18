@@ -590,3 +590,35 @@ class SurfaceCard extends StatelessWidget {
     );
   }
 }
+
+/// A continuously rotating uicons spinner glyph for inline loading states.
+class SpinnerIcon extends StatefulWidget {
+  const SpinnerIcon({super.key, required this.size});
+
+  final double size;
+
+  @override
+  State<SpinnerIcon> createState() => _SpinnerIconState();
+}
+
+class _SpinnerIconState extends State<SpinnerIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: Icon(AppIcons.loading, size: widget.size),
+    );
+  }
+}

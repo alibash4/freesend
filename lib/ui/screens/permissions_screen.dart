@@ -9,6 +9,7 @@ import 'package:free_send/services/permissions/app_permissions.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/widgets/common.dart';
 
 /// First-launch runtime permission gate for Android.
 ///
@@ -114,7 +115,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             const SizedBox(height: AppSpacing.xl * 1.5),
             if (android) ...[
               _PermissionRow(
-                icon: AppIcons.wifi,
+                icon: Icons.place_outlined,
                 title: l10n.permLocationTitle,
                 body: l10n.permLocationBody,
                 status: _statusFor(Permission.locationWhenInUse),
@@ -176,11 +177,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                     ? null
                     : (allGranted ? _finish : _request),
                 child: _requesting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const SpinnerIcon(size: 16)
                     : Text(
                         allGranted ? l10n.permContinue : l10n.permAllow,
                       ),
