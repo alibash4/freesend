@@ -33,7 +33,7 @@ class AppState extends ChangeNotifier {
   /// Whether taps produce a light haptic tick on devices that support it.
   bool haptics = true;
 
-  /// Motor intensity for haptic ticks, 0.0 (light) to 1.0 (heavy).
+  /// Motor intensity for haptic ticks, 0.0 (subtle) to 1.0 (heavy).
   double hapticIntensity = 0.5;
 
   /// Whether the dark theme uses the softened near-black variant. Only
@@ -118,13 +118,12 @@ class AppState extends ChangeNotifier {
           PlatformDispatcher.instance.platformBrightness == Brightness.dark);
 
   /// Fires the configured haptic tick when feedback is enabled. Flutter
-  /// exposes no motor amplitude, so intensity selects the impact strength.
+  /// exposes no motor amplitude and most devices render the softer impacts
+  /// identically, so intensity is an honest two-step choice.
   void tick() {
     if (!haptics) return;
-    if (hapticIntensity < 0.25) {
+    if (hapticIntensity < 0.5) {
       HapticFeedback.lightImpact();
-    } else if (hapticIntensity < 0.75) {
-      HapticFeedback.mediumImpact();
     } else {
       HapticFeedback.heavyImpact();
     }

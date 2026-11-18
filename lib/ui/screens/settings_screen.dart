@@ -162,7 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         AppSpacing.lg,
         PlatformEnv.isDesktop ? AppSpacing.lg : AppSpacing.sm,
         AppSpacing.lg,
-        AppSpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
+        AppSpacing.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -218,7 +218,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
-        builder: (sheetContext) => editor,
+        // viewInsets must be read inside the sheet so the content rides up
+        // with the keyboard instead of sitting behind it.
+        builder: (sheetContext) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: SafeArea(top: false, child: editor),
+        ),
       );
     }
   }
@@ -522,7 +529,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         value: appState.hapticIntensity,
                         min: 0,
                         max: 1,
-                        divisions: 2,
+                        divisions: 1,
                         onChanged: appState.setHapticIntensity,
                       ),
                     ],

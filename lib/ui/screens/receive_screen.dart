@@ -13,10 +13,12 @@ import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/services/transfer/doorbell.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/services/permissions/transfer_setup.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
@@ -102,11 +104,19 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Navigator.of(context).pop(false);
+            },
             child: const Text('Decline'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Navigator.of(context).pop(true);
+            },
             child: const Text('Accept'),
           ),
         ],
@@ -178,9 +188,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     if (target == null) return;
     final parts = target.split(':');
     final host = parts.first.trim();
-    final port = parts.length > 1
-        ? int.tryParse(parts[1].trim()) ?? 47811
-        : 47811;
+    final port =
+        parts.length > 1 ? int.tryParse(parts[1].trim()) ?? 47811 : 47811;
     await controller.connectToAddress(host, port);
   }
 
@@ -200,7 +209,6 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       return Scaffold(backgroundColor: Theme.of(context).colorScheme.surface);
     }
     final controller = context.watch<ReceiveController>();
-    final l10n = AppLocalizations.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -208,87 +216,72 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(l10n.receiveTitle),
           leading: IconButton(
             icon: Icon(AppIcons.back),
-            onPressed: () => widget.onBack?.call(),
+            mouseCursor: SystemMouseCursors.click,
+            onPressed: () {
+              context.read<AppState>().tick();
+              widget.onBack?.call();
+            },
           ),
-        actions: [
-          if (ScanScreen.isSupported &&
-              (controller.phase == ReceivePhase.idle ||
-                  controller.phase == ReceivePhase.scanning))
-            IconButton(
-              tooltip: l10n.scanPairingCode,
-              onPressed: () => _openScanner(controller),
-              icon: Icon(AppIcons.scan),
-            ),
-          if (controller.isWaiting)
-            IconButton(
-              tooltip: l10n.rescan,
-              onPressed: () => controller.startWaiting(
-                host: PlatformEnv.kind == PlatformKind.android,
+        ),
+        body: SafeArea(
+          child: ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+            children: [
+              Padding(
+                padding: kPagePadding,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: switch (controller.phase) {
+                    ReceivePhase.idle ||
+                    ReceivePhase.scanning ||
+                    ReceivePhase.joining =>
+                      _WaitingView(
+                        key: const ValueKey('scan'),
+                        controller: controller,
+                        onJoin: () => _openJoinSheet(controller),
+                        onManual: () => _openManualConnect(controller),
+                        onScan: () => _openScanner(controller),
+                        onPaste: () => _enterCode(controller),
+                      ),
+                    ReceivePhase.reviewing => _ReviewView(
+                        key: const ValueKey('review'),
+                        controller: controller,
+                      ),
+                    ReceivePhase.transferring => _ProgressView(
+                        key: const ValueKey('progress'),
+                        controller: controller,
+                      ),
+                    ReceivePhase.completed => _DoneView(
+                        key: const ValueKey('done'),
+                        controller: controller,
+                        onDone: () async {
+                          await controller.reset();
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                      ),
+                    ReceivePhase.failed || ReceivePhase.cancelled => _ErrorView(
+                        key: const ValueKey('error'),
+                        controller: controller,
+                        onRetry: () async {
+                          await controller.reset();
+                          if (context.mounted) {
+                            await controller.startWaiting(
+                              host: PlatformEnv.kind == PlatformKind.android,
+                            );
+                          }
+                        },
+                      ),
+                  },
+                ),
               ),
-              icon: Icon(AppIcons.refresh),
-            ),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-          children: [
-            Padding(
-              padding: kPagePadding,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: switch (controller.phase) {
-                  ReceivePhase.idle ||
-                  ReceivePhase.scanning ||
-                  ReceivePhase.joining =>
-                    _WaitingView(
-                      key: const ValueKey('scan'),
-                      controller: controller,
-                      onJoin: () => _openJoinSheet(controller),
-                      onManual: () => _openManualConnect(controller),
-                      onScan: () => _openScanner(controller),
-                      onPaste: () => _enterCode(controller),
-                    ),
-                  ReceivePhase.reviewing => _ReviewView(
-                      key: const ValueKey('review'),
-                      controller: controller,
-                    ),
-                  ReceivePhase.transferring => _ProgressView(
-                      key: const ValueKey('progress'),
-                      controller: controller,
-                    ),
-                  ReceivePhase.completed => _DoneView(
-                      key: const ValueKey('done'),
-                      controller: controller,
-                      onDone: () async {
-                        await controller.reset();
-                        if (context.mounted) Navigator.of(context).pop();
-                      },
-                    ),
-                  ReceivePhase.failed || ReceivePhase.cancelled => _ErrorView(
-                      key: const ValueKey('error'),
-                      controller: controller,
-                      onRetry: () async {
-                        await controller.reset();
-                        if (context.mounted) {
-                          await controller.startWaiting(
-                            host: PlatformEnv.kind == PlatformKind.android,
-                          );
-                        }
-                      },
-                    ),
-                },
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -316,12 +309,7 @@ class _WaitingView extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(
-              child: Text(
-                'Waiting for a device',
-                style: theme.textTheme.headlineSmall,
-              ),
-            ),
+            const Expanded(child: AppPageTitle('Waiting for a device')),
             if (controller.phase == ReceivePhase.joining)
               const SizedBox(
                 width: 18,
@@ -335,7 +323,7 @@ class _WaitingView extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Text(
           controller.isWaiting
-              ? 'Ready to receive. Keep this screen open.'
+              ? 'Keep this screen open. The sending device will find you.'
               : 'Getting ready…',
           style: theme.textTheme.bodySmall,
         ),
@@ -391,27 +379,148 @@ class _WaitingView extends StatelessWidget {
           ReceiverPresence.idle => const SizedBox.shrink(),
         },
         const SizedBox(height: AppSpacing.lg),
-        Wrap(
-          spacing: AppSpacing.sm,
-          children: [
-            TextButton.icon(
-              onPressed: ScanScreen.isSupported ? onScan : null,
-              icon: Icon(AppIcons.scan, size: 16),
-              label: const Text('Scan code'),
-            ),
-            TextButton.icon(
-              onPressed: onPaste,
-              icon: Icon(AppIcons.paste, size: 16),
-              label: const Text('Enter code'),
-            ),
-            TextButton.icon(
-              onPressed: onManual,
-              icon: Icon(AppIcons.address, size: 16),
-              label: const Text('Connect by address'),
-            ),
-          ],
+        _OtherWaysToConnect(
+          controller: controller,
+          onScan: onScan,
+          onPaste: onPaste,
+          onManual: onManual,
         ),
       ],
+    );
+  }
+}
+
+/// The escape hatches, folded away so the waiting state stays the anchor.
+/// Each row names the action and says when to use it.
+class _OtherWaysToConnect extends StatelessWidget {
+  const _OtherWaysToConnect({
+    required this.controller,
+    required this.onScan,
+    required this.onPaste,
+    required this.onManual,
+  });
+
+  final ReceiveController controller;
+  final VoidCallback onScan;
+  final VoidCallback onPaste;
+  final VoidCallback onManual;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        shape: const Border(),
+        collapsedShape: const Border(),
+        leading: Icon(
+          AppIcons.link,
+          size: 18,
+          color: scheme.onSurfaceVariant,
+        ),
+        title: Text(
+          'Other ways to connect',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          'If the devices do not find each other on their own',
+          style: theme.textTheme.bodySmall,
+        ),
+        children: [
+          if (ScanScreen.isSupported)
+            _ConnectOption(
+              icon: AppIcons.scan,
+              title: 'Scan a pairing code',
+              subtitle: 'Point the camera at the code on the sending device',
+              onTap: () {
+                controller.appState.tick();
+                onScan();
+              },
+            ),
+          _ConnectOption(
+            icon: AppIcons.paste,
+            title: 'Enter a pairing code',
+            subtitle: 'Paste a code sent in a message or shown on screen',
+            onTap: () {
+              controller.appState.tick();
+              onPaste();
+            },
+          ),
+          _ConnectOption(
+            icon: AppIcons.address,
+            title: 'Connect by address',
+            subtitle: 'Type the address shown on the sending device',
+            onTap: () {
+              controller.appState.tick();
+              onManual();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One self-explaining row inside "Other ways to connect".
+class _ConnectOption extends StatelessWidget {
+  const _ConnectOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              Icon(
+                AppIcons.chevronRight,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -454,21 +563,24 @@ class _QrPanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Scan this from the other device',
+            'The other device scans this code',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'The other device opens FreeSend and scans this code to connect.',
+            'On the sending device, open FreeSend and scan to connect.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.xs),
           TextButton.icon(
-            onPressed: () =>
-                Clipboard.setData(ClipboardData(text: payload)),
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              Clipboard.setData(ClipboardData(text: payload));
+            },
             icon: Icon(AppIcons.copy, size: 16),
             label: const Text('Copy code'),
           ),
@@ -540,21 +652,28 @@ class _JoinPromptPanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'This device joins the hotspot the phone creates. Pick it in the '
-            'list once it appears.',
+            'This device needs to join the hotspot the phone creates. Enter '
+            'its name and password below.',
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.md),
-          OutlinedButton.icon(
-            onPressed: onJoin,
-            icon: Icon(AppIcons.wifi, size: 17),
-            label: const Text('Join a hotspot'),
+          FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              controller.appState.tick();
+              onJoin();
+            },
+            child: const Text('Join a hotspot'),
           ),
           const SizedBox(height: AppSpacing.xs),
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: TextButton.icon(
-              onPressed: controller.toggleLocalWifiQr,
+              style: clickCursorStyle,
+              onPressed: () {
+                controller.appState.tick();
+                controller.toggleLocalWifiQr();
+              },
               icon: Icon(
                 controller.showLocalWifiQr ? AppIcons.wifi : AppIcons.link,
                 size: 16,
@@ -562,7 +681,7 @@ class _JoinPromptPanel extends StatelessWidget {
               label: Text(
                 controller.showLocalWifiQr
                     ? 'Back to the hotspot'
-                    : 'Unable to connect? Use local Wi-Fi network',
+                    : 'On the same Wi-Fi? Show a code instead',
               ),
             ),
           ),
@@ -583,7 +702,6 @@ class _JoinPromptPanel extends StatelessWidget {
   }
 }
 
-
 class _ReviewView extends StatelessWidget {
   const _ReviewView({super.key, required this.controller});
 
@@ -594,12 +712,13 @@ class _ReviewView extends StatelessWidget {
     final theme = Theme.of(context);
     final manifest = controller.manifest!;
     final selectedCount = controller.selectedIds.length;
-    final allSelected = selectedCount == manifest.items.length && selectedCount > 0;
+    final allSelected =
+        selectedCount == manifest.items.length && selectedCount > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(manifest.hostName, style: theme.textTheme.headlineSmall),
+        AppPageTitle(manifest.hostName),
         const SizedBox(height: AppSpacing.xs),
         Text(
           'Offering ${formatCount(manifest.items.length, 'file')} · '
@@ -607,96 +726,135 @@ class _ReviewView extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Text('Choose what to receive', style: theme.textTheme.titleMedium),
-            const Spacer(),
-            TextButton(
-              onPressed: () => controller.selectAll(value: !allSelected),
-              child: Text(allSelected ? 'Clear all' : 'Select all'),
-            ),
-          ],
+        SectionHeader(
+          title: 'Choose what to receive',
+          icon: AppIcons.inbox,
+          action: TextButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              controller.appState.tick();
+              controller.selectAll(value: !allSelected);
+            },
+            child: Text(allSelected ? 'Clear all' : 'Select all'),
+          ),
         ),
-        const SizedBox(height: AppSpacing.xs),
         Column(
           children: [
             for (var i = 0; i < manifest.items.length; i++) ...[
-              if (i > 0)
-                Divider(height: 1, color: theme.colorScheme.hairline),
-              CheckboxListTile(
-                value: controller.selectedIds.contains(manifest.items[i].id),
-                onChanged: (_) =>
-                    controller.toggleSelection(manifest.items[i].id),
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.trailing,
-                dense: true,
-                title: Text(
-                  manifest.items[i].name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+              if (i > 0) Divider(height: 1, color: theme.colorScheme.hairline),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: CheckboxListTile(
+                  value: controller.selectedIds.contains(manifest.items[i].id),
+                  onChanged: (_) {
+                    controller.appState.tick();
+                    controller.toggleSelection(manifest.items[i].id);
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  dense: true,
+                  title: Text(
+                    manifest.items[i].name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  formatBytes(manifest.items[i].size),
-                  style: theme.textTheme.bodySmall,
+                  subtitle: Text(
+                    formatBytes(manifest.items[i].size),
+                    style: theme.textTheme.bodySmall,
+                  ),
                 ),
               ),
             ],
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        SurfaceCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    AppIcons.folder,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Saving to ${controller.saveLocation}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              if (controller.encrypted) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Icon(
+                      AppIcons.lock,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Encrypted session'
+                        '${controller.securityCode == null ? '' : ' · ${controller.securityCode}'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
-            Icon(
-              AppIcons.folder,
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
             Expanded(
-              child: Text(
-                'Saving to ${controller.saveLocation}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+              child: OutlinedButton(
+                style: clickCursorStyle,
+                onPressed: () {
+                  controller.appState.tick();
+                  controller.cancel();
+                },
+                child: const Text('Back to sessions'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: FilledButton.icon(
+                style: clickCursorStyle,
+                onPressed: selectedCount == 0
+                    ? null
+                    : () {
+                        controller.appState.tick();
+                        controller.beginReceive();
+                      },
+                icon: Icon(AppIcons.download, size: 17),
+                label: Text(
+                  selectedCount == 0
+                      ? 'Select files'
+                      : 'Receive $selectedCount · '
+                          '${formatBytes(controller.selectedBytes)}',
+                ),
               ),
             ),
           ],
-        ),
-        if (controller.encrypted) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Icon(AppIcons.lock, size: 14, color: theme.colorScheme.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Encrypted session'
-                  '${controller.securityCode == null ? '' : ' · ${controller.securityCode}'}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-        const SizedBox(height: AppSpacing.lg),
-        FilledButton.icon(
-          onPressed: selectedCount == 0 ? null : controller.beginReceive,
-          icon: Icon(AppIcons.download, size: 17),
-          label: Text(
-            selectedCount == 0
-                ? 'Select files to receive'
-                : 'Receive $selectedCount · ${formatBytes(controller.selectedBytes)}',
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: controller.cancel,
-          child: const Text('Back to sessions'),
         ),
       ],
     );
@@ -737,40 +895,40 @@ class _ProgressView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: _Metric(
-                label: 'From',
-                value: controller.manifest?.hostName ?? 'Nearby device',
-              ),
-            ),
-            Expanded(
-              child: _Metric(
-                label: 'Speed',
-                value: formatSpeed(controller.speedBytesPerSecond),
-              ),
-            ),
-            Expanded(
-              child: _Metric(
-                label: 'Remaining',
-                value: formatEta(
-                  (controller.totalBytes - controller.receivedBytes)
-                      .clamp(0, controller.totalBytes),
-                  controller.speedBytesPerSecond,
+        SurfaceCard(
+          child: Row(
+            children: [
+              Expanded(
+                child: _Metric(
+                  label: 'From',
+                  value: controller.manifest?.hostName ?? 'Nearby device',
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: _Metric(
+                  label: 'Speed',
+                  value: formatSpeed(controller.speedBytesPerSecond),
+                ),
+              ),
+              Expanded(
+                child: _Metric(
+                  label: 'Remaining',
+                  value: formatEta(
+                    (controller.totalBytes - controller.receivedBytes)
+                        .clamp(0, controller.totalBytes),
+                    controller.speedBytesPerSecond,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text('Files', style: theme.textTheme.titleMedium),
-        const SizedBox(height: AppSpacing.xs),
+        SectionHeader(title: 'Files', icon: AppIcons.inbox),
         Column(
           children: [
             for (var i = 0; i < controller.receivedItems.length; i++) ...[
-              if (i > 0)
-                Divider(height: 1, color: theme.colorScheme.hairline),
+              if (i > 0) Divider(height: 1, color: theme.colorScheme.hairline),
               FileTile(
                 name: controller.receivedItems[i].name,
                 size: controller.receivedItems[i].size,
@@ -803,9 +961,15 @@ class _ProgressView extends StatelessWidget {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: controller.pausedByMe
-                    ? controller.resume
-                    : controller.pause,
+                style: clickCursorStyle,
+                onPressed: () {
+                  controller.appState.tick();
+                  if (controller.pausedByMe) {
+                    controller.resume();
+                  } else {
+                    controller.pause();
+                  }
+                },
                 icon: Icon(
                   controller.pausedByMe ? AppIcons.play : AppIcons.pause,
                   size: 17,
@@ -816,7 +980,11 @@ class _ProgressView extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: controller.cancel,
+                style: clickCursorStyle,
+                onPressed: () {
+                  controller.appState.tick();
+                  controller.cancel();
+                },
                 icon: Icon(AppIcons.stop, size: 17),
                 label: const Text('Cancel'),
               ),
@@ -843,69 +1011,96 @@ class _DoneView extends StatelessWidget {
     final theme = Theme.of(context);
     final record = controller.lastRecord;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpacing.lg),
-        Container(
-          width: 68,
-          height: 68,
-          decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            AppIcons.check,
-            size: 30,
-            color: AppColors.success,
+        Center(
+          child: Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              AppIcons.check,
+              size: 30,
+              color: AppColors.success,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text('Files received', style: theme.textTheme.headlineSmall),
+        Center(
+            child: AppPageTitle('Files received', textAlign: TextAlign.center)),
         const SizedBox(height: AppSpacing.xs),
-        Text(
-          record == null
-              ? ''
-              : '${formatCount(record.fileCount, 'file')} · '
-                  '${formatBytes(record.bytes)} · '
-                  '${formatSpeed(record.averageBytesPerSecond)} average',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Icon(
-              AppIcons.folder,
-              size: 15,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                controller.saveLocation,
-                style: theme.textTheme.bodySmall,
-                maxLines: 2,
-                textAlign: TextAlign.center,
-              ),
-            ),
-            if (!Platform.isAndroid)
-              TextButton(
-                onPressed: () => _revealFolder(controller.saveLocation),
-                child: const Text('Open'),
-              ),
-          ],
+        Center(
+          child: Text(
+            record == null
+                ? ''
+                : '${formatCount(record.fileCount, 'file')} · '
+                    '${formatBytes(record.bytes)} · '
+                    '${formatSpeed(record.averageBytesPerSecond)} average',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        FilledButton(onPressed: () => onDone(), child: const Text('Done')),
+        SurfaceCard(
+          child: Row(
+            children: [
+              Icon(
+                AppIcons.folder,
+                size: 15,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  controller.saveLocation,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (!Platform.isAndroid)
+                TextButton(
+                  style: clickCursorStyle,
+                  onPressed: () {
+                    context.read<AppState>().tick();
+                    _revealFolder(controller.saveLocation);
+                  },
+                  child: const Text('Open'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              onDone();
+            },
+            child: const Text('Done'),
+          ),
+        ),
         const SizedBox(height: AppSpacing.sm),
-        OutlinedButton(
-          onPressed: () async {
-            await controller.reset();
-            if (!context.mounted) return;
-            await controller.startWaiting(
-              host: PlatformEnv.kind == PlatformKind.android,
-            );
-          },
-          child: const Text('Receive more'),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            style: clickCursorStyle,
+            onPressed: () async {
+              context.read<AppState>().tick();
+              await controller.reset();
+              if (!context.mounted) return;
+              await controller.startWaiting(
+                host: PlatformEnv.kind == PlatformKind.android,
+              );
+            },
+            child: const Text('Receive more'),
+          ),
         ),
       ],
     );
@@ -941,49 +1136,71 @@ class _ErrorView extends StatelessWidget {
     final theme = Theme.of(context);
     final cancelled = controller.phase == ReceivePhase.cancelled;
     final failed = controller.receivedItems
-        .where((item) =>
-            !item.done && controller.selectedIds.contains(item.id))
+        .where((item) => !item.done && controller.selectedIds.contains(item.id))
         .length;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpacing.lg),
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.error.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            cancelled ? AppIcons.stop : AppIcons.unlink,
-            size: 30,
-            color: theme.colorScheme.error,
+        Center(
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.error.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              cancelled ? AppIcons.stop : AppIcons.unlink,
+              size: 30,
+              color: theme.colorScheme.error,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Text(
-          cancelled ? 'Transfer cancelled' : 'Could not connect',
-          style: theme.textTheme.headlineSmall,
-          textAlign: TextAlign.center,
+        Center(
+          child: AppPageTitle(
+            cancelled ? 'Transfer cancelled' : 'Could not connect',
+            textAlign: TextAlign.center,
+          ),
         ),
         if (controller.errorMessage != null) ...[
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            controller.errorMessage!,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall,
+          Center(
+            child: Text(
+              controller.errorMessage!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
+            ),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
         if (failed > 0 && !cancelled) ...[
-          FilledButton.icon(
-            onPressed: controller.retryFailed,
-            icon: Icon(AppIcons.refresh, size: 17),
-            label: Text('Retry $failed file${failed == 1 ? '' : 's'}'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                controller.retryFailed();
+              },
+              icon: Icon(AppIcons.refresh, size: 17),
+              label: Text('Retry $failed file${failed == 1 ? '' : 's'}'),
+            ),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
-        FilledButton(onPressed: () => onRetry(), child: const Text('Scan again')),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            style: clickCursorStyle,
+            onPressed: () {
+              context.read<AppState>().tick();
+              onRetry();
+            },
+            child: const Text('Scan again'),
+          ),
+        ),
       ],
     );
   }
@@ -1007,7 +1224,7 @@ class _Metric extends StatelessWidget {
           value,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall?.copyWith(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1038,44 +1255,51 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Join the hotspot', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Use the hotspot name and password shown on the sending device.',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _ssid,
-            autofocus: true,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Hotspot name'),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            controller: _password,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton.icon(
-            onPressed: _submit,
-            icon: Icon(AppIcons.wifi, size: 17),
-            label: const Text('Join and scan'),
-          ),
-        ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Join the hotspot', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Use the hotspot name and password shown on the sending device.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _ssid,
+              autofocus: true,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: 'Hotspot name'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Password'),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                _submit();
+              },
+              icon: Icon(AppIcons.wifi, size: 17),
+              label: const Text('Join and scan'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1107,39 +1331,47 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Connect by address', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Enter the address shown on the sending device. The port is '
-            'optional and defaults to 47811.',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _address,
-            autofocus: true,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(labelText: 'Address or host:port'),
-            onSubmitted: (value) => Navigator.of(context).pop(value),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(_address.text.trim()),
-            icon: Icon(AppIcons.link, size: 17),
-            label: const Text('Connect'),
-          ),
-        ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Connect by address', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Enter the address shown on the sending device. The port is '
+              'optional and defaults to 47811.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _address,
+              autofocus: true,
+              keyboardType: TextInputType.url,
+              decoration:
+                  const InputDecoration(labelText: 'Address or host:port'),
+              onSubmitted: (value) => Navigator.of(context).pop(value),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                Navigator.of(context).pop(_address.text.trim());
+              },
+              icon: Icon(AppIcons.link, size: 17),
+              label: const Text('Connect'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1178,49 +1410,60 @@ class _CodeSheetState extends State<_CodeSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.lg + bottomInset,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Enter pairing code', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'On the sending device, tap Copy code under the QR code, then paste '
-            'it here. The code starts with freesend://',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _code,
-            autofocus: true,
-            minLines: 1,
-            maxLines: 3,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(
-              labelText: 'Pairing code',
-              hintText: 'freesend://pair?…',
-              suffixIcon: IconButton(
-                tooltip: 'Paste from clipboard',
-                onPressed: _pasteFromClipboard,
-                icon: Icon(AppIcons.paste, size: 17),
-              ),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.lg + bottomInset,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Enter pairing code', style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'On the sending device, tap Copy code under the QR code, then paste '
+              'it here. The code starts with freesend://',
+              style: theme.textTheme.bodySmall,
             ),
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          FilledButton.icon(
-            onPressed: _submit,
-            icon: Icon(AppIcons.link, size: 17),
-            label: const Text('Connect'),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: _code,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 3,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                labelText: 'Pairing code',
+                hintText: 'freesend://pair?…',
+                suffixIcon: IconButton(
+                  tooltip: 'Paste from clipboard',
+                  mouseCursor: SystemMouseCursors.click,
+                  onPressed: () {
+                    context.read<AppState>().tick();
+                    _pasteFromClipboard();
+                  },
+                  icon: Icon(AppIcons.paste, size: 17),
+                ),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              style: clickCursorStyle,
+              onPressed: () {
+                context.read<AppState>().tick();
+                _submit();
+              },
+              icon: Icon(AppIcons.link, size: 17),
+              label: const Text('Connect'),
+            ),
+          ],
+        ),
       ),
     );
   }

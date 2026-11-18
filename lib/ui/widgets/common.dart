@@ -6,6 +6,12 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 
+/// Shared button style that shows the click cursor on desktop platforms.
+/// Harmless on touch-only devices.
+const clickCursorStyle = ButtonStyle(
+  mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
+);
+
 /// Lets the user pick the transport a session uses: the app's normal Wi-Fi
 /// path, or a cable between the two devices.
 class LinkPicker extends StatelessWidget {
