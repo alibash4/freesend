@@ -84,11 +84,11 @@ class _TransfersScreenState extends State<TransfersScreen> {
         ] else
           Padding(
             padding: kPagePadding,
-             child: EmptyState(
-               icon: AppIcons.zap,
-               title: l10n.nothingTransferring,
-               message: l10n.nothingTransferringMessage,
-             ),
+            child: EmptyState(
+              icon: AppIcons.zap,
+              title: l10n.nothingTransferring,
+              message: l10n.nothingTransferringMessage,
+            ),
           ),
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.xs),
@@ -110,11 +110,11 @@ class _TransfersScreenState extends State<TransfersScreen> {
         if (records.isEmpty)
           Padding(
             padding: kPagePadding,
-             child: EmptyState(
-               icon: AppIcons.history,
-               title: l10n.noHistoryYetTitle,
-               message: l10n.noHistoryYetMessage,
-             ),
+            child: EmptyState(
+              icon: AppIcons.history,
+              title: l10n.noHistoryYetTitle,
+              message: l10n.noHistoryYetMessage,
+            ),
           )
         else
           Padding(
@@ -189,6 +189,7 @@ class _SendTransferCard extends StatelessWidget {
                   value: formatEta(
                     controller.remainingBytes,
                     controller.speedBytesPerSecond,
+                    l10n,
                   ),
                 ),
               ),
@@ -236,9 +237,8 @@ class _SendTransferCard extends StatelessWidget {
               else
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: controller.canPause
-                        ? controller.pauseTransfer
-                        : null,
+                    onPressed:
+                        controller.canPause ? controller.pauseTransfer : null,
                     icon: Icon(AppIcons.stop, size: 17),
                     label: Text(l10n.pause),
                   ),
@@ -332,9 +332,7 @@ class _ReceiveTransferCard extends StatelessWidget {
                     : l10n.receivingFrom(
                         controller.manifest?.hostName ?? l10n.device,
                       ),
-                icon: controller.isPaused
-                    ? AppIcons.stop
-                    : AppIcons.receive,
+                icon: controller.isPaused ? AppIcons.stop : AppIcons.receive,
               ),
               const Spacer(),
               if (controller.isPaused) const PulsingDots(),
@@ -363,6 +361,7 @@ class _ReceiveTransferCard extends StatelessWidget {
                     (controller.totalBytes - controller.receivedBytes)
                         .clamp(0, controller.totalBytes),
                     controller.speedBytesPerSecond,
+                    l10n,
                   ),
                 ),
               ),
@@ -377,8 +376,7 @@ class _ReceiveTransferCard extends StatelessWidget {
               size: item.size,
               progress: item.progress,
               subtitle: switch (item.status) {
-                TransferStatus.done =>
-                  l10n.statusSaved(formatBytes(item.size)),
+                TransferStatus.done => l10n.statusSaved(formatBytes(item.size)),
                 TransferStatus.paused => l10n.statusPaused(
                     formatBytes(item.transferred),
                     formatBytes(item.size),
@@ -459,7 +457,7 @@ class _RecordRow extends StatelessWidget {
                 Text(
                   '${isSend ? l10n.sent : l10n.received} · '
                   '${l10n.fileCount(record.fileCount)} · '
-                  '${formatTimestamp(record.timestamp)}',
+                  '${formatTimestamp(record.timestamp, l10n)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],

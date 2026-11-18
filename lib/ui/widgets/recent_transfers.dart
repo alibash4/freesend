@@ -33,8 +33,7 @@ class RecentTransfers extends StatelessWidget {
       byDay.putIfAbsent(day, () => []).add(record);
     }
 
-    final days = byDay.entries.toList()
-      ..sort((a, b) => b.key.compareTo(a.key));
+    final days = byDay.entries.toList()..sort((a, b) => b.key.compareTo(a.key));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,13 +42,13 @@ class RecentTransfers extends StatelessWidget {
         if (days.isEmpty)
           Padding(
             padding: EdgeInsets.only(top: AppSpacing.xs),
-             child: Center(
-               child: EmptyState(
-                 icon: AppIcons.history,
-                 title: l10n.nothingSentYet,
-                 message: l10n.nothingSentMessage,
-               ),
-             ),
+            child: Center(
+              child: EmptyState(
+                icon: AppIcons.history,
+                title: l10n.nothingSentYet,
+                message: l10n.nothingSentMessage,
+              ),
+            ),
           )
         else
           for (final day in days.take(2)) ...[
@@ -57,7 +56,8 @@ class RecentTransfers extends StatelessWidget {
             for (var i = 0; i < day.value.length; i++) ...[
               _RecentTransferRow(record: day.value[i]),
               if (i < day.value.length - 1)
-                Container(height: 1, color: Theme.of(context).colorScheme.hairline),
+                Container(
+                    height: 1, color: Theme.of(context).colorScheme.hairline),
             ],
           ],
       ],
@@ -73,8 +73,12 @@ class _DayHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = formatTimestamp(date);
-    final comma = label.indexOf(',');
+    final label = formatTimestamp(date, AppLocalizations.of(context));
+    var comma = label.indexOf(',');
+    final arabicComma = label.indexOf('،');
+    if (arabicComma != -1 && (comma == -1 || arabicComma < comma)) {
+      comma = arabicComma;
+    }
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
       child: Text(
@@ -103,8 +107,7 @@ class _RecentTransferRow extends StatelessWidget {
         : names.length == 1
             ? names.first
             : '${names.first} +${record.fileCount - 1}';
-    final subtitle =
-        '${record.peerName} · ${formatBytes(record.bytes)} · '
+    final subtitle = '${record.peerName} · ${formatBytes(record.bytes)} · '
         '${_timeOfDay(record.timestamp)}';
 
     return Padding(

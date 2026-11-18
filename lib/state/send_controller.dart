@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
@@ -38,6 +39,10 @@ class SendController extends ChangeNotifier {
 
   final AppState appState;
   final HotspotService _hotspotService;
+
+  /// Strings for messages this controller produces; resolved at call time so
+  /// a locale change applies to the next message, not just the next rebuild.
+  AppLocalizations get _l10n => lookupAppLocalizations(appState.locale);
   final SessionSeeker _seeker = SessionSeeker();
   StreamSubscription<List<SeekCandidate>>? _candidateSub;
 
@@ -153,6 +158,7 @@ class SendController extends ChangeNotifier {
     );
     return code.isUsable ? code : null;
   }
+
   bool get isBusy =>
       phase == SendPhase.preparing ||
       phase == SendPhase.waitingForPeer ||
@@ -283,8 +289,7 @@ class SendController extends ChangeNotifier {
         // A cable needs no hotspot: the wired address is the one to advertise.
         final wired = await wiredIpv4();
         if (wired == null) {
-          _fail('No wired network was found. Connect an Ethernet cable, or '
-              'switch back to Wi-Fi.');
+          _fail(_l10n.noWiredNetworkSend);
           return;
         }
         bindAddress = wired;
@@ -296,8 +301,7 @@ class SendController extends ChangeNotifier {
         await ensureHotspotPermissions();
         bindAddress = await localIpv4();
         if (bindAddress == null) {
-          _fail('FreeSend could not find a local address. Connect to a Wi-Fi '
-              'network, or use a cable.');
+          _fail(_l10n.noLocalAddressSend);
           return;
         }
       }
@@ -319,8 +323,9 @@ class SendController extends ChangeNotifier {
       port = await host.start();
       _host = host;
       await _foreground.start(
-        title: 'Ready to share',
-        text: '${items.length} file${items.length == 1 ? '' : 's'} · waiting for a receiver',
+        title: _l10n.readyToShare,
+        text:
+            '${_l10n.fileCount(items.length)} · ${_l10n.waitingForReceiverNote}',
       );
 
       await _seeker.start(
@@ -331,7 +336,7 @@ class SendController extends ChangeNotifier {
       AppLog.info(
         'send',
         'session up on ${_sessionAddress ?? 'unknown'}:$port with '
-        '${items.length} files (${formatBytes(totalBytes)})',
+            '${items.length} files (${formatBytes(totalBytes)})',
       );
       _candidateSub ??= _seeker.candidates.listen((list) {
         candidates = list;
@@ -343,10 +348,9 @@ class SendController extends ChangeNotifier {
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
-      _fail('Could not open the transfer listener. Allow FreeSend through the system '
-          'firewall on private networks, then try again (${error.message}).');
+      _fail(_l10n.listenerFailed(error.message));
     } on Object catch (error) {
-      _fail('Could not start sharing: $error');
+      _fail(_l10n.couldNotStartSharing(error));
     }
   }
 
@@ -422,7 +426,10 @@ class SendController extends ChangeNotifier {
     item.status = TransferStatus.active;
     sentBytes = items.fold<int>(0, (sum, entry) => sum + entry.transferred);
     unawaited(_foreground.update(
-      title: 'Sending ${formatBytes(sentBytes)} of ${formatBytes(totalBytes)}',
+      title: _l10n.sendingProgressTitle(
+        formatBytes(sentBytes),
+        formatBytes(totalBytes),
+      ),
       text: currentFileName,
     ));
     _sampleSpeed();
@@ -446,8 +453,9 @@ class SendController extends ChangeNotifier {
     final delta = sentBytes - _lastSampleBytes;
     final instant = delta / (elapsed / 1000);
     // Exponential smoothing keeps the number readable while it fluctuates.
-    speedBytesPerSecond =
-        speedBytesPerSecond == 0 ? instant : speedBytesPerSecond * 0.7 + instant * 0.3;
+    speedBytesPerSecond = speedBytesPerSecond == 0
+        ? instant
+        : speedBytesPerSecond * 0.7 + instant * 0.3;
     _lastSampleAt = now;
     _lastSampleBytes = sentBytes;
   }
@@ -523,7 +531,7 @@ class SendController extends ChangeNotifier {
     final record = TransferRecord(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       direction: TransferDirection.send,
-      peerName: peerName ?? 'Nearby device',
+      peerName: peerName ?? _l10n.nearbyDevice,
       peerPlatform: peerPlatform,
       fileCount: files,
       bytes: bytes,
@@ -564,8 +572,7 @@ class SendController extends ChangeNotifier {
 
   Future<bool> _joinReceiverHotspot(PairingCode code) async {
     if (!_hotspotService.canJoin) {
-      errorMessage = 'This device cannot join a hotspot. Use a shared Wi-Fi '
-          'network instead.';
+      errorMessage = _l10n.cannotJoinHotspot;
       notifyListeners();
       return false;
     }
@@ -576,8 +583,10 @@ class SendController extends ChangeNotifier {
       await _rebindSession();
       return true;
     } on HotspotException catch (error) {
-      AppLog.error('hotspot', 'could not join "${code.ssid}": '
-          '${error.message}');
+      AppLog.error(
+          'hotspot',
+          'could not join "${code.ssid}": '
+              '${error.message}');
       errorMessage = error.message;
       notifyListeners();
       return false;
@@ -619,7 +628,8 @@ class SendController extends ChangeNotifier {
 
   /// Knocks a scanned address, whose QR carries the receiver's doorbell port.
   Future<void> knockAddress(String host, int doorbellPort) async {
-    await _knock(id: 'scanned@$host:$doorbellPort', ip: host, consentPort: doorbellPort);
+    await _knock(
+        id: 'scanned@$host:$doorbellPort', ip: host, consentPort: doorbellPort);
   }
 
   Future<void> _knock({

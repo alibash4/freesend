@@ -470,24 +470,24 @@ void main() {
 
     // A device pinned by an earlier encrypted session is not asked again.
     await tester.runAsync(() => appState.store.trustDevice(TrustedDevice(
-      instanceId: 'sender-test',
-      name: 'Desk Mini',
-      publicKey: 'pin-key',
-      fingerprint: 'pin-fingerprint',
-      addedAt: DateTime.now(),
-    )));
+          instanceId: 'sender-test',
+          name: 'Desk Mini',
+          publicKey: 'pin-key',
+          fingerprint: 'pin-fingerprint',
+          addedAt: DateTime.now(),
+        )));
     await tester.runAsync(() => KnockClient.send(
-      host: InternetAddress.loopbackIPv4.address,
-      port: controller.doorbellPort!,
-      senderInstanceId: 'sender-test',
-      senderName: 'Desk Mini',
-      platform: 'Linux',
-      fileCount: 12,
-      totalBytes: 1024,
-      fileServerHost: InternetAddress.loopbackIPv4.address,
-      fileServerPort: 47811,
-      timeout: const Duration(seconds: 5),
-    ));
+          host: InternetAddress.loopbackIPv4.address,
+          port: controller.doorbellPort!,
+          senderInstanceId: 'sender-test',
+          senderName: 'Desk Mini',
+          platform: 'Linux',
+          fileCount: 12,
+          totalBytes: 1024,
+          fileServerHost: InternetAddress.loopbackIPv4.address,
+          fileServerPort: 47811,
+          timeout: const Duration(seconds: 5),
+        ));
     await settle(tester);
     expect(find.text('Accept files from Desk Mini?'), findsNothing);
     expect(controller.activeKnock, isNull);
@@ -511,12 +511,12 @@ void main() {
     expect(find.textContaining('a warning from the test'), findsOneWidget);
 
     // Filtering narrows to warnings only.
-    await tester.tap(find.text('warn'));
+    await tester.tap(find.text('warning'));
     await tester.pumpAndSettle();
     expect(find.textContaining('a line from the test'), findsNothing);
     expect(find.textContaining('a warning from the test'), findsOneWidget);
 
-    await tester.tap(find.text('all'));
+    await tester.tap(find.text('All'));
     await tester.pumpAndSettle();
     expect(find.byIcon(AppIcons.copy), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -558,10 +558,13 @@ void main() {
 
   testWidgets('peer list shows independent receiver progress', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: const [Locale('en'), Locale('ar')],
+        localizationsDelegates: [AppLocalizations.delegate],
         home: Scaffold(
           body: Padding(
-            padding: EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: PeerList(
               peers: [
                 PeerInfo(

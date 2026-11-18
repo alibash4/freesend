@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
@@ -39,6 +40,10 @@ class ReceiveController extends ChangeNotifier {
 
   final AppState appState;
   final HotspotService _hotspotService;
+
+  /// Strings for messages this controller produces; resolved at call time so
+  /// a locale change applies to the next message, not just the next rebuild.
+  AppLocalizations get _l10n => lookupAppLocalizations(appState.locale);
   final SessionScanner _scanner = SessionScanner();
   final TransferForeground _foreground = TransferForeground();
 
@@ -100,6 +105,7 @@ class ReceiveController extends ChangeNotifier {
   bool get isPaused => receivedItems.any(
         (item) => item.status == TransferStatus.paused && !item.done,
       );
+
   /// The receiver asked for the stream to stop. Distinct from a sender pause,
   /// which arrives as a frame while the socket is still being read.
   bool pausedByMe = false;
@@ -146,8 +152,7 @@ class ReceiveController extends ChangeNotifier {
     if (link == ShareLink.ethernet) {
       bindAddress = await wiredIpv4();
       if (bindAddress == null) {
-        errorMessage = 'No wired network was found. Connect an Ethernet cable, '
-            'then try again.';
+        errorMessage = _l10n.noWiredNetworkReceive;
         phase = ReceivePhase.failed;
         notifyListeners();
         return;
@@ -162,8 +167,7 @@ class ReceiveController extends ChangeNotifier {
       notifyListeners();
     });
     if (!ok) {
-      errorMessage =
-          'Discovery could not start. You can still connect by IP address.';
+      errorMessage = _l10n.discoveryFailedBody;
     }
     phase = ReceivePhase.scanning;
     notifyListeners();
@@ -197,8 +201,10 @@ class ReceiveController extends ChangeNotifier {
       platform: PlatformEnv.label,
       consentPort: _doorbell.port ?? 0,
     );
-    AppLog.info('receive', 'waiting (presence: ${presence.name}, '
-        'doorbell :${_doorbell.port})');
+    AppLog.info(
+        'receive',
+        'waiting (presence: ${presence.name}, '
+            'doorbell :${_doorbell.port})');
     notifyListeners();
   }
 
@@ -260,7 +266,8 @@ class ReceiveController extends ChangeNotifier {
       AppLog.info('consent', 'declined ${knock.senderName}');
       return;
     }
-    AppLog.info('host', 'connecting back to ${knock.senderHost}:${knock.senderPort}');
+    AppLog.info(
+        'host', 'connecting back to ${knock.senderHost}:${knock.senderPort}');
     await connectToAddress(
       knock.senderHost,
       knock.senderPort,
@@ -316,15 +323,14 @@ class ReceiveController extends ChangeNotifier {
       // the permission cannot be assumed to be granted yet.
       await ensureHotspotPermissions();
       final info = await _hotspotService.join(ssid.trim(), password);
-      hotspotNotice = info.note ??
-          'Connected to "${info.ssid}". Looking for the sharing device…';
+      hotspotNotice = info.note ?? _l10n.connectedLooking(info.ssid);
       await startScanning();
       phase = ReceivePhase.scanning;
     } on HotspotException catch (error) {
       errorMessage = error.message;
       phase = ReceivePhase.failed;
     } on Object catch (error) {
-      errorMessage = 'Could not join the hotspot: $error';
+      errorMessage = _l10n.couldNotJoinHotspot('$error');
       phase = ReceivePhase.failed;
     }
     notifyListeners();
@@ -344,13 +350,11 @@ class ReceiveController extends ChangeNotifier {
       if (code.hasHotspot && canJoinHotspot) {
         await ensureHotspotPermissions();
         final info = await _hotspotService.join(code.ssid!, code.password);
-        hotspotNotice = info.note ?? 'Joined "${code.ssid}".';
+        hotspotNotice = info.note ?? _l10n.joinedHotspotNote(code.ssid ?? '');
       } else if (code.hasHotspot) {
         // Windows cannot join a hotspot on the user's behalf, so it falls back
         // to the system Wi-Fi menu and then finds the session by discovery.
-        hotspotNotice =
-            'Join "${code.ssid}" from your Wi-Fi menu. The session appears here '
-            'as soon as you are connected.';
+        hotspotNotice = _l10n.joinHotspotManuallyNote(code.ssid ?? '');
       }
 
       final host = code.host;
@@ -416,9 +420,7 @@ class ReceiveController extends ChangeNotifier {
       await _loadRecovery();
       phase = ReceivePhase.reviewing;
     } on SocketException {
-      errorMessage =
-          'Could not reach $ip:$port. Make sure both devices are on the same '
-          'hotspot.';
+      errorMessage = _l10n.couldNotReachAddress('$ip:$port');
       phase = ReceivePhase.failed;
       await client.dispose();
       _client = null;
@@ -499,8 +501,9 @@ class ReceiveController extends ChangeNotifier {
     _recovery ??= TransferRecovery(saveLocation);
     phase = ReceivePhase.transferring;
     await _foreground.start(
-      title: 'Receiving files',
-      text: '${selectedIds.length} file${selectedIds.length == 1 ? '' : 's'} · ${formatBytes(totalBytes)}',
+      title: _l10n.receivingFilesTitle,
+      text:
+          '${_l10n.fileCount(selectedIds.length)} · ${formatBytes(totalBytes)}',
     );
     notifyListeners();
 
@@ -516,7 +519,7 @@ class ReceiveController extends ChangeNotifier {
       // The client already reported a specific message via events.
       if (phase != ReceivePhase.completed) {
         phase = ReceivePhase.failed;
-        errorMessage ??= 'The transfer did not finish.';
+        errorMessage ??= _l10n.transferDidNotFinish;
       }
       notifyListeners();
     } finally {
@@ -650,8 +653,8 @@ class ReceiveController extends ChangeNotifier {
       _lastSampleBytes = receivedBytes;
       phase = ReceivePhase.transferring;
       await _foreground.start(
-        title: 'Retrying transfer',
-        text: '${retryIds.length} file${retryIds.length == 1 ? '' : 's'} failed earlier',
+        title: _l10n.retryingTransferTitle,
+        text: _l10n.retryFailedFiles(retryIds.length),
       );
       notifyListeners();
       await client.receive(
@@ -661,8 +664,7 @@ class ReceiveController extends ChangeNotifier {
         baseBytes: doneBytes,
       );
     } on SocketException {
-      errorMessage = 'Could not reach $host:$port. Make sure both devices are '
-          'on the same hotspot.';
+      errorMessage = _l10n.couldNotReachAddress('$host:$port');
       phase = ReceivePhase.failed;
     } on Object catch (error) {
       if (phase != ReceivePhase.completed) {
@@ -702,7 +704,10 @@ class ReceiveController extends ChangeNotifier {
     currentFileName = item.name;
     receivedBytes = bytes;
     unawaited(_foreground.update(
-      title: 'Receiving ${formatBytes(receivedBytes)} of ${formatBytes(totalBytes)}',
+      title: _l10n.receivingProgressTitle(
+        formatBytes(receivedBytes),
+        formatBytes(totalBytes),
+      ),
       text: currentFileName,
     ));
     _maybeSaveRecovery();
@@ -721,8 +726,9 @@ class ReceiveController extends ChangeNotifier {
     final elapsed = now.difference(last).inMilliseconds;
     if (elapsed < AppConstants.progressInterval.inMilliseconds) return;
     final instant = (receivedBytes - _lastSampleBytes) / (elapsed / 1000);
-    speedBytesPerSecond =
-        speedBytesPerSecond == 0 ? instant : speedBytesPerSecond * 0.7 + instant * 0.3;
+    speedBytesPerSecond = speedBytesPerSecond == 0
+        ? instant
+        : speedBytesPerSecond * 0.7 + instant * 0.3;
     _lastSampleAt = now;
     _lastSampleBytes = receivedBytes;
   }
@@ -814,7 +820,7 @@ class ReceiveController extends ChangeNotifier {
     final record = TransferRecord(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       direction: TransferDirection.receive,
-      peerName: manifest?.hostName ?? 'Nearby device',
+      peerName: manifest?.hostName ?? _l10n.nearbyDevice,
       peerPlatform: manifest?.hostPlatform,
       fileCount: files,
       bytes: bytes,

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/services/app_logger.dart';
@@ -42,7 +43,9 @@ class _LogsScreenState extends State<LogsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Logs copied')));
+      ..showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).logsCopied)),
+      );
   }
 
   Future<void> _saveToFile() async {
@@ -50,25 +53,26 @@ class _LogsScreenState extends State<LogsScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('Saved to $path')));
+      ..showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).savedTo(path))),
+      );
   }
 
   Future<void> _clear() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear logs?'),
-        content: const Text(
-          'The on-device log file keeps its history; only this view empties.',
-        ),
+        title: Text(l10n.clearLogsQuestion),
+        content: Text(l10n.clearLogsBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n.clear),
           ),
         ],
       ),
@@ -84,22 +88,23 @@ class _LogsScreenState extends State<LogsScreen> {
     final entries = AppLog.entries
         .where((entry) => _filter == null || entry.level == _filter)
         .toList(growable: false);
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logs'),
+        title: Text(l10n.logsTitle),
         actions: [
           IconButton(
-            tooltip: 'Copy all',
+            tooltip: l10n.copyAll,
             onPressed: _copyAll,
             icon: Icon(AppIcons.copy),
           ),
           IconButton(
-            tooltip: 'Save to file',
+            tooltip: l10n.saveToFile,
             onPressed: _saveToFile,
             icon: Icon(AppIcons.folder),
           ),
           IconButton(
-            tooltip: 'Clear',
+            tooltip: l10n.clear,
             onPressed: _clear,
             icon: Icon(AppIcons.trash),
           ),
@@ -115,7 +120,13 @@ class _LogsScreenState extends State<LogsScreen> {
                 children: [
                   for (final level in [null, ...LogLevel.values])
                     FilterChip(
-                      label: Text(level?.name ?? 'all'),
+                      label: Text(switch (level) {
+                        null => l10n.allFilter,
+                        LogLevel.debug => l10n.logLevelDebug,
+                        LogLevel.info => l10n.logLevelInfo,
+                        LogLevel.warn => l10n.logLevelWarn,
+                        LogLevel.error => l10n.logLevelError,
+                      }),
                       selected: _filter == level,
                       onSelected: (_) => setState(() => _filter = level),
                     ),
@@ -126,7 +137,7 @@ class _LogsScreenState extends State<LogsScreen> {
               child: entries.isEmpty
                   ? Center(
                       child: Text(
-                        'No log entries yet.',
+                        l10n.noLogEntries,
                         style: theme.textTheme.bodySmall,
                       ),
                     )

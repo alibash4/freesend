@@ -319,7 +319,7 @@ class DetailRow extends StatelessWidget {
         if (onCopy != null)
           IconButton(
             onPressed: onCopy,
-            tooltip: 'Copy $label',
+            tooltip: AppLocalizations.of(context).copyLabel(label),
             visualDensity: VisualDensity.compact,
             icon: Icon(
               AppIcons.copy,

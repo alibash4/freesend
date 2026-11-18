@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/pairing_code.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -20,6 +21,7 @@ class PairingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         // Always dark-on-white, even in dark mode: scanners need the contrast
@@ -44,23 +46,19 @@ class PairingCard extends StatelessWidget {
               dataModuleShape: QrDataModuleShape.square,
               color: AppColors.ink,
             ),
-            semanticsLabel: 'FreeSend pairing code',
+            semanticsLabel: l10n.qrCodeSemantics,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'Scan to pair',
+          l10n.scanToPair,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          code.hasHotspot
-              ? 'On the other device, open FreeSend, choose Receive, and scan '
-                  'this. It joins the hotspot and connects on its own.'
-              : 'On the other device, open FreeSend, choose Receive, and scan '
-                  'this to connect without typing an address.',
+          code.hasHotspot ? l10n.pairingHotspotHint : l10n.pairingNoHotspotHint,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall,
         ),
@@ -69,7 +67,7 @@ class PairingCard extends StatelessWidget {
           TextButton.icon(
             onPressed: onCopy,
             icon: Icon(AppIcons.copy, size: 16),
-            label: const Text('Copy code'),
+            label: Text(l10n.copyCode),
           ),
         ],
       ],

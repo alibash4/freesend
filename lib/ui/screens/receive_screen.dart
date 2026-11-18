@@ -81,23 +81,23 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
 
   Future<void> _showKnockDialog(Knock knock) async {
     final controller = context.read<ReceiveController>();
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('Accept files from ${knock.senderName}?'),
+        title: Text(l10n.knockAcceptTitle(knock.senderName)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${formatCount(knock.fileCount, 'file')} · '
+              '${l10n.fileCount(knock.fileCount)} · '
               '${formatBytes(knock.totalBytes)}',
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'You are asked once per device; known devices connect '
-              'automatically.',
+              l10n.knockNote,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -109,7 +109,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
               context.read<AppState>().tick();
               Navigator.of(context).pop(false);
             },
-            child: const Text('Decline'),
+            child: Text(l10n.decline),
           ),
           FilledButton(
             style: clickCursorStyle,
@@ -117,7 +117,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
               context.read<AppState>().tick();
               Navigator.of(context).pop(true);
             },
-            child: const Text('Accept'),
+            child: Text(l10n.accept),
           ),
         ],
       ),
@@ -170,8 +170,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('That is not a FreeSend pairing code.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).invalidPairingCode),
           ),
         );
       return;
@@ -304,12 +304,15 @@ class _WaitingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Expanded(child: AppPageTitle('Waiting for a device')),
+            Expanded(
+              child: AppPageTitle(l10n.waitingForDevice),
+            ),
             if (controller.phase == ReceivePhase.joining)
               const SizedBox(
                 width: 18,
@@ -322,9 +325,7 @@ class _WaitingView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          controller.isWaiting
-              ? 'Keep this screen open. The sending device will find you.'
-              : 'Getting ready…',
+          controller.isWaiting ? l10n.waitingHintOpen : l10n.waitingHintReady,
           style: theme.textTheme.bodySmall,
         ),
         if (controller.hotspotNotice != null) ...[
@@ -408,6 +409,7 @@ class _OtherWaysToConnect extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final scheme = theme.colorScheme;
     return Theme(
       data: theme.copyWith(dividerColor: Colors.transparent),
@@ -422,21 +424,21 @@ class _OtherWaysToConnect extends StatelessWidget {
           color: scheme.onSurfaceVariant,
         ),
         title: Text(
-          'Other ways to connect',
+          l10n.otherWaysTitle,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
-          'If the devices do not find each other on their own',
+          l10n.otherWaysSubtitle,
           style: theme.textTheme.bodySmall,
         ),
         children: [
           if (ScanScreen.isSupported)
             _ConnectOption(
               icon: AppIcons.scan,
-              title: 'Scan a pairing code',
-              subtitle: 'Point the camera at the code on the sending device',
+              title: l10n.scanPairingCode,
+              subtitle: l10n.scanPairingCodeHint,
               onTap: () {
                 controller.appState.tick();
                 onScan();
@@ -444,8 +446,8 @@ class _OtherWaysToConnect extends StatelessWidget {
             ),
           _ConnectOption(
             icon: AppIcons.paste,
-            title: 'Enter a pairing code',
-            subtitle: 'Paste a code sent in a message or shown on screen',
+            title: l10n.enterPairingCode,
+            subtitle: l10n.enterPairingCodeHint,
             onTap: () {
               controller.appState.tick();
               onPaste();
@@ -453,8 +455,8 @@ class _OtherWaysToConnect extends StatelessWidget {
           ),
           _ConnectOption(
             icon: AppIcons.address,
-            title: 'Connect by address',
-            subtitle: 'Type the address shown on the sending device',
+            title: l10n.connectByAddress,
+            subtitle: l10n.connectByAddressHint,
             onTap: () {
               controller.appState.tick();
               onManual();
@@ -534,6 +536,7 @@ class _QrPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -558,19 +561,19 @@ class _QrPanel extends StatelessWidget {
                 dataModuleShape: QrDataModuleShape.square,
                 color: AppColors.ink,
               ),
-              semanticsLabel: 'FreeSend pairing code',
+              semanticsLabel: l10n.qrCodeSemantics,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'The other device scans this code',
+            l10n.qrScanTitle,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'On the sending device, open FreeSend and scan to connect.',
+            l10n.qrScanHint,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
@@ -582,7 +585,7 @@ class _QrPanel extends StatelessWidget {
               Clipboard.setData(ClipboardData(text: payload));
             },
             icon: Icon(AppIcons.copy, size: 16),
-            label: const Text('Copy code'),
+            label: Text(l10n.copyCode),
           ),
         ],
       ),
@@ -596,6 +599,7 @@ class _NoCameraPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return SurfaceCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,8 +612,7 @@ class _NoCameraPanel extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              "There's nothing to scan here. The other device will find this "
-              'one by name - keep both on the same network.',
+              l10n.noCameraBody,
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -628,6 +631,7 @@ class _JoinPromptPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,7 +646,7 @@ class _JoinPromptPanel extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
-                  "Connect to the phone's hotspot",
+                  l10n.joinHotspotPromptTitle,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -652,8 +656,7 @@ class _JoinPromptPanel extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'This device needs to join the hotspot the phone creates. Enter '
-            'its name and password below.',
+            l10n.joinHotspotPromptBody,
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -663,7 +666,7 @@ class _JoinPromptPanel extends StatelessWidget {
               controller.appState.tick();
               onJoin();
             },
-            child: const Text('Join a hotspot'),
+            child: Text(l10n.joinHotspot),
           ),
           const SizedBox(height: AppSpacing.xs),
           Align(
@@ -680,8 +683,8 @@ class _JoinPromptPanel extends StatelessWidget {
               ),
               label: Text(
                 controller.showLocalWifiQr
-                    ? 'Back to the hotspot'
-                    : 'On the same Wi-Fi? Show a code instead',
+                    ? l10n.backToHotspot
+                    : l10n.sameWifiShowCode,
               ),
             ),
           ),
@@ -689,8 +692,7 @@ class _JoinPromptPanel extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             if (controller.localWifiQrPayload == null)
               Text(
-                'This device has no usable local address. Connect both devices '
-                'to the same network first.',
+                l10n.noLocalAddressBody,
                 style: theme.textTheme.bodySmall,
               )
             else
@@ -710,6 +712,7 @@ class _ReviewView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final manifest = controller.manifest!;
     final selectedCount = controller.selectedIds.length;
     final allSelected =
@@ -721,13 +724,15 @@ class _ReviewView extends StatelessWidget {
         AppPageTitle(manifest.hostName),
         const SizedBox(height: AppSpacing.xs),
         Text(
-          'Offering ${formatCount(manifest.items.length, 'file')} · '
-          '${formatBytes(manifest.totalBytes)}',
+          l10n.offeringSummary(
+            l10n.fileCount(manifest.items.length),
+            formatBytes(manifest.totalBytes),
+          ),
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.lg),
         SectionHeader(
-          title: 'Choose what to receive',
+          title: l10n.chooseWhatToReceive,
           icon: AppIcons.inbox,
           action: TextButton(
             style: clickCursorStyle,
@@ -735,7 +740,7 @@ class _ReviewView extends StatelessWidget {
               controller.appState.tick();
               controller.selectAll(value: !allSelected);
             },
-            child: Text(allSelected ? 'Clear all' : 'Select all'),
+            child: Text(allSelected ? l10n.clearAll : l10n.selectAll),
           ),
         ),
         Column(
@@ -789,7 +794,7 @@ class _ReviewView extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Saving to ${controller.saveLocation}',
+                      l10n.savingTo(controller.saveLocation),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall,
@@ -809,8 +814,9 @@ class _ReviewView extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Encrypted session'
-                        '${controller.securityCode == null ? '' : ' · ${controller.securityCode}'}',
+                        controller.securityCode == null
+                            ? l10n.encryptedSession
+                            : '${l10n.encryptedSession} · ${controller.securityCode}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.primary,
                         ),
@@ -832,7 +838,7 @@ class _ReviewView extends StatelessWidget {
                   controller.appState.tick();
                   controller.cancel();
                 },
-                child: const Text('Back to sessions'),
+                child: Text(l10n.backToSessions),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -848,9 +854,11 @@ class _ReviewView extends StatelessWidget {
                 icon: Icon(AppIcons.download, size: 17),
                 label: Text(
                   selectedCount == 0
-                      ? 'Select files'
-                      : 'Receive $selectedCount · '
-                          '${formatBytes(controller.selectedBytes)}',
+                      ? l10n.selectFiles
+                      : l10n.receiveCountLabel(
+                          l10n.fileCount(selectedCount),
+                          formatBytes(controller.selectedBytes),
+                        ),
                 ),
               ),
             ),
@@ -869,18 +877,20 @@ class _ProgressView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (controller.encrypted)
           StatusPill(
-            label: 'Encrypted',
+            label: l10n.encryptedTag,
             icon: AppIcons.lock,
             color: theme.colorScheme.primary,
           ),
         if (controller.anyPaused) ...[
           StatusPill(
-            label: controller.pausedByMe ? 'Paused by you' : 'Paused by sender',
+            label:
+                controller.pausedByMe ? l10n.pausedByYou : l10n.pausedBySender,
             icon: AppIcons.pause,
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -890,8 +900,10 @@ class _ProgressView extends StatelessWidget {
           child: ProgressRing(
             progress: controller.overallProgress,
             headline: '${(controller.overallProgress * 100).round()}%',
-            caption: '${formatBytes(controller.receivedBytes)} of '
-                '${formatBytes(controller.totalBytes)}',
+            caption: l10n.ofTotal(
+              formatBytes(controller.receivedBytes),
+              formatBytes(controller.totalBytes),
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -900,23 +912,24 @@ class _ProgressView extends StatelessWidget {
             children: [
               Expanded(
                 child: _Metric(
-                  label: 'From',
-                  value: controller.manifest?.hostName ?? 'Nearby device',
+                  label: l10n.fromLabel,
+                  value: controller.manifest?.hostName ?? l10n.nearbyDevice,
                 ),
               ),
               Expanded(
                 child: _Metric(
-                  label: 'Speed',
+                  label: l10n.speed,
                   value: formatSpeed(controller.speedBytesPerSecond),
                 ),
               ),
               Expanded(
                 child: _Metric(
-                  label: 'Remaining',
+                  label: l10n.remaining,
                   value: formatEta(
                     (controller.totalBytes - controller.receivedBytes)
                         .clamp(0, controller.totalBytes),
                     controller.speedBytesPerSecond,
+                    l10n,
                   ),
                 ),
               ),
@@ -924,7 +937,7 @@ class _ProgressView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        SectionHeader(title: 'Files', icon: AppIcons.inbox),
+        SectionHeader(title: l10n.files, icon: AppIcons.inbox),
         Column(
           children: [
             for (var i = 0; i < controller.receivedItems.length; i++) ...[
@@ -934,16 +947,18 @@ class _ProgressView extends StatelessWidget {
                 size: controller.receivedItems[i].size,
                 progress: controller.receivedItems[i].progress,
                 subtitle: switch (controller.receivedItems[i].status) {
-                  TransferStatus.done =>
-                    '${formatBytes(controller.receivedItems[i].size)} · saved',
-                  TransferStatus.paused =>
-                    '${formatBytes(controller.receivedItems[i].transferred)} of '
-                        '${formatBytes(controller.receivedItems[i].size)} · paused',
-                  TransferStatus.failed => 'Failed',
+                  TransferStatus.done => l10n.statusSaved(
+                      formatBytes(controller.receivedItems[i].size)),
+                  TransferStatus.paused => l10n.statusPaused(
+                      formatBytes(controller.receivedItems[i].transferred),
+                      formatBytes(controller.receivedItems[i].size)),
+                  TransferStatus.failed => l10n.failedTag,
                   TransferStatus.active ||
                   TransferStatus.pending =>
-                    '${formatBytes(controller.receivedItems[i].transferred)} of '
-                        '${formatBytes(controller.receivedItems[i].size)}',
+                    l10n.ofTotal(
+                      formatBytes(controller.receivedItems[i].transferred),
+                      formatBytes(controller.receivedItems[i].size),
+                    ),
                 },
                 trailing: controller.receivedItems[i].done
                     ? Icon(
@@ -974,7 +989,9 @@ class _ProgressView extends StatelessWidget {
                   controller.pausedByMe ? AppIcons.play : AppIcons.pause,
                   size: 17,
                 ),
-                label: Text(controller.pausedByMe ? 'Resume' : 'Pause'),
+                label: Text(
+                  controller.pausedByMe ? l10n.resume : l10n.pause,
+                ),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -986,7 +1003,7 @@ class _ProgressView extends StatelessWidget {
                   controller.cancel();
                 },
                 icon: Icon(AppIcons.stop, size: 17),
-                label: const Text('Cancel'),
+                label: Text(l10n.cancel),
               ),
             ),
           ],
@@ -1009,6 +1026,7 @@ class _DoneView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final record = controller.lastRecord;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1031,15 +1049,18 @@ class _DoneView extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         Center(
-            child: AppPageTitle('Files received', textAlign: TextAlign.center)),
+            child: AppPageTitle(l10n.filesReceivedTitle,
+                textAlign: TextAlign.center)),
         const SizedBox(height: AppSpacing.xs),
         Center(
           child: Text(
             record == null
                 ? ''
-                : '${formatCount(record.fileCount, 'file')} · '
-                    '${formatBytes(record.bytes)} · '
-                    '${formatSpeed(record.averageBytesPerSecond)} average',
+                : l10n.doneSummaryAverage(
+                    l10n.fileCount(record.fileCount),
+                    formatBytes(record.bytes),
+                    formatSpeed(record.averageBytesPerSecond),
+                  ),
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
@@ -1069,7 +1090,7 @@ class _DoneView extends StatelessWidget {
                     context.read<AppState>().tick();
                     _revealFolder(controller.saveLocation);
                   },
-                  child: const Text('Open'),
+                  child: Text(l10n.open),
                 ),
             ],
           ),
@@ -1083,7 +1104,7 @@ class _DoneView extends StatelessWidget {
               context.read<AppState>().tick();
               onDone();
             },
-            child: const Text('Done'),
+            child: Text(l10n.done),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -1099,7 +1120,7 @@ class _DoneView extends StatelessWidget {
                 host: PlatformEnv.kind == PlatformKind.android,
               );
             },
-            child: const Text('Receive more'),
+            child: Text(l10n.receiveMore),
           ),
         ),
       ],
@@ -1134,6 +1155,7 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final cancelled = controller.phase == ReceivePhase.cancelled;
     final failed = controller.receivedItems
         .where((item) => !item.done && controller.selectedIds.contains(item.id))
@@ -1160,7 +1182,7 @@ class _ErrorView extends StatelessWidget {
         const SizedBox(height: AppSpacing.lg),
         Center(
           child: AppPageTitle(
-            cancelled ? 'Transfer cancelled' : 'Could not connect',
+            cancelled ? l10n.transferCancelled : l10n.couldNotConnect,
             textAlign: TextAlign.center,
           ),
         ),
@@ -1185,7 +1207,7 @@ class _ErrorView extends StatelessWidget {
                 controller.retryFailed();
               },
               icon: Icon(AppIcons.refresh, size: 17),
-              label: Text('Retry $failed file${failed == 1 ? '' : 's'}'),
+              label: Text(l10n.retryFiles(failed)),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -1198,7 +1220,7 @@ class _ErrorView extends StatelessWidget {
               context.read<AppState>().tick();
               onRetry();
             },
-            child: const Text('Scan again'),
+            child: Text(l10n.scanAgain),
           ),
         ),
       ],
@@ -1254,6 +1276,7 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return SafeArea(
       top: false,
@@ -1268,10 +1291,10 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Join the hotspot', style: theme.textTheme.titleLarge),
+            Text(l10n.joinHotspotSheetTitle, style: theme.textTheme.titleLarge),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Use the hotspot name and password shown on the sending device.',
+              l10n.hotspotCredentialsHint,
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1279,13 +1302,13 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
               controller: _ssid,
               autofocus: true,
               textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(labelText: 'Hotspot name'),
+              decoration: InputDecoration(labelText: l10n.hotspotName),
             ),
             const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _password,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: InputDecoration(labelText: l10n.password),
               onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1296,7 +1319,7 @@ class _JoinHotspotSheetState extends State<_JoinHotspotSheet> {
                 _submit();
               },
               icon: Icon(AppIcons.wifi, size: 17),
-              label: const Text('Join and scan'),
+              label: Text(l10n.joinAndScan),
             ),
           ],
         ),
@@ -1330,6 +1353,7 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return SafeArea(
       top: false,
@@ -1344,11 +1368,10 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Connect by address', style: theme.textTheme.titleLarge),
+            Text(l10n.connectByAddress, style: theme.textTheme.titleLarge),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Enter the address shown on the sending device. The port is '
-              'optional and defaults to 47811.',
+              l10n.manualConnectBody,
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1356,8 +1379,7 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
               controller: _address,
               autofocus: true,
               keyboardType: TextInputType.url,
-              decoration:
-                  const InputDecoration(labelText: 'Address or host:port'),
+              decoration: InputDecoration(labelText: l10n.addressOrHost),
               onSubmitted: (value) => Navigator.of(context).pop(value),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1368,7 +1390,7 @@ class _ManualConnectSheetState extends State<_ManualConnectSheet> {
                 Navigator.of(context).pop(_address.text.trim());
               },
               icon: Icon(AppIcons.link, size: 17),
-              label: const Text('Connect'),
+              label: Text(l10n.connect),
             ),
           ],
         ),
@@ -1409,6 +1431,7 @@ class _CodeSheetState extends State<_CodeSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return SafeArea(
       top: false,
@@ -1423,11 +1446,10 @@ class _CodeSheetState extends State<_CodeSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Enter pairing code', style: theme.textTheme.titleLarge),
+            Text(l10n.pairingCodeSheetTitle, style: theme.textTheme.titleLarge),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'On the sending device, tap Copy code under the QR code, then paste '
-              'it here. The code starts with freesend://',
+              l10n.pairingCodeHint,
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -1438,10 +1460,10 @@ class _CodeSheetState extends State<_CodeSheet> {
               maxLines: 3,
               keyboardType: TextInputType.url,
               decoration: InputDecoration(
-                labelText: 'Pairing code',
+                labelText: l10n.pairingCodeLabel,
                 hintText: 'freesend://pair?…',
                 suffixIcon: IconButton(
-                  tooltip: 'Paste from clipboard',
+                  tooltip: l10n.pasteFromClipboard,
                   mouseCursor: SystemMouseCursors.click,
                   onPressed: () {
                     context.read<AppState>().tick();
@@ -1460,7 +1482,7 @@ class _CodeSheetState extends State<_CodeSheet> {
                 _submit();
               },
               icon: Icon(AppIcons.link, size: 17),
-              label: const Text('Connect'),
+              label: Text(l10n.connect),
             ),
           ],
         ),

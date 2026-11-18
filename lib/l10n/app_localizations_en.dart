@@ -614,4 +614,793 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateFailed => 'Update failed';
+
+  @override
+  String knockAcceptTitle(Object name) {
+    return 'Accept files from $name?';
+  }
+
+  @override
+  String get knockNote =>
+      'You are asked once per device; known devices connect automatically.';
+
+  @override
+  String get decline => 'Decline';
+
+  @override
+  String get accept => 'Accept';
+
+  @override
+  String get invalidPairingCode => 'That is not a FreeSend pairing code.';
+
+  @override
+  String get waitingHintOpen =>
+      'Keep this screen open. The sending device will find you.';
+
+  @override
+  String get waitingHintReady => 'Getting ready…';
+
+  @override
+  String get otherWaysTitle => 'Other ways to connect';
+
+  @override
+  String get otherWaysSubtitle =>
+      'If the devices do not find each other on their own';
+
+  @override
+  String get scanPairingCodeHint =>
+      'Point the camera at the code on the sending device';
+
+  @override
+  String get enterPairingCode => 'Enter a pairing code';
+
+  @override
+  String get enterPairingCodeHint =>
+      'Paste a code sent in a message or shown on screen';
+
+  @override
+  String get connectByAddressHint =>
+      'Type the address shown on the sending device';
+
+  @override
+  String get qrCodeSemantics => 'FreeSend pairing code';
+
+  @override
+  String get qrScanTitle => 'The other device scans this code';
+
+  @override
+  String get qrScanHint =>
+      'On the sending device, open FreeSend and scan to connect.';
+
+  @override
+  String get copyCode => 'Copy code';
+
+  @override
+  String get noCameraBody =>
+      'There\'s nothing to scan here. The other device will find this one by name - keep both on the same network.';
+
+  @override
+  String get joinHotspotPromptTitle => 'Connect to the phone\'s hotspot';
+
+  @override
+  String get joinHotspotPromptBody =>
+      'This device needs to join the hotspot the phone creates. Enter its name and password below.';
+
+  @override
+  String get backToHotspot => 'Back to the hotspot';
+
+  @override
+  String get sameWifiShowCode => 'On the same Wi-Fi? Show a code instead';
+
+  @override
+  String get noLocalAddressBody =>
+      'This device has no usable local address. Connect both devices to the same network first.';
+
+  @override
+  String offeringSummary(Object files, Object size) {
+    return 'Offering $files · $size';
+  }
+
+  @override
+  String get chooseWhatToReceive => 'Choose what to receive';
+
+  @override
+  String get selectAll => 'Select all';
+
+  @override
+  String get clearAll => 'Clear all';
+
+  @override
+  String savingTo(Object path) {
+    return 'Saving to $path';
+  }
+
+  @override
+  String get encryptedSession => 'Encrypted session';
+
+  @override
+  String get backToSessions => 'Back to sessions';
+
+  @override
+  String get selectFiles => 'Select files';
+
+  @override
+  String receiveCountLabel(Object count, Object size) {
+    return 'Receive $count · $size';
+  }
+
+  @override
+  String get encryptedTag => 'Encrypted';
+
+  @override
+  String get pausedByYou => 'Paused by you';
+
+  @override
+  String get nearbyDevice => 'Nearby device';
+
+  @override
+  String get fromLabel => 'From';
+
+  @override
+  String fileSaved(Object size) {
+    return '$size · saved';
+  }
+
+  @override
+  String filePaused(Object done, Object size) {
+    return '$done of $size · paused';
+  }
+
+  @override
+  String get failedTag => 'Failed';
+
+  @override
+  String fileProgress(Object done, Object size) {
+    return '$done of $size';
+  }
+
+  @override
+  String get filesReceivedTitle => 'Files received';
+
+  @override
+  String doneSummaryAverage(Object files, Object size, Object speed) {
+    return '$files · $size · $speed average';
+  }
+
+  @override
+  String get open => 'Open';
+
+  @override
+  String get receiveMore => 'Receive more';
+
+  @override
+  String get transferCancelled => 'Transfer cancelled';
+
+  @override
+  String get couldNotConnect => 'Could not connect';
+
+  @override
+  String retryFiles(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Retry $count files',
+      one: 'Retry 1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanAgain => 'Scan again';
+
+  @override
+  String get joinHotspotSheetTitle => 'Join the hotspot';
+
+  @override
+  String get hotspotCredentialsHint =>
+      'Use the hotspot name and password shown on the sending device.';
+
+  @override
+  String get hotspotName => 'Hotspot name';
+
+  @override
+  String get password => 'Password';
+
+  @override
+  String get joinAndScan => 'Join and scan';
+
+  @override
+  String get manualConnectBody =>
+      'Enter the address shown on the sending device. The port is optional and defaults to 47811.';
+
+  @override
+  String get addressOrHost => 'Address or host:port';
+
+  @override
+  String get connect => 'Connect';
+
+  @override
+  String get pairingCodeSheetTitle => 'Enter pairing code';
+
+  @override
+  String get pairingCodeHint =>
+      'On the sending device, tap Copy code under the QR code, then paste it here. The code starts with freesend://';
+
+  @override
+  String get pairingCodeLabel => 'Pairing code';
+
+  @override
+  String get pasteFromClipboard => 'Paste from clipboard';
+
+  @override
+  String filePickerFailed(Object error) {
+    return 'Could not open the file picker: $error';
+  }
+
+  @override
+  String get noAppBundles =>
+      'No installable app bundles were found on this device.';
+
+  @override
+  String get appBundleUnreadable => 'That app bundle is no longer readable.';
+
+  @override
+  String get chooseFolderToSend => 'Choose a folder to send';
+
+  @override
+  String get androidFolderUnreadable =>
+      'That Android folder could not be read. Choose it again.';
+
+  @override
+  String get folderNotReadable => 'That folder is not readable.';
+
+  @override
+  String get folderNoReadableFiles => 'That folder has no readable files.';
+
+  @override
+  String labelCopied(Object label) {
+    return '$label copied';
+  }
+
+  @override
+  String portOnly(Object port) {
+    return 'Port $port';
+  }
+
+  @override
+  String get transferringTag => 'Transferring';
+
+  @override
+  String deviceConnected(Object name) {
+    return '$name connected';
+  }
+
+  @override
+  String get genericDevice => 'Device';
+
+  @override
+  String get chooseReceivers => 'Choose who receives these';
+
+  @override
+  String get scanReceiverCode => 'Scan the receiver\'s code';
+
+  @override
+  String get lookingForReceiver => 'Looking for a device to receive these';
+
+  @override
+  String get noCandidatesBody =>
+      'Nobody is ready yet - on the other device, open FreeSend and tap Receive.';
+
+  @override
+  String get selectDevice => 'Select a device';
+
+  @override
+  String askDevices(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Ask $count devices',
+      one: 'Ask 1 device',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanQrCode => 'Scan a QR code';
+
+  @override
+  String get orJoinManually => 'Or join manually';
+
+  @override
+  String get networkLabel => 'Network';
+
+  @override
+  String get wired => 'Wired';
+
+  @override
+  String get hotspotLabel => 'Hotspot';
+
+  @override
+  String get addressLabel => 'Address';
+
+  @override
+  String get pairingInstructions =>
+      'On the other device, open FreeSend, choose Receive, and scan the code above — or join this hotspot and the session appears on its own.';
+
+  @override
+  String preparingSummary(Object files, Object size) {
+    return 'Preparing $files · $size';
+  }
+
+  @override
+  String get stopSharing => 'Stop sharing';
+
+  @override
+  String sentToName(Object name) {
+    return 'Sent to $name';
+  }
+
+  @override
+  String get theOtherDevice => 'the other device';
+
+  @override
+  String get shareAgain => 'Share these files again';
+
+  @override
+  String get sharingStopped => 'Sharing stopped';
+
+  @override
+  String get couldNotShare => 'Could not share';
+
+  @override
+  String get tryAgain => 'Try again';
+
+  @override
+  String get backToFiles => 'Back to files';
+
+  @override
+  String get sendAnApp => 'Send an app';
+
+  @override
+  String get installedApp => 'Installed app';
+
+  @override
+  String appVersion(Object version) {
+    return 'Version $version';
+  }
+
+  @override
+  String get addToTransfer => 'Add to this transfer';
+
+  @override
+  String get anyFileType => 'Any file type';
+
+  @override
+  String get mediaLibrary => 'Media library';
+
+  @override
+  String get mediaLibraryHint => 'Photos, videos, and audio with thumbnails';
+
+  @override
+  String get audioLabel => 'Audio';
+
+  @override
+  String get docsHint => 'PDF, Office, text, CSV';
+
+  @override
+  String get appsLabel => 'Apps';
+
+  @override
+  String get appsHint => 'Installable app bundles on this device';
+
+  @override
+  String get folderLabel => 'Folder';
+
+  @override
+  String get folderHint => 'Send a whole folder tree';
+
+  @override
+  String get waitingAnswer => 'Waiting for an answer';
+
+  @override
+  String get acceptedTag => 'Accepted';
+
+  @override
+  String get declinedTag => 'Declined';
+
+  @override
+  String get unreachable => 'Unreachable';
+
+  @override
+  String get shareNearby => 'Share to nearby';
+
+  @override
+  String get shareNearbyHint => 'Find devices that are waiting to receive.';
+
+  @override
+  String get scanQrHint =>
+      'Read a receiver\'s code instead of waiting for it to appear.';
+
+  @override
+  String get sendToGroup => 'Send to a group';
+
+  @override
+  String get sendToGroupHint =>
+      'Pick several devices; each one accepts on its own.';
+
+  @override
+  String get howToSend => 'How do you want to send?';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get scanHint => 'Point the camera at the code on the sending device.';
+
+  @override
+  String get scanWrongCode =>
+      'That code is not from FreeSend. Point the camera at the code on the sending device.';
+
+  @override
+  String get cameraOff => 'Camera access is off';
+
+  @override
+  String get cameraFailed => 'The camera could not start';
+
+  @override
+  String get cameraDeniedBody =>
+      'FreeSend needs the camera only to read the pairing code. Allow it in system settings, or type the code instead.';
+
+  @override
+  String get cameraBusyBody =>
+      'Another app may be using the camera. You can also type the code instead.';
+
+  @override
+  String get openSettings => 'Open settings';
+
+  @override
+  String get enterCodeInstead => 'Enter the code instead';
+
+  @override
+  String get mediaTitle => 'Media';
+
+  @override
+  String get mediaPermissionOff =>
+      'Photo access is off. Allow it in system settings to browse this device.';
+
+  @override
+  String mediaReadFailed(Object error) {
+    return 'Could not read the media library: $error';
+  }
+
+  @override
+  String albumReadFailed(Object error) {
+    return 'Could not read that album: $error';
+  }
+
+  @override
+  String get mediaItemsUnreadable =>
+      'Those items are not readable on this device.';
+
+  @override
+  String get searchAlbum => 'Search this album';
+
+  @override
+  String get allFilter => 'All';
+
+  @override
+  String get photosFilter => 'Photos';
+
+  @override
+  String get albumLabel => 'Album';
+
+  @override
+  String get preparing => 'Preparing…';
+
+  @override
+  String sendItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Send $count items',
+      one: 'Send 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get mediaUnavailable => 'Media unavailable';
+
+  @override
+  String get noMediaHere => 'No media here';
+
+  @override
+  String get noMediaHint =>
+      'Pick another album or choose files with the system picker.';
+
+  @override
+  String get logsTitle => 'Logs';
+
+  @override
+  String get logsCopied => 'Logs copied';
+
+  @override
+  String savedTo(Object path) {
+    return 'Saved to $path';
+  }
+
+  @override
+  String get clearLogsQuestion => 'Clear logs?';
+
+  @override
+  String get clearLogsBody =>
+      'The on-device log file keeps its history; only this view empties.';
+
+  @override
+  String get copyAll => 'Copy all';
+
+  @override
+  String get saveToFile => 'Save to file';
+
+  @override
+  String get noLogEntries => 'No log entries yet.';
+
+  @override
+  String get logLevelDebug => 'debug';
+
+  @override
+  String get logLevelInfo => 'info';
+
+  @override
+  String get logLevelWarn => 'warning';
+
+  @override
+  String get logLevelError => 'error';
+
+  @override
+  String get diagnostics => 'Diagnostics';
+
+  @override
+  String get diagnosticsBody =>
+      'Inspect, copy or save everything the app logged this session.';
+
+  @override
+  String get openLogs => 'Open logs';
+
+  @override
+  String get checkingForUpdates => 'Checking for updates';
+
+  @override
+  String updateAvailableTitle(Object version) {
+    return 'FreeSend $version is available';
+  }
+
+  @override
+  String get askingGitLab => 'Asking GitLab what is new.';
+
+  @override
+  String get whatsNew => 'What is new';
+
+  @override
+  String youAreOn(Object version) {
+    return 'You are on $version';
+  }
+
+  @override
+  String sizeYouAreOn(Object size, Object version) {
+    return '$size · you are on $version';
+  }
+
+  @override
+  String downloadingPercent(Object percent) {
+    return 'Downloading… $percent%';
+  }
+
+  @override
+  String get downloadUpdate => 'Download update';
+
+  @override
+  String get notNow => 'Not now';
+
+  @override
+  String get installRestart => 'Install and restart';
+
+  @override
+  String get later => 'Later';
+
+  @override
+  String get gotIt => 'Got it';
+
+  @override
+  String get receivers => 'Receivers';
+
+  @override
+  String peerProgress(Object count, Object done, Object sent, Object total) {
+    return '$sent of $total · $done/$count files';
+  }
+
+  @override
+  String sendingFile(Object name) {
+    return 'Sending $name';
+  }
+
+  @override
+  String get sendingTag => 'Sending';
+
+  @override
+  String get activeTag => 'Active';
+
+  @override
+  String get connectingTag => 'Connecting';
+
+  @override
+  String get scanToPair => 'Scan to pair';
+
+  @override
+  String get pairingHotspotHint =>
+      'On the other device, open FreeSend, choose Receive, and scan this. It joins the hotspot and connects on its own.';
+
+  @override
+  String get pairingNoHotspotHint =>
+      'On the other device, open FreeSend, choose Receive, and scan this to connect without typing an address.';
+
+  @override
+  String copyLabel(Object label) {
+    return 'Copy $label';
+  }
+
+  @override
+  String get etaMoment => 'a moment';
+
+  @override
+  String get etaFinishing => 'finishing';
+
+  @override
+  String get etaEstimating => 'estimating';
+
+  @override
+  String todayAt(Object time) {
+    return 'Today, $time';
+  }
+
+  @override
+  String yesterdayAt(Object time) {
+    return 'Yesterday, $time';
+  }
+
+  @override
+  String get noWiredNetworkReceive =>
+      'No wired network was found. Connect an Ethernet cable, then try again.';
+
+  @override
+  String get discoveryFailedBody =>
+      'Discovery could not start. You can still connect by IP address.';
+
+  @override
+  String connectedLooking(Object ssid) {
+    return 'Connected to \"$ssid\". Looking for the sharing device…';
+  }
+
+  @override
+  String couldNotJoinHotspot(Object error) {
+    return 'Could not join the hotspot: $error';
+  }
+
+  @override
+  String joinedHotspotNote(Object ssid) {
+    return 'Joined \"$ssid\".';
+  }
+
+  @override
+  String joinHotspotManuallyNote(Object ssid) {
+    return 'Join \"$ssid\" from your Wi-Fi menu. The session appears here as soon as you are connected.';
+  }
+
+  @override
+  String couldNotReachAddress(Object address) {
+    return 'Could not reach $address. Make sure both devices are on the same hotspot.';
+  }
+
+  @override
+  String get transferDidNotFinish => 'The transfer did not finish.';
+
+  @override
+  String get receivingFilesTitle => 'Receiving files';
+
+  @override
+  String get retryingTransferTitle => 'Retrying transfer';
+
+  @override
+  String retryFailedFiles(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files failed earlier',
+      one: '1 file failed earlier',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String receivingProgressTitle(Object sent, Object total) {
+    return 'Receiving $sent of $total';
+  }
+
+  @override
+  String get noWiredNetworkSend =>
+      'No wired network was found. Connect an Ethernet cable, or switch back to Wi-Fi.';
+
+  @override
+  String get noLocalAddressSend =>
+      'FreeSend could not find a local address. Connect to a Wi-Fi network, or use a cable.';
+
+  @override
+  String get readyToShare => 'Ready to share';
+
+  @override
+  String get waitingForReceiverNote => 'waiting for a receiver';
+
+  @override
+  String listenerFailed(Object error) {
+    return 'Could not open the transfer listener. Allow FreeSend through the system firewall on private networks, then try again ($error).';
+  }
+
+  @override
+  String couldNotStartSharing(Object error) {
+    return 'Could not start sharing: $error';
+  }
+
+  @override
+  String sendingProgressTitle(Object sent, Object total) {
+    return 'Sending $sent of $total';
+  }
+
+  @override
+  String get cannotJoinHotspot =>
+      'This device cannot join a hotspot. Use a shared Wi-Fi network instead.';
+
+  @override
+  String get hotspotWinNote =>
+      'Sharing over your current network. For the fastest link, turn on Mobile hotspot in Windows Settings, then connect the other device to it.';
+
+  @override
+  String get hotspotMacNote =>
+      'Sharing over your current network. For the fastest link, turn on Internet Sharing in System Settings under General, then connect the other device to it.';
+
+  @override
+  String joinHotspotManuallyError(Object ssid) {
+    return 'Join the hotspot \"$ssid\" from your system Wi-Fi menu, then come back here.';
+  }
+
+  @override
+  String get noWifiInterface => 'No Wi-Fi interface found.';
+
+  @override
+  String couldNotJoinSsid(Object error, Object ssid) {
+    return 'Could not join \"$ssid\": $error';
+  }
+
+  @override
+  String get noWifiAdapter =>
+      'No Wi-Fi adapter found. Connect to the other device\'s hotspot instead.';
+
+  @override
+  String couldNotStartHotspot(Object error) {
+    return 'Could not start the hotspot: $error';
+  }
+
+  @override
+  String get noHotspotDetails => 'The system did not return hotspot details.';
+
+  @override
+  String get couldNotStartHotspotPlain => 'Could not start the hotspot.';
+
+  @override
+  String couldNotJoinPlain(Object ssid) {
+    return 'Could not join \"$ssid\".';
+  }
+
+  @override
+  String get hotspotPermissionRequired =>
+      'Android requires the location (or nearby devices) permission to use a hotspot. Enable it in system settings and try again.';
 }
