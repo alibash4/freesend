@@ -592,6 +592,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.';
 
   @override
+  String get vpnWarningTitle => 'A VPN is on';
+
+  @override
+  String get vpnWarningBody =>
+      'It usually still works, but if the other device cannot find you, turn the VPN off - or connect both devices to the same network.';
+
+  @override
   String get setupOptional => 'Optional';
 
   @override

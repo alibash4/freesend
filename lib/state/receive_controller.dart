@@ -12,6 +12,7 @@ import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
+import 'package:free_send/services/permissions/network_probe.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
@@ -63,6 +64,10 @@ class ReceiveController extends ChangeNotifier {
 
   /// What the waiting screen should show.
   ReceiverPresence presence = ReceiverPresence.idle;
+
+  /// Set on desktops when a VPN is attached; advisory only, the gate that
+  /// blocks on Android does not apply here.
+  bool vpnWarning = false;
 
   /// The knock currently awaiting an answer, if any.
   Knock? activeKnock;

@@ -15,6 +15,7 @@ import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/widgets/vpn_warning.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
@@ -639,6 +640,10 @@ class _SessionView extends StatelessWidget {
             },
             style: theme.textTheme.titleMedium,
           ),
+          if (controller.vpnWarning) ...[
+            const VpnWarning(),
+            const SizedBox(height: AppSpacing.md),
+          ],
           if (controller.hotspot != null) ...[
             _HostedLinkCard(
               ssid: controller.hotspot!.ssid,

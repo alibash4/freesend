@@ -18,6 +18,7 @@ import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/widgets/vpn_warning.dart';
 import 'package:free_send/ui/kit/app_page_title.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/services/permissions/transfer_setup.dart';
@@ -328,6 +329,10 @@ class _WaitingView extends StatelessWidget {
           controller.isWaiting ? l10n.waitingHintOpen : l10n.waitingHintReady,
           style: theme.textTheme.bodySmall,
         ),
+        if (controller.vpnWarning) ...[
+          const SizedBox(height: AppSpacing.md),
+          const VpnWarning(),
+        ],
         if (controller.hotspotNotice != null) ...[
           const SizedBox(height: AppSpacing.md),
           SurfaceCard(

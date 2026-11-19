@@ -1088,6 +1088,18 @@ abstract class AppLocalizations {
   /// **'Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.'**
   String get setupLocationBody;
 
+  /// No description provided for @vpnWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A VPN is on'**
+  String get vpnWarningTitle;
+
+  /// No description provided for @vpnWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It usually still works, but if the other device cannot find you, turn the VPN off - or connect both devices to the same network.'**
+  String get vpnWarningBody;
+
   /// No description provided for @setupOptional.
   ///
   /// In en, this message translates to:

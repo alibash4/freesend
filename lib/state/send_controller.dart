@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/permissions/network_probe.dart';
 import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
@@ -53,6 +54,10 @@ class SendController extends ChangeNotifier {
 
   SendPhase phase = SendPhase.idle;
   HotspotInfo? hotspot;
+
+  /// Advisory only: a VPN on a desktop usually still works, so this warns
+  /// instead of blocking the way the Android gate does.
+  bool vpnWarning = false;
 
   /// The transport the next session will use.
   ShareLink link = ShareLink.wifi;
@@ -280,6 +285,10 @@ class SendController extends ChangeNotifier {
       item.transferred = 0;
       item.done = false;
       item.status = TransferStatus.pending;
+    }
+    vpnWarning = !Platform.isAndroid && await NetworkProbe.vpnIsOn;
+    if (vpnWarning) {
+      AppLog.warn('send', 'VPN detected - advising the user');
     }
     notifyListeners();
 

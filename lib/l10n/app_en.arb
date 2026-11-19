@@ -165,6 +165,8 @@
   "setupVpnBody": "FreeSend shares over the local network, which a VPN hides. Turn your VPN off and come back - this check repeats automatically.",
   "setupLocationTitle": "Location is on",
   "setupLocationBody": "Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.",
+  "vpnWarningTitle": "A VPN is on",
+  "vpnWarningBody": "It usually still works, but if the other device cannot find you, turn the VPN off - or connect both devices to the same network.",
   "setupOptional": "Optional",
   "setupEnable": "Allow",
   "setupSettings": "Settings",

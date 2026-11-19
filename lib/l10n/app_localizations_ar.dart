@@ -604,6 +604,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'يحتاج أندرويد إلى خدمات الموقع مفعّلة لتشغيل نقطة الاتصال التي يستخدمها النقل. فعّل الموقع ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
 
   @override
+  String get vpnWarningTitle => 'الشبكة الافتراضية الخاصة (VPN) مفعّلة';
+
+  @override
+  String get vpnWarningBody =>
+      'يعمل عادة دون مشكلة، لكن إن لم يتمكن الجهاز الآخر من العثور عليك فأوقف الشبكة الافتراضية الخاصة، أو وصّل الجهازين بالشبكة نفسها.';
+
+  @override
   String get setupOptional => 'اختياري';
 
   @override
