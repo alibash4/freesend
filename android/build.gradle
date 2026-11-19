@@ -11,7 +11,16 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
 
+// A dozen plugins still compile with -source/-target 1.8, which javac flags as
+// obsolete on the JDK this build uses. The warning is noise from their build
+// files, not from FreeSend, and upgrading each plugin to fix it is out of our
+// control, so the lint category is turned off for those subprojects.
+subprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << "-Xlint:-options"
+    }
 }
 
 tasks.register("clean", Delete) {
