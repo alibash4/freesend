@@ -49,6 +49,7 @@ class SendScreen extends StatefulWidget {
         : showModalBottomSheet<SendMode>(
             context: context,
             isScrollControlled: true,
+            showDragHandle: true,
             builder: (context) => const _SendChooserSheet(),
           );
   }
@@ -69,8 +70,8 @@ class _SendScreenState extends State<SendScreen> {
     super.initState();
     final initial = widget.initialMode;
     if (initial != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.read<SendController>().setMode(initial);
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) await _applyMode(initial);
       });
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) => _chooseMode());
@@ -82,23 +83,39 @@ class _SendScreenState extends State<SendScreen> {
   Future<void> _chooseMode() async {
     if (_chooserShown) return;
     _chooserShown = true;
-    final controller = context.read<SendController>();
     final mode = await SendScreen.choose(context);
     if (!mounted) return;
     if (mode == null) {
       widget.onBack?.call();
       return;
     }
-    controller.setMode(mode);
+    await _applyMode(mode);
   }
 
-  /// Scanning a receiver's QR hands us its doorbell address.
+  /// Applies the chosen mode; scan mode opens the camera right away and the
+  /// code waits for the session to start.
+  Future<void> _applyMode(SendMode mode) async {
+    final controller = context.read<SendController>();
+    controller.setMode(mode);
+    if (mode == SendMode.scanCode) await _scanReceiver(controller);
+  }
+
+  /// Scanning a receiver's QR hands us its doorbell address. Mid-session it
+  /// knocks immediately; before a session exists the code is parked and the
+  /// controller knocks it once the session is waiting.
   Future<void> _scanReceiver(SendController controller) async {
+    controller.setPendingScan(null);
     final code = await ScanScreen.open(context);
     if (code == null || !mounted) return;
     final host = code.host;
     if (host == null) return;
-    await controller.knockScanned(code);
+    final live = controller.phase == SendPhase.waitingForPeer ||
+        controller.phase == SendPhase.transferring;
+    if (live) {
+      await controller.knockScanned(code);
+    } else {
+      controller.setPendingScan(code);
+    }
   }
 
   late final ScrollController _scrollController = AnimatedScrollController(
@@ -1276,13 +1293,14 @@ class _SendChooserBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final entries = <(SendMode, String, String, IconData)>[
       (
         SendMode.nearby,
         l10n.shareNearby,
         l10n.shareNearbyHint,
-        AppIcons.radar,
+        AppIcons.share,
       ),
       if (showScanEntry(PlatformEnv.kind))
         (
@@ -1295,7 +1313,7 @@ class _SendChooserBody extends StatelessWidget {
         SendMode.group,
         l10n.sendToGroup,
         l10n.sendToGroupHint,
-        AppIcons.device,
+        AppIcons.users,
       ),
     ];
     return Column(
@@ -1304,31 +1322,109 @@ class _SendChooserBody extends StatelessWidget {
       children: [
         Text(l10n.howToSend, style: theme.textTheme.titleLarge),
         const SizedBox(height: AppSpacing.md),
-        for (final (mode, title, body, icon) in entries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pop(mode),
-                icon: Icon(icon, size: 18),
-                label: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title),
-                      Text(
-                        body,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
+        SurfaceCard(
+          padding: EdgeInsets.zero,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < entries.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: scheme.hairline),
+                    _ChooserOption(
+                      icon: entries[i].$4,
+                      title: entries[i].$2,
+                      subtitle: entries[i].$3,
+                      onTap: () {
+                        context.read<AppState>().tick();
+                        Navigator.of(context).pop(entries[i].$1);
+                      },
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
+        ),
       ],
+    );
+  }
+}
+
+/// One send mode as a self-explaining row: icon, title, hint, chevron.
+/// Hover fills the row with the theme hover color and turns the title and
+/// chevron accent.
+class _ChooserOption extends StatefulWidget {
+  const _ChooserOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  State<_ChooserOption> createState() => _ChooserOptionState();
+}
+
+class _ChooserOptionState extends State<_ChooserOption> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Container(
+        color: _hovered ? theme.hoverColor : null,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          hoverColor: Colors.transparent,
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(widget.icon, size: 18, color: scheme.onSurfaceVariant),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: _hovered ? AppColors.accent : null,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(widget.subtitle, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Icon(
+                  chevronGlyph(context),
+                  size: 16,
+                  color: _hovered ? AppColors.accent : scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1359,7 +1455,8 @@ class _HostedLinkCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(AppIcons.wifi, size: 16, color: theme.colorScheme.accentText),
+              Icon(AppIcons.wifi,
+                  size: 16, color: theme.colorScheme.accentText),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Text(
@@ -1421,35 +1518,38 @@ class _SendChooserSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
-          AppSpacing.md,
+          AppSpacing.sm,
           AppSpacing.lg,
           AppSpacing.lg,
         ),
-        child: _SendChooserBody(),
+        child: const _SendChooserBody(),
       ),
     );
   }
 }
 
-/// Desktop: a centered modal with a Close control.
+/// Desktop: the same plain dialog chrome as the device-name editor.
 class _SendChooserDialog extends StatelessWidget {
   const _SendChooserDialog();
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l10n.sendTitle),
-      content: SizedBox(width: 380, child: _SendChooserBody()),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.close),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 48,
+        vertical: 24,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: const Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: _SendChooserBody(),
         ),
-      ],
+      ),
     );
   }
 }

@@ -9,6 +9,7 @@ abstract final class AppIcons {
   // Transfer.
   static final IconData send = UIcons.regularRounded.arrow_up_right;
   static final IconData sendPlane = UIcons.regularRounded.paper_plane;
+  static final IconData share = UIcons.regularRounded.share;
   static final IconData receive = UIcons.regularRounded.arrow_down;
   static final IconData hotspot = UIcons.regularRounded.signal_alt;
   static final IconData wifi = UIcons.regularRounded.wifi_alt;
@@ -16,6 +17,7 @@ abstract final class AppIcons {
   static final IconData unlink = UIcons.regularRounded.link_slash;
   static final IconData zap = UIcons.regularRounded.bolt;
   static final IconData device = UIcons.regularRounded.screen;
+  static final IconData users = UIcons.regularRounded.users;
   static final IconData phone = UIcons.regularRounded.smartphone;
 
   // Pairing.

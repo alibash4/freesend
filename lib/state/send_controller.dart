@@ -116,6 +116,16 @@ class SendController extends ChangeNotifier {
   /// The entry the user picked from the send control.
   SendMode mode = SendMode.nearby;
 
+  /// A receiver code scanned before the session exists. It is knocked once
+  /// the session reaches `waitingForPeer`, so picking "scan a code" can open
+  /// the camera before any files are chosen.
+  PairingCode? pendingScan;
+
+  void setPendingScan(PairingCode? code) {
+    pendingScan = code;
+    notifyListeners();
+  }
+
   /// Receivers ticked in group mode.
   final Set<String> selected = {};
 
@@ -318,8 +328,10 @@ class SendController extends ChangeNotifier {
         } on HotspotException catch (error) {
           // Hosting is the fast path, not the only one: stay on the shared
           // network so the radar keeps working.
-          AppLog.warn('hotspot', 'could not host, staying on Wi-Fi: '
-              '${error.message}');
+          AppLog.warn(
+              'hotspot',
+              'could not host, staying on Wi-Fi: '
+                  '${error.message}');
           errorMessage = error.message;
         }
         bindAddress = hotspot?.ip ?? await localIpv4();
@@ -375,6 +387,12 @@ class SendController extends ChangeNotifier {
 
       phase = SendPhase.waitingForPeer;
       notifyListeners();
+
+      final pending = pendingScan;
+      if (pending != null) {
+        pendingScan = null;
+        unawaited(knockScanned(pending));
+      }
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
@@ -722,6 +740,7 @@ class SendController extends ChangeNotifier {
     currentFileName = null;
     _lastSampleAt = null;
     _lastSampleBytes = 0;
+    pendingScan = null;
     for (final item in items) {
       item.transferred = 0;
       item.done = false;
