@@ -78,8 +78,9 @@ class _AppNavItemView extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final color = selected ? AppColors.accent : scheme.onSurfaceVariant;
-    final labelColor = selected ? scheme.onSurface : scheme.onSurfaceVariant;
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    final color = selected ? AppColors.accent : idle;
+    final labelColor = selected ? scheme.onSurface : idle;
     final activeBackground = dark
         ? Colors.white.withValues(
             alpha: scheme.isBlackVariant ? 0.05 : 0.08,

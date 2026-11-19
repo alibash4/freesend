@@ -60,8 +60,10 @@ class AppSidebar extends StatelessWidget {
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
+              // No leading padding: the selection bar sits flush with the
+              // sidebar edge. Trailing padding keeps the tiles inset.
+              padding: const EdgeInsetsDirectional.only(
+                end: AppSpacing.sm,
               ),
               children: [
                 for (var i = 0; i < items.length; i++)
@@ -97,12 +99,15 @@ class _SidebarItemView extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final color = selected ? AppColors.accent : scheme.onSurfaceVariant;
-    final labelColor = selected ? scheme.onSurface : scheme.onSurfaceVariant;
-    final hoverColor =
-        dark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04);
-    final highlightColor =
-        dark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04);
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    final color = selected ? AppColors.accent : idle;
+    final labelColor = selected ? scheme.onSurface : idle;
+    final hoverColor = dark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.04);
+    final highlightColor = dark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.04);
     return Semantics(
       button: true,
       selected: selected,
@@ -112,7 +117,7 @@ class _SidebarItemView extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-              width: 12,
+              width: 8,
               child: Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: AnimatedContainer(
