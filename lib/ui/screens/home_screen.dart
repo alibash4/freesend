@@ -31,6 +31,24 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  /// The send control comes first; only the chosen entry navigates.
+  Future<void> _openSend() async {
+    final callback = widget.onOpenSend;
+    if (callback == null) {
+      final mode = await SendScreen.choose(context);
+      if (mode == null || !mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => SendScreen(initialMode: mode),
+        ),
+      );
+      return;
+    }
+    // Shells that own navigation (the app wrapper) still get the tap and raise
+    // the control themselves.
+    callback();
+  }
+
   void _open(VoidCallback? callback, Widget page) {
     if (callback != null) {
       callback();
@@ -78,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? AppColors.accentWashDark
                         : AppColors.accentWash,
                     ink: dark ? AppColors.accentInkDark : AppColors.accentInk,
-                    onTap: () => _open(widget.onOpenSend, const SendScreen()),
+                    onTap: _openSend,
                   ),
                   _FolderAction(
                     icon: UIcons.solidRounded.download,

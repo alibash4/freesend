@@ -27,9 +27,30 @@ import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/ui/widgets/scan_radar.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({super.key, this.onBack});
+  const SendScreen({super.key, this.onBack, this.initialMode});
 
   final VoidCallback? onBack;
+
+  /// The entry already chosen from the send control, so this screen does not
+  /// raise the chooser a second time.
+  final SendMode? initialMode;
+
+  /// Raises the send control where the user is, and returns what they picked.
+  ///
+  /// A sheet on mobile, a centered dialog on desktop. Null means dismissed, in
+  /// which case nothing should navigate.
+  static Future<SendMode?> choose(BuildContext context) {
+    return PlatformEnv.isDesktop
+        ? showDialog<SendMode>(
+            context: context,
+            builder: (context) => const _SendChooserDialog(),
+          )
+        : showModalBottomSheet<SendMode>(
+            context: context,
+            isScrollControlled: true,
+            builder: (context) => const _SendChooserSheet(),
+          );
+  }
 
   @override
   State<SendScreen> createState() => _SendScreenState();
@@ -45,7 +66,14 @@ class _SendScreenState extends State<SendScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _chooseMode());
+    final initial = widget.initialMode;
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<SendController>().setMode(initial);
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _chooseMode());
+    }
   }
 
   /// The send control: nearby, scan a code, or a group. A sheet on mobile, a
@@ -54,16 +82,7 @@ class _SendScreenState extends State<SendScreen> {
     if (_chooserShown) return;
     _chooserShown = true;
     final controller = context.read<SendController>();
-    final mode = PlatformEnv.isDesktop
-        ? await showDialog<SendMode>(
-            context: context,
-            builder: (context) => const _SendChooserDialog(),
-          )
-        : await showModalBottomSheet<SendMode>(
-            context: context,
-            isScrollControlled: true,
-            builder: (context) => const _SendChooserSheet(),
-          );
+    final mode = await SendScreen.choose(context);
     if (!mounted) return;
     if (mode == null) {
       widget.onBack?.call();

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -33,9 +34,22 @@ class _AppShellState extends State<AppShell> {
   /// content fades on nav taps while physical swipes stay unanimated.
   bool _animatePageSwap = false;
 
+  /// The entry chosen from the send control, handed to the overlay screen.
+  SendMode? _sendMode;
+
+  /// The send control comes first; the overlay only opens once something is
+  /// chosen.
+  Future<void> _openSend() async {
+    final mode = await SendScreen.choose(context);
+    if (mode == null || !mounted) return;
+    setState(() => _sendMode = mode);
+    _setIndex(5);
+  }
+
   void _setIndex(int index) {
     // Valid pages: 0-3 are the nav tabs, 5-6 the send/receive overlays.
     if (index < 0 || index > 6 || index == 4) return;
+    if (index != 5) _sendMode = null;
     _animatePageSwap = true;
     if (index < 4) {
       _pageController.jumpToPage(index);
@@ -103,7 +117,7 @@ class _AppShellState extends State<AppShell> {
                     },
                     children: [
                       HomeScreen(
-                        onOpenSend: () => _setIndex(5),
+                        onOpenSend: _openSend,
                         onOpenReceive: () => _setIndex(6),
                       ),
                       const TransfersScreen(),
@@ -117,7 +131,10 @@ class _AppShellState extends State<AppShell> {
                 child: FadeOnChange(
                   index: _index,
                   child: _index == 5
-                      ? SendScreen(onBack: () => _setIndex(0))
+                      ? SendScreen(
+                          initialMode: _sendMode,
+                          onBack: () => _setIndex(0),
+                        )
                       : _index == 6
                           ? ReceiveScreen(onBack: () => _setIndex(0))
                           : const SizedBox.shrink(),
