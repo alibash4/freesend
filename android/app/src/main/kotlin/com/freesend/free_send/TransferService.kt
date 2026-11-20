@@ -98,7 +98,7 @@ class TransferService : Service() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setSmallIcon(R.drawable.freesend_logo)
             .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
