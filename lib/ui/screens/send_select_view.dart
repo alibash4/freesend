@@ -39,12 +39,9 @@ class _SendSelectViewState extends State<SendSelectView> {
   bool _loadingApps = false;
   List<InstalledApp> _apps = const [];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadApps();
-  }
-
+  /// App enumeration is expensive, so it stays lazy: only
+  /// [_selectCategory] kicks it off, and only on Android where the APK
+  /// category exists.
   Future<void> _loadApps() async {
     if (_loadingApps || _apps.isNotEmpty) return;
     setState(() => _loadingApps = true);
@@ -60,8 +57,17 @@ class _SendSelectViewState extends State<SendSelectView> {
     final effectiveExtensions = extensions ??
         (type == FileType.custom
             ? const [
-                'pdf', 'doc', 'docx', 'txt', 'md', 'rtf', 'xls', 'xlsx',
-                'csv', 'ppt', 'pptx',
+                'pdf',
+                'doc',
+                'docx',
+                'txt',
+                'md',
+                'rtf',
+                'xls',
+                'xlsx',
+                'csv',
+                'ppt',
+                'pptx',
               ]
             : null);
     final picked = await FilePicker.pickFiles(
@@ -110,15 +116,12 @@ class _SendSelectViewState extends State<SendSelectView> {
         .where((recent) => File(recent.path).existsSync())
         .toList(growable: false);
     return switch (_category) {
-      _SendCategory.music => all
-          .where((recent) => _isMusic(recent.name))
-          .toList(growable: false),
-      _SendCategory.docs => all
-          .where((recent) => _isDocument(recent.name))
-          .toList(growable: false),
-      _SendCategory.videos => all
-          .where((recent) => _isVideo(recent.name))
-          .toList(growable: false),
+      _SendCategory.music =>
+        all.where((recent) => _isMusic(recent.name)).toList(growable: false),
+      _SendCategory.docs =>
+        all.where((recent) => _isDocument(recent.name)).toList(growable: false),
+      _SendCategory.videos =>
+        all.where((recent) => _isVideo(recent.name)).toList(growable: false),
       _SendCategory.large => all
           .where((recent) => recent.size >= 100 * 1024 * 1024)
           .toList(growable: false),
@@ -135,8 +138,18 @@ class _SendSelectViewState extends State<SendSelectView> {
     final l10n = AppLocalizations.of(context);
     final controller = widget.controller;
     final wide = MediaQuery.sizeOf(context).width >= 840;
-    final recents = _categoryRecents();
+    // Recents stat every file synchronously, so only resolve them for the
+    // categories that actually render them.
+    final needsRecents = _category != _SendCategory.files &&
+        _category != _SendCategory.folders &&
+        _category != _SendCategory.apk;
+    final recents = needsRecents ? _categoryRecents() : const <RecentFile>[];
     final selected = controller.items;
+    // APK bundles only exist on Android; other platforms never show the tab.
+    final categories = _SendCategory.values
+        .where(
+            (category) => category != _SendCategory.apk || Platform.isAndroid)
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -146,10 +159,10 @@ class _SendSelectViewState extends State<SendSelectView> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.zero,
-            itemCount: _SendCategory.values.length,
+            itemCount: categories.length,
             separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
             itemBuilder: (context, index) {
-              final category = _SendCategory.values[index];
+              final category = categories[index];
               return _CategoryChip(
                 label: _categoryLabel(l10n, category),
                 icon: _categoryIcon(category),
@@ -215,9 +228,7 @@ class _SendSelectViewState extends State<SendSelectView> {
               ),
             ),
             FilledButton.icon(
-              onPressed: selected.isEmpty
-                  ? null
-                  : () => widget.onStart(),
+              onPressed: selected.isEmpty ? null : () => widget.onStart(),
               icon: Icon(AppIcons.send, size: 17),
               label: Text(l10n.startSharing),
             ),
@@ -235,10 +246,10 @@ class _SendSelectViewState extends State<SendSelectView> {
     if (items.isEmpty) {
       return _empty(
         l10n,
+        _category == _SendCategory.folders ? l10n.addFolder : l10n.addFiles,
         _category == _SendCategory.folders
-            ? l10n.addFolder
-            : l10n.addFiles,
-        _category == _SendCategory.folders ? _addFolder : () => _addFiles(FileType.any),
+            ? _addFolder
+            : () => _addFiles(FileType.any),
       );
     }
     return _contentLayout(
@@ -283,9 +294,8 @@ class _SendSelectViewState extends State<SendSelectView> {
               }
               _togglePath(recent.path);
             },
-            longPress: (!wide)
-                ? () => setState(() => _selectionMode = true)
-                : null,
+            longPress:
+                (!wide) ? () => setState(() => _selectionMode = true) : null,
             grid: _grid,
             wide: wide,
           ),
@@ -318,9 +328,8 @@ class _SendSelectViewState extends State<SendSelectView> {
               }
               _togglePath(app.path);
             },
-            longPress: (!wide)
-                ? () => setState(() => _selectionMode = true)
-                : null,
+            longPress:
+                (!wide) ? () => setState(() => _selectionMode = true) : null,
             grid: _grid,
             wide: wide,
           ),
@@ -362,7 +371,8 @@ class _SendSelectViewState extends State<SendSelectView> {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       child: Column(
         children: [
-          Icon(AppIcons.folderOpen, size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(AppIcons.folderOpen,
+              size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: AppSpacing.sm),
           Text(l10n.emptyCategory),
           const SizedBox(height: AppSpacing.md),
@@ -377,16 +387,34 @@ class _SendSelectViewState extends State<SendSelectView> {
   }
 
   bool _isMusic(String name) => const {
-        'mp3', 'wav', 'flac', 'm4a', 'ogg', 'aac',
+        'mp3',
+        'wav',
+        'flac',
+        'm4a',
+        'ogg',
+        'aac',
       }.contains(_extension(name));
 
   bool _isDocument(String name) => const {
-        'pdf', 'doc', 'docx', 'txt', 'md', 'rtf', 'xls', 'xlsx', 'csv',
-        'ppt', 'pptx',
+        'pdf',
+        'doc',
+        'docx',
+        'txt',
+        'md',
+        'rtf',
+        'xls',
+        'xlsx',
+        'csv',
+        'ppt',
+        'pptx',
       }.contains(_extension(name));
 
   bool _isVideo(String name) => const {
-        'mp4', 'mkv', 'mov', 'avi', 'webm',
+        'mp4',
+        'mkv',
+        'mov',
+        'avi',
+        'webm',
       }.contains(_extension(name));
 
   String _extension(String name) {
@@ -466,13 +494,17 @@ class _CategoryChip extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                color: selected
+                    ? scheme.onPrimaryContainer
+                    : scheme.onSurfaceVariant,
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
+                  color: selected
+                      ? scheme.onPrimaryContainer
+                      : scheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -547,7 +579,8 @@ class _SelectableTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -589,4 +622,3 @@ class _SelectableTile extends StatelessWidget {
     );
   }
 }
-

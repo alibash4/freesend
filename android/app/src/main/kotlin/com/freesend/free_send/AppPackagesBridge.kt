@@ -2,6 +2,8 @@ package com.freesend.free_send
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.os.Handler
+import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -21,7 +23,17 @@ class AppPackagesBridge(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "list" -> result.success(listApps())
+            "list" -> {
+                // PackageManager queries are expensive; run them off the
+                // platform thread so Flutter frames keep rendering, then
+                // hop back to deliver the result.
+                Thread {
+                    val apps = listApps()
+                    Handler(Looper.getMainLooper()).post {
+                        result.success(apps)
+                    }
+                }.start()
+            }
             else -> result.notImplemented()
         }
     }

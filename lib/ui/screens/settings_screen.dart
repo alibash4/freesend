@@ -506,13 +506,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: appState.blackTheme,
                   onChanged: (value) => appState.setBlackTheme(value),
                 ),
-                const SizedBox(height: AppSpacing.lg),
-                _UpdateRow(
-                  label: l10n.floatingNav,
-                  subtitle: l10n.floatingNavSubtitle,
-                  value: appState.floatingNav,
-                  onChanged: (value) => appState.setFloatingNav(value),
-                ),
+                // The floating pill only exists where the bottom navigation
+                // does - phones. Desktop uses the sidebar instead.
+                if (PlatformEnv.kind == PlatformKind.android ||
+                    PlatformEnv.kind == PlatformKind.ios) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  _UpdateRow(
+                    label: l10n.floatingNav,
+                    subtitle: l10n.floatingNavSubtitle,
+                    value: appState.floatingNav,
+                    onChanged: (value) => appState.setFloatingNav(value),
+                  ),
+                ],
                 if (PlatformEnv.kind == PlatformKind.android ||
                     PlatformEnv.kind == PlatformKind.ios) ...[
                   const SizedBox(height: AppSpacing.xl),
