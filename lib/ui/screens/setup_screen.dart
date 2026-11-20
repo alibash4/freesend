@@ -157,14 +157,17 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
           controller: _scrollController,
           title: widget.title,
           leading: Transform.translate(
-            offset: const Offset(-7, 0),
+            offset: Offset(
+              Directionality.of(context) == TextDirection.rtl ? 7 : -7,
+              0,
+            ),
             child: IconButton(
               onPressed: _leave,
               icon: Icon(backGlyph(context), size: 25),
               mouseCursor: SystemMouseCursors.click,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
             ),
           ),
           child: ListView(

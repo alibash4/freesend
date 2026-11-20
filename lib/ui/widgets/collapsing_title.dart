@@ -87,9 +87,11 @@ class _CollapsingHeaderState extends State<CollapsingHeader> {
       t,
     )!;
     final dark = theme.brightness == Brightness.dark;
-    // Expanded: title sits under the leading control, left-aligned. Collapsed:
-    // it glides up beside the control (or stays left when there is none).
-    final titleLeft = lerpDouble(
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // Expanded: title sits under the leading control at the start edge.
+    // Collapsed: it glides up beside the control (or stays at the edge when
+    // there is none).
+    final titleStart = lerpDouble(
       AppSpacing.md,
       widget.leading == null ? AppSpacing.md : AppSpacing.md + 52,
       t,
@@ -115,14 +117,15 @@ class _CollapsingHeaderState extends State<CollapsingHeader> {
               children: [
                 if (widget.leading != null)
                   Positioned(
-                    left: AppSpacing.md,
+                    left: rtl ? null : AppSpacing.md,
+                    right: rtl ? AppSpacing.md : null,
                     top: leadingTop,
                     child: widget.leading!,
                   ),
                 Positioned(
-                  left: titleLeft,
+                  left: rtl ? AppSpacing.md : titleStart,
+                  right: rtl ? titleStart : AppSpacing.md,
                   top: titleTop,
-                  right: AppSpacing.md,
                   child: Text(
                     widget.title,
                     maxLines: 1,

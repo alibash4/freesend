@@ -171,7 +171,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
             controller: _scrollController,
             title: _titleFor(context, controller),
             leading: Transform.translate(
-              offset: const Offset(-7, 0),
+              offset: Offset(
+                Directionality.of(context) == TextDirection.rtl ? 7 : -7,
+                0,
+              ),
               child: IconButton(
                 onPressed: () {
                   context.read<AppState>().tick();
@@ -181,7 +184,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                 mouseCursor: SystemMouseCursors.click,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                alignment: Alignment.centerLeft,
+                alignment: AlignmentDirectional.centerStart,
               ),
             ),
             child: ListView(
