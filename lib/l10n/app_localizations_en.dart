@@ -521,6 +521,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platform => 'Platform';
 
   @override
+  String get iconGallery => 'Icon gallery';
+
+  @override
   String get saveLocationUpdated => 'Save location updated';
 
   @override
@@ -612,12 +615,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupDone => 'Done';
-
-  @override
-  String get setupActionNeeded => 'Action needed';
-
-  @override
-  String get setupCheckAgain => 'Check again';
 
   @override
   String get updateUpToDate => 'You\'re on the latest version.';

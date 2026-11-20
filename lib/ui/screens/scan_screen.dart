@@ -295,12 +295,6 @@ class _ScanScreenState extends State<ScanScreen> {
                 icon: Icon(AppIcons.settings, size: 17),
                 label: Text(l10n.openSettings),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              TextButton.icon(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: Icon(AppIcons.address, size: 16),
-                label: Text(l10n.enterCodeInstead),
-              ),
             ],
           ),
         ),

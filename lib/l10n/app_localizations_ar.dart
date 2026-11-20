@@ -533,6 +533,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get platform => 'المنصة';
 
   @override
+  String get iconGallery => 'معرض الأيقونات';
+
+  @override
   String get saveLocationUpdated => 'تم تحديث موقع الحفظ';
 
   @override
@@ -624,12 +627,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get setupDone => 'تم';
-
-  @override
-  String get setupActionNeeded => 'يتطلب إجراءً';
-
-  @override
-  String get setupCheckAgain => 'تحقق مجددًا';
 
   @override
   String get updateUpToDate => 'أنت تستخدم أحدث إصدار.';

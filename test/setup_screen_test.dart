@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -30,18 +29,12 @@ void main() {
       'Roboto-Bold.ttf',
     ]);
     await _loadFont('MaterialIcons', ['MaterialIcons-Regular.otf']);
-    // Package fonts are not part of the test bundle, so the two icon fonts
-    // the app uses are registered by hand.
-    await _loadPackageFont(
-      family: 'uicons_regular_rounded',
-      package: 'uicons_regular_rounded',
-      asset: 'font/uicons_regular_rounded.ttf',
-    );
-    await _loadPackageFont(
-      family: 'uicons_solid_rounded',
-      package: 'uicons_solid_rounded',
-      asset: 'font/uicons_solid_rounded.ttf',
-    );
+    // Icon fonts ship as plain project assets, so they are registered by
+    // hand for the test bundle.
+    await _loadAssetFont(
+        'uicons-regular-rounded', 'assets/fonts/uicons-rr.ttf');
+    await _loadAssetFont('uicons-solid-rounded', 'assets/fonts/uicons-sr.ttf');
+    await _loadAssetFont('uicons-brands', 'assets/fonts/uicons-brands.ttf');
   });
 
   setUp(() {
@@ -95,13 +88,12 @@ void main() {
     expect(find.text('Wi-Fi is on'), findsOneWidget);
     expect(find.text('VPN is off'), findsOneWidget);
 
-    // Permission rows can be granted in place; system rows only report.
-    // The first unmet required step owns the single action button.
-    expect(find.text('Action needed'), findsNWidgets(3));
+    // Every unmet row carries its own inline action: permission rows ask
+    // the system (Allow), status rows jump to settings. Nothing is locked.
     expect(find.text('Done'), findsNothing);
     expect(find.text('Optional'), findsOneWidget);
-    expect(find.text('Allow', skipOffstage: false), findsOneWidget);
-    expect(find.text('Check again', skipOffstage: false), findsOneWidget);
+    expect(find.text('Allow'), findsOneWidget);
+    expect(find.text('Settings'), findsNWidgets(2));
 
     await capture(tester, '18-setup-receive');
   });
@@ -110,8 +102,8 @@ void main() {
     await pump(tester, 'Before you send', dark: true);
     expect(find.text('Before you send'), findsOneWidget);
     expect(find.text('Before you receive'), findsNothing);
-    expect(find.text('Action needed'), findsNWidgets(3));
-    expect(find.text('Allow', skipOffstage: false), findsOneWidget);
+    expect(find.text('Allow'), findsOneWidget);
+    expect(find.text('Settings'), findsNWidgets(2));
 
     await capture(tester, '19-setup-send-dark');
   });
@@ -143,24 +135,8 @@ ThemeData _withFont(ThemeData base) => base.copyWith(
       primaryTextTheme: base.primaryTextTheme.apply(fontFamily: 'Roboto'),
     );
 
-Future<void> _loadPackageFont({
-  required String family,
-  required String package,
-  required String asset,
-}) async {
-  // flutter_test cannot resolve package URIs, so the package root comes from
-  // the project's own package config.
-  final config = File('.dart_tool/package_config.json');
-  if (!config.existsSync()) return;
-  final decoded =
-      jsonDecode(await config.readAsString()) as Map<String, Object?>;
-  final packages =
-      (decoded['packages'] as List<Object?>).cast<Map<String, Object?>>();
-  final match = packages.where((entry) => entry['name'] == package);
-  if (match.isEmpty) return;
-  final root = config.uri.resolve(match.first['rootUri']! as String);
-  final rootPath = root.toFilePath().replaceAll(RegExp(r'/+$'), '');
-  final file = File('$rootPath/$asset');
+Future<void> _loadAssetFont(String family, String path) async {
+  final file = File(path);
   if (!await file.exists()) return;
   final bytes = await file.readAsBytes();
   final loader = FontLoader(family)

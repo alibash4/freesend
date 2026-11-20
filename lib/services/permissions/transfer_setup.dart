@@ -140,8 +140,13 @@ abstract final class TransferSetup {
         if (_blocked(status)) await openAppSettings();
         return;
       case SetupKind.wifi:
+        await NetworkProbe.openSystemSettings('wifi');
+        return;
       case SetupKind.vpn:
+        await NetworkProbe.openSystemSettings('vpn');
+        return;
       case SetupKind.location:
+        await NetworkProbe.openSystemSettings('location');
         return;
     }
   }

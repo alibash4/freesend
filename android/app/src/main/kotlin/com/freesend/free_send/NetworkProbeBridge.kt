@@ -1,10 +1,13 @@
 package com.freesend.free_send
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.provider.Settings
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -29,6 +32,7 @@ class NetworkProbeBridge(
             "isVpnActive" -> result.success(isVpnActive())
             "isLocationEnabled" -> result.success(isLocationEnabled())
             "isWifiEnabled" -> result.success(isWifiEnabled())
+            "openSettings" -> openSettings(call.argument<String>("target"), result)
             else -> result.notImplemented()
         }
     }
@@ -51,6 +55,31 @@ class NetworkProbeBridge(
             .getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 ?: return true
         return wifi.isWifiEnabled
+    }
+
+    /// Jumps to the system settings page that owns the switch a checklist row
+    /// is waiting on. Falls back to the main Settings screen when a device
+    /// does not expose the specific page.
+    private fun openSettings(target: String?, result: MethodChannel.Result) {
+        val specific = when (target) {
+            "wifi" -> Intent(Settings.ACTION_WIFI_SETTINGS)
+            "location" -> Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            else -> Intent("android.settings.VPN_SETTINGS")
+        }
+        val flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        try {
+            context.startActivity(specific.addFlags(flags))
+            result.success(true)
+        } catch (e: ActivityNotFoundException) {
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_SETTINGS).addFlags(flags),
+                )
+                result.success(true)
+            } catch (e2: ActivityNotFoundException) {
+                result.success(false)
+            }
+        }
     }
 
     private fun isVpnActive(): Boolean {

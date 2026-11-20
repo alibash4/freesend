@@ -33,6 +33,18 @@ abstract final class NetworkProbe {
   /// network a desktop joins both need it on.
   static Future<bool> get wifiIsOn => _read('isWifiEnabled');
 
+  /// Opens the system settings page that owns [target] (`wifi`, `vpn` or
+  /// `location`) so the user can flip the switch a checklist row waits on.
+  /// Android only; a no-op elsewhere.
+  static Future<void> openSystemSettings(String target) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod<void>('openSettings', {'target': target});
+    } on Object {
+      // Settings must never break the checklist.
+    }
+  }
+
   static Future<bool> _read(String method) async {
     if (!Platform.isAndroid && !Platform.isIOS) return false;
     try {

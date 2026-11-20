@@ -962,6 +962,12 @@ abstract class AppLocalizations {
   /// **'Platform'**
   String get platform;
 
+  /// No description provided for @iconGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon gallery'**
+  String get iconGallery;
+
   /// No description provided for @saveLocationUpdated.
   ///
   /// In en, this message translates to:
@@ -1129,18 +1135,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get setupDone;
-
-  /// No description provided for @setupActionNeeded.
-  ///
-  /// In en, this message translates to:
-  /// **'Action needed'**
-  String get setupActionNeeded;
-
-  /// No description provided for @setupCheckAgain.
-  ///
-  /// In en, this message translates to:
-  /// **'Check again'**
-  String get setupCheckAgain;
 
   /// No description provided for @updateUpToDate.
   ///
