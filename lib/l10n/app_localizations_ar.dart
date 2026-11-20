@@ -936,7 +936,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get scanQrCode => 'مسح رمز QR';
+  String get scanQrCode => 'مسح رمز الاقتران';
 
   @override
   String get orJoinManually => 'أو انضم يدويًا';
@@ -1042,13 +1042,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unreachable => 'تعذّر الوصول';
 
   @override
-  String get shareNearby => 'مشاركة مع الأجهزة القريبة';
+  String get shareNearby => 'مشاركة مع جهاز قريب';
 
   @override
-  String get shareNearbyHint => 'اعثر على أجهزة تنتظر الاستلام.';
+  String get shareNearbyHint => 'اختر جهازًا ينتظر الاستلام.';
 
   @override
-  String get scanQrHint => 'اقرأ رمز المستلم بدلًا من انتظار ظهوره.';
+  String get scanQrHint => 'امسح الرمز الظاهر على جهاز الاستلام للاتصال فورًا.';
 
   @override
   String get sendToGroup => 'إرسال إلى مجموعة';

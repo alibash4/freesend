@@ -920,7 +920,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get scanQrCode => 'Scan a QR code';
+  String get scanQrCode => 'Scan a pairing code';
 
   @override
   String get orJoinManually => 'Or join manually';
@@ -1026,14 +1026,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unreachable => 'Unreachable';
 
   @override
-  String get shareNearby => 'Share to nearby';
+  String get shareNearby => 'Share to a nearby device';
 
   @override
-  String get shareNearbyHint => 'Find devices that are waiting to receive.';
+  String get shareNearbyHint => 'Pick a device that is waiting to receive.';
 
   @override
   String get scanQrHint =>
-      'Read a receiver\'s code instead of waiting for it to appear.';
+      'Scan the code shown on the receiving device to connect right away.';
 
   @override
   String get sendToGroup => 'Send to a group';

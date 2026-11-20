@@ -103,6 +103,7 @@ class AppBottomNav extends StatelessWidget {
               child: _AppNavItemView(
                 item: items[i],
                 selected: i == selectedIndex,
+                floating: floating,
                 onTap: () => onSelected(i),
               ),
             ),
@@ -187,11 +188,13 @@ class _AppNavItemView extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.onTap,
+    this.floating = false,
   });
 
   final AppNavItem item;
   final bool selected;
   final VoidCallback onTap;
+  final bool floating;
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +206,11 @@ class _AppNavItemView extends StatelessWidget {
         ? Colors.white.withValues(
             alpha: scheme.isBlackVariant ? 0.05 : 0.08,
           )
-        : AppColors.neutral100;
+        // The floating island needs a firmer tint to stay visible through
+        // its translucent fill; the docked bar keeps the softer wash.
+        : floating
+            ? AppColors.neutral200
+            : AppColors.neutral100;
     return Semantics(
       button: true,
       selected: selected,

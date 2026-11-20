@@ -1631,7 +1631,7 @@ abstract class AppLocalizations {
   /// No description provided for @scanQrCode.
   ///
   /// In en, this message translates to:
-  /// **'Scan a QR code'**
+  /// **'Scan a pairing code'**
   String get scanQrCode;
 
   /// No description provided for @orJoinManually.
@@ -1829,19 +1829,19 @@ abstract class AppLocalizations {
   /// No description provided for @shareNearby.
   ///
   /// In en, this message translates to:
-  /// **'Share to nearby'**
+  /// **'Share to a nearby device'**
   String get shareNearby;
 
   /// No description provided for @shareNearbyHint.
   ///
   /// In en, this message translates to:
-  /// **'Find devices that are waiting to receive.'**
+  /// **'Pick a device that is waiting to receive.'**
   String get shareNearbyHint;
 
   /// No description provided for @scanQrHint.
   ///
   /// In en, this message translates to:
-  /// **'Read a receiver\'s code instead of waiting for it to appear.'**
+  /// **'Scan the code shown on the receiving device to connect right away.'**
   String get scanQrHint;
 
   /// No description provided for @sendToGroup.
