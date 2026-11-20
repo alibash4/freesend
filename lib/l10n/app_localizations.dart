@@ -650,6 +650,12 @@ abstract class AppLocalizations {
   /// **'Stop'**
   String get stop;
 
+  /// No description provided for @waitingNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for files'**
+  String get waitingNotificationTitle;
+
   /// No description provided for @cancelTransfer.
   ///
   /// In en, this message translates to:

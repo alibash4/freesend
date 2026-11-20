@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/app_navigation.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
@@ -46,6 +49,27 @@ class _AppShellState extends State<AppShell> {
     _setIndex(5);
   }
 
+  StreamSubscription<AppOverlay>? _navSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Requests can arrive before this state exists (a cold start through the
+    // notification), so drain the pending slot and then follow the stream.
+    _applyOverlay(appNavigation.takePending());
+    _navSubscription = appNavigation.requests.listen(_applyOverlay);
+  }
+
+  void _applyOverlay(AppOverlay? overlay) {
+    switch (overlay) {
+      case AppOverlay.receive:
+        _setIndex(6);
+      case AppOverlay.send:
+      case null:
+        break;
+    }
+  }
+
   void _setIndex(int index) {
     // Valid pages: 0-3 are the nav tabs, 5-6 the send/receive overlays.
     if (index < 0 || index > 6 || index == 4) return;
@@ -64,6 +88,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    unawaited(_navSubscription?.cancel());
     _pageController.dispose();
     super.dispose();
   }

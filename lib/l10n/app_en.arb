@@ -92,6 +92,7 @@
   "resume": "Resume",
   "pause": "Pause",
   "stop": "Stop",
+  "waitingNotificationTitle": "Waiting for files",
   "cancelTransfer": "Cancel transfer",
   "liveOnThisDevice": "Live on this device",
   "nothingTransferring": "Nothing transferring",

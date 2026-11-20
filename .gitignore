@@ -44,3 +44,4 @@ app.*.map.json
 
 # Test artefacts (screenshots produced by test/ui_render_test.dart)
 /artifacts/
+/android/.kotlin/

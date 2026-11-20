@@ -12,7 +12,6 @@ import 'package:free_send/core/format.dart';
 import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/pairing_code.dart';
-import 'package:free_send/services/transfer/doorbell.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/receive_controller.dart';
 import 'package:free_send/l10n/app_localizations.dart';
@@ -43,11 +42,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   /// Null while the grant check is in flight. False opens the setup screen.
   bool? _setupReady;
 
-  StreamSubscription<Knock>? _knocks;
-
   @override
   void dispose() {
-    unawaited(_knocks?.cancel());
     _scrollController.dispose();
     super.dispose();
   }
@@ -64,8 +60,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     setState(() => _setupReady = ready);
     if (!ready) return;
     _beginWaiting();
-    final controller = context.read<ReceiveController>();
-    _knocks = controller.knocks.listen(_showKnockDialog);
+    // Knock consent is handled app-wide in app.dart so a sender is answered
+    // even while the user sits on another tab.
   }
 
   /// The receiver waits; it does not hunt. The sender's signal finds it.
@@ -78,53 +74,6 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         host: PlatformEnv.kind == PlatformKind.android,
       );
     }
-  }
-
-  Future<void> _showKnockDialog(Knock knock) async {
-    final controller = context.read<ReceiveController>();
-    final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.knockAcceptTitle(knock.senderName)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${l10n.fileCount(knock.fileCount)} · '
-              '${formatBytes(knock.totalBytes)}',
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              l10n.knockNote,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            style: clickCursorStyle,
-            onPressed: () {
-              context.read<AppState>().tick();
-              Navigator.of(context).pop(false);
-            },
-            child: Text(l10n.decline),
-          ),
-          FilledButton(
-            style: clickCursorStyle,
-            onPressed: () {
-              context.read<AppState>().tick();
-              Navigator.of(context).pop(true);
-            },
-            child: Text(l10n.accept),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    await controller.answerKnock(confirmed ?? false);
   }
 
   void _leave() {
@@ -626,7 +575,6 @@ class _NoCameraPanel extends StatelessWidget {
     );
   }
 }
-
 
 /// Asks for the hotspot password the phone shows, then joins it.
 Future<void> _askHotspotPassword(BuildContext context, String ssid) async {

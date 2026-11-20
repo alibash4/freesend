@@ -3,6 +3,7 @@ package com.freesend.free_send
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -14,12 +15,17 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 /**
- * Keeps the Flutter process alive while a transfer is running.
+ * Keeps the Flutter process alive while a transfer or a receive-wait is
+ * running.
  *
  * Dart sockets and the Flutter engine live in this process, so without a
  * foreground service Android can freeze or kill it as soon as the app is
  * backgrounded. The notification is deliberately quiet: it reports progress
  * and never makes a sound.
+ *
+ * Two user-facing hooks live here: tapping the notification opens the app on
+ * the receive screen, and the optional "Stop" action asks Dart to tear the
+ * waiting session down.
  */
 class TransferService : Service() {
 
@@ -37,14 +43,23 @@ class TransferService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_STOP_WAITING -> {
+                // Dart owns the sockets; it hears the event and calls stop(),
+                // which sends ACTION_STOP and ends this service.
+                TransferEvents.emit(EVENT_STOP_WAITING)
+                return START_NOT_STICKY
+            }
         }
 
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Transfer in progress"
         val text = intent?.getStringExtra(EXTRA_TEXT) ?: "Sharing over the local network"
-        val notification = buildNotification(title, text)
+        val stopLabel = intent?.getStringExtra(EXTRA_STOP_LABEL)
+        val notification = buildNotification(title, text, stopLabel)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -75,17 +90,50 @@ class TransferService : Service() {
         super.onTaskRemoved(rootIntent)
     }
 
-    private fun buildNotification(title: String, text: String): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun buildNotification(
+        title: String,
+        text: String,
+        stopLabel: String?,
+    ): Notification {
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
+            .setContentIntent(openAppIntent())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
-            .build()
+
+        if (stopLabel != null) {
+            builder.addAction(
+                0,
+                stopLabel,
+                PendingIntent.getService(
+                    this,
+                    REQUEST_STOP_WAITING,
+                    Intent(this, TransferService::class.java)
+                        .setAction(ACTION_STOP_WAITING),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+        }
+        return builder.build()
+    }
+
+    /** Tapping the notification lands on the receive tab of the running app. */
+    private fun openAppIntent(): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra(EXTRA_NAVIGATE, NAVIGATE_RECEIVE)
+        }
+        return PendingIntent.getActivity(
+            this,
+            REQUEST_OPEN_APP,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
     }
 
     private fun ensureChannel() {
@@ -96,7 +144,7 @@ class TransferService : Service() {
             "File transfers",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shown while files are being sent or received."
+            description = "Shown while files are being sent, received, or awaited."
             setShowBadge(false)
         }
         manager.createNotificationChannel(channel)
@@ -108,15 +156,34 @@ class TransferService : Service() {
         private const val ACTION_START = "com.freesend.free_send.action.START"
         private const val ACTION_UPDATE = "com.freesend.free_send.action.UPDATE"
         private const val ACTION_STOP = "com.freesend.free_send.action.STOP"
+        private const val ACTION_STOP_WAITING =
+            "com.freesend.free_send.action.STOP_WAITING"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_TEXT = "text"
+        private const val EXTRA_STOP_LABEL = "stopLabel"
+        private const val EXTRA_NAVIGATE = "navigate"
+        private const val NAVIGATE_RECEIVE = "receive"
+        private const val REQUEST_OPEN_APP = 1
+        private const val REQUEST_STOP_WAITING = 2
         private const val WAKE_LOCK_TIMEOUT_MS = 10 * 60 * 1000L
 
-        fun start(context: Context, title: String, text: String) {
+        /** Event name Dart receives through the transfer events channel. */
+        const val EVENT_STOP_WAITING = "stop_waiting"
+        const val EVENT_OPEN_RECEIVE = "open_receive"
+        const val EXTRA_NAVIGATE_KEY = EXTRA_NAVIGATE
+        const val NAVIGATE_RECEIVE_VALUE = NAVIGATE_RECEIVE
+
+        fun start(
+            context: Context,
+            title: String,
+            text: String,
+            stopLabel: String? = null,
+        ) {
             val intent = Intent(context, TransferService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_TEXT, text)
+                if (stopLabel != null) putExtra(EXTRA_STOP_LABEL, stopLabel)
             }
             ContextCompat.startForegroundService(context, intent)
         }

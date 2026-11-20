@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_logger.dart';
+import 'package:free_send/services/app_navigation.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -32,11 +33,21 @@ enum ReceivePhase {
   cancelled,
 }
 
+/// Whether the receiver brought its own hotspot up or joined the sender's;
+/// decides what [ReceiveController.stopWaiting] has to release.
+enum _HotspotRole { none, hosted, joined }
+
 /// Drives the receiving side: find a session on the hotspot, review the offer,
 /// then pull the selected files to disk.
 class ReceiveController extends ChangeNotifier {
   ReceiveController({required this.appState, HotspotService? hotspotService})
-      : _hotspotService = hotspotService ?? createHotspotService();
+      : _hotspotService = hotspotService ?? createHotspotService() {
+    _serviceEvents = _foreground.events.listen(_onServiceEvent);
+  }
+
+  _HotspotRole _hotspotRole = _HotspotRole.none;
+  String? _hotspotSsid;
+  StreamSubscription<String>? _serviceEvents;
 
   final AppState appState;
   final HotspotService _hotspotService;
@@ -189,7 +200,12 @@ class ReceiveController extends ChangeNotifier {
   /// [host] is decided by the caller from the pairing rules; it is false until
   /// the hotspot phase supplies the link.
   Future<void> startWaiting({bool host = false}) async {
-    if (isWaiting) return;
+    if (isWaiting) {
+      // The link never went down (e.g. "receive more" after a transfer), so
+      // just make sure the background notification reflects it.
+      unawaited(_showWaitingNotification());
+      return;
+    }
     errorMessage = null;
     await _doorbell.start();
     _doorbell.onKnock = _onKnock;
@@ -209,7 +225,61 @@ class ReceiveController extends ChangeNotifier {
         'receive',
         'waiting (presence: ${presence.name}, '
             'doorbell :${_doorbell.port})');
+    unawaited(_showWaitingNotification());
     notifyListeners();
+  }
+
+  /// The persistent notification that keeps the process (and therefore the
+  /// hotspot, doorbell, and presence answers) alive while the user is
+  /// elsewhere. Its Stop action arrives back through [_onServiceEvent].
+  Future<void> _showWaitingNotification() {
+    return _foreground.start(
+      title: _l10n.waitingNotificationTitle,
+      text: _hotspotSsid ?? appState.deviceName,
+      stopLabel: _l10n.stop,
+    );
+  }
+
+  /// Events from the native foreground service: the notification's Stop
+  /// action and its tap-to-open body.
+  void _onServiceEvent(String event) {
+    AppLog.info('receive', 'foreground service event: $event');
+    switch (event) {
+      case 'stop_waiting':
+        // Never yank the link out from under a live or about-to-start
+        // transfer; the notification only offers Stop while waiting anyway.
+        if (phase == ReceivePhase.transferring ||
+            phase == ReceivePhase.reviewing) {
+          return;
+        }
+        unawaited(stopWaiting());
+      case 'open_receive':
+        appNavigation.request(AppOverlay.receive);
+    }
+  }
+
+  /// A finished transfer hands the foreground slot back to the waiting
+  /// notification, since the doorbell keeps answering afterwards.
+  Future<void> _releaseTransferForeground() async {
+    if (isWaiting) {
+      await _showWaitingNotification();
+    } else {
+      await _foreground.stop();
+    }
+  }
+
+  /// Releases whichever hotspot role this device took on, if any.
+  Future<void> _releaseHotspot() async {
+    switch (_hotspotRole) {
+      case _HotspotRole.hosted:
+        await _hotspotService.stop();
+      case _HotspotRole.joined:
+        await _hotspotService.leave();
+      case _HotspotRole.none:
+        break;
+    }
+    _hotspotRole = _HotspotRole.none;
+    _hotspotSsid = null;
   }
 
   /// The QR payload for a device that hosts the link itself.
@@ -220,6 +290,8 @@ class ReceiveController extends ChangeNotifier {
       final info = await _hotspotService.start(deviceName: appState.deviceName);
       AppLog.info('hotspot', 'started "${info.ssid}" (${info.ip})');
       hotspotNotice = info.note;
+      _hotspotRole = _HotspotRole.hosted;
+      _hotspotSsid = info.ssid;
       final address = info.ip ?? await localIpv4();
       if (address == null) return null;
       return PairingCode(
@@ -250,7 +322,7 @@ class ReceiveController extends ChangeNotifier {
         'consent',
         '${knock.senderName} is a remembered device - accepting directly',
       );
-      await answerKnock(true);
+      await answerKnock(true, knock);
       return;
     }
     activeKnock = knock;
@@ -258,12 +330,14 @@ class ReceiveController extends ChangeNotifier {
     if (!_knocks.isClosed) _knocks.add(knock);
   }
 
-  /// Answers the pending knock. Accepting dials back the sender's file server
-  /// and continues into the normal review flow.
-  Future<void> answerKnock(bool accepted) async {
-    final knock = activeKnock;
+  /// Answers a knock. Accepting dials back the sender's file server and
+  /// continues into the normal review flow. [forKnock] pins the answer to the
+  /// knock the user actually saw, since a newer knock may have replaced
+  /// [activeKnock] while the dialog was open.
+  Future<void> answerKnock(bool accepted, [Knock? forKnock]) async {
+    final knock = forKnock ?? activeKnock;
     if (knock == null) return;
-    activeKnock = null;
+    if (activeKnock?.requestId == knock.requestId) activeKnock = null;
     await _doorbell.decide(knock.requestId, accepted);
     notifyListeners();
     if (!accepted) {
@@ -306,11 +380,20 @@ class ReceiveController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Stops the doorbell and presence answers, releasing the link.
+  /// Stops the doorbell, presence answers, and whichever hotspot this device
+  /// brought up or joined, releasing the link and its notification.
   Future<void> stopWaiting() async {
+    if (!isWaiting && _hotspotRole == _HotspotRole.none) return;
+    AppLog.info('receive', 'waiting stopped by user');
     activeKnock = null;
     await _doorbell.stop();
     await _responder.stop();
+    await _releaseHotspot();
+    unawaited(_foreground.stop());
+    waitingQrPayload = null;
+    hotspotNotice = null;
+    showLocalWifiQr = false;
+    localWifiQrPayload = null;
     presence = ReceiverPresence.idle;
     notifyListeners();
   }
@@ -358,6 +441,8 @@ class ReceiveController extends ChangeNotifier {
       await ensureHotspotPermissions();
       final info = await _hotspotService.join(ssid.trim(), password);
       hotspotNotice = info.note ?? _l10n.connectedLooking(info.ssid);
+      _hotspotRole = _HotspotRole.joined;
+      _hotspotSsid = info.ssid;
       await startScanning();
       phase = ReceivePhase.scanning;
     } on HotspotException catch (error) {
@@ -385,6 +470,8 @@ class ReceiveController extends ChangeNotifier {
         await ensureHotspotPermissions();
         final info = await _hotspotService.join(code.ssid!, code.password);
         hotspotNotice = info.note ?? _l10n.joinedHotspotNote(code.ssid ?? '');
+        _hotspotRole = _HotspotRole.joined;
+        _hotspotSsid = info.ssid;
       } else if (code.hasHotspot) {
         // Windows cannot join a hotspot on the user's behalf, so it falls back
         // to the system Wi-Fi menu and then finds the session by discovery.
@@ -797,7 +884,7 @@ class ReceiveController extends ChangeNotifier {
     receivedBytes = bytes;
     totalBytes = totalBytes == 0 ? bytes : totalBytes;
     phase = ReceivePhase.completed;
-    unawaited(_foreground.stop());
+    unawaited(_releaseTransferForeground());
     _recoveryDone = true;
     _recoveryEntries.clear();
     resumeOffsets.clear();
@@ -866,7 +953,7 @@ class ReceiveController extends ChangeNotifier {
     }
     errorMessage = message;
     phase = ReceivePhase.failed;
-    unawaited(_foreground.stop());
+    unawaited(_releaseTransferForeground());
     unawaited(_saveRecovery());
     notifyListeners();
   }
@@ -912,7 +999,7 @@ class ReceiveController extends ChangeNotifier {
       final bytes = receivedBytes;
       final files = receivedItems.where((item) => item.done).length;
       pausedByMe = false;
-      unawaited(_foreground.stop());
+      unawaited(_releaseTransferForeground());
       await _saveRecovery();
       await _client?.cancel();
       _client = null;
@@ -959,12 +1046,13 @@ class ReceiveController extends ChangeNotifier {
       item.status = TransferStatus.pending;
     }
     phase = ReceivePhase.idle;
-    unawaited(_foreground.stop());
+    unawaited(_releaseTransferForeground());
     notifyListeners();
   }
 
   @override
   void dispose() {
+    unawaited(_serviceEvents?.cancel());
     unawaited(_scanSubscription?.cancel());
     unawaited(_scanner.stop());
     unawaited(_doorbell.stop());

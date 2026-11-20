@@ -92,6 +92,7 @@
   "resume": "استئناف",
   "pause": "إيقاف مؤقت",
   "stop": "إيقاف",
+  "waitingNotificationTitle": "بانتظار الملفات",
   "cancelTransfer": "إلغاء التحويل",
   "liveOnThisDevice": "مباشر على هذا الجهاز",
   "nothingTransferring": "لا يوجد تحويل جارٍ",

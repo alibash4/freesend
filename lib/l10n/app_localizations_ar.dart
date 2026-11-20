@@ -324,6 +324,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get stop => 'إيقاف';
 
   @override
+  String get waitingNotificationTitle => 'بانتظار الملفات';
+
+  @override
   String get cancelTransfer => 'إلغاء التحويل';
 
   @override

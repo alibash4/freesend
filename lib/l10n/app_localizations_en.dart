@@ -321,6 +321,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stop => 'Stop';
 
   @override
+  String get waitingNotificationTitle => 'Waiting for files';
+
+  @override
   String get cancelTransfer => 'Cancel transfer';
 
   @override

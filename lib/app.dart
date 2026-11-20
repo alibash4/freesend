@@ -13,6 +13,7 @@ import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/widgets/knock_gate.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
 /// Picks the concrete [ThemeData] for the current choice. MaterialApp only
@@ -40,6 +41,9 @@ class FreeSendApp extends StatelessWidget {
           create: (_) => SendController(appState: appState),
         ),
         ChangeNotifierProvider<ReceiveController>(
+          // Eager: it owns the foreground-service event stream, which must be
+          // listening before the OS delivers a notification action.
+          lazy: false,
           create: (_) => ReceiveController(appState: appState),
         ),
         ChangeNotifierProvider<UpdateController>(
@@ -106,7 +110,7 @@ class _UpdateBootstrapState extends State<_UpdateBootstrap> {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: const [Locale('ar'), Locale('en')],
-        home: const AppShell(),
+        home: const KnockGate(child: AppShell()),
       ),
     );
   }
