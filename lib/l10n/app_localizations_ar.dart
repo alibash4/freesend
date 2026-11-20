@@ -324,6 +324,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get stop => 'إيقاف';
 
   @override
+  String get waitingNotificationTitle => 'بانتظار الملفات';
+
+  @override
   String get cancelTransfer => 'إلغاء التحويل';
 
   @override
@@ -488,6 +491,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'وضع داكن أعمق لشاشات OLED: مريح للعين ويوفّر البطارية.';
 
   @override
+  String get floatingNav => 'شريط تنقل عائم';
+
+  @override
+  String get floatingNavSubtitle =>
+      'شريط زجاجي شفاف يطفو فوق المحتوى بدل الارتكاز على الحافة.';
+
+  @override
   String get hapticFeedback => 'الاستجابة عند اللمس';
 
   @override
@@ -528,6 +538,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get platform => 'المنصة';
+
+  @override
+  String get iconGallery => 'معرض الأيقونات';
 
   @override
   String get saveLocationUpdated => 'تم تحديث موقع الحفظ';
@@ -604,6 +617,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'يحتاج أندرويد إلى خدمات الموقع مفعّلة لتشغيل نقطة الاتصال التي يستخدمها النقل. فعّل الموقع ثم عُد إلى هنا، ويُعاد هذا الفحص تلقائيًا.';
 
   @override
+  String get vpnWarningTitle => 'الشبكة الافتراضية الخاصة (VPN) مفعّلة';
+
+  @override
+  String get vpnWarningBody =>
+      'يعمل عادة دون مشكلة، لكن إن لم يتمكن الجهاز الآخر من العثور عليك فأوقف الشبكة الافتراضية الخاصة، أو وصّل الجهازين بالشبكة نفسها.';
+
+  @override
   String get setupOptional => 'اختياري';
 
   @override
@@ -614,12 +634,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get setupDone => 'تم';
-
-  @override
-  String get setupActionNeeded => 'يتطلب إجراءً';
-
-  @override
-  String get setupCheckAgain => 'تحقق مجددًا';
 
   @override
   String get updateUpToDate => 'أنت تستخدم أحدث إصدار.';
@@ -922,7 +936,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get scanQrCode => 'مسح رمز QR';
+  String get scanQrCode => 'مسح رمز الاقتران';
 
   @override
   String get orJoinManually => 'أو انضم يدويًا';
@@ -1028,13 +1042,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unreachable => 'تعذّر الوصول';
 
   @override
-  String get shareNearby => 'مشاركة مع الأجهزة القريبة';
+  String get shareNearby => 'مشاركة مع جهاز قريب';
 
   @override
-  String get shareNearbyHint => 'اعثر على أجهزة تنتظر الاستلام.';
+  String get shareNearbyHint => 'اختر جهازًا ينتظر الاستلام.';
 
   @override
-  String get scanQrHint => 'اقرأ رمز المستلم بدلًا من انتظار ظهوره.';
+  String get scanQrHint => 'امسح الرمز الظاهر على جهاز الاستلام للاتصال فورًا.';
 
   @override
   String get sendToGroup => 'إرسال إلى مجموعة';

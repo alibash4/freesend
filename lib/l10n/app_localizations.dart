@@ -650,6 +650,12 @@ abstract class AppLocalizations {
   /// **'Stop'**
   String get stop;
 
+  /// No description provided for @waitingNotificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for files'**
+  String get waitingNotificationTitle;
+
   /// No description provided for @cancelTransfer.
   ///
   /// In en, this message translates to:
@@ -878,6 +884,18 @@ abstract class AppLocalizations {
   /// **'A deeper dark made for OLED screens: easy on the eyes, easy on battery.'**
   String get blackThemeSubtitle;
 
+  /// No description provided for @floatingNav.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating navigation'**
+  String get floatingNav;
+
+  /// No description provided for @floatingNavSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A frosted-glass pill that hovers above the content instead of docking to the edge.'**
+  String get floatingNavSubtitle;
+
   /// No description provided for @hapticFeedback.
   ///
   /// In en, this message translates to:
@@ -955,6 +973,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Platform'**
   String get platform;
+
+  /// No description provided for @iconGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon gallery'**
+  String get iconGallery;
 
   /// No description provided for @saveLocationUpdated.
   ///
@@ -1088,6 +1112,18 @@ abstract class AppLocalizations {
   /// **'Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.'**
   String get setupLocationBody;
 
+  /// No description provided for @vpnWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A VPN is on'**
+  String get vpnWarningTitle;
+
+  /// No description provided for @vpnWarningBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It usually still works, but if the other device cannot find you, turn the VPN off - or connect both devices to the same network.'**
+  String get vpnWarningBody;
+
   /// No description provided for @setupOptional.
   ///
   /// In en, this message translates to:
@@ -1111,18 +1147,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get setupDone;
-
-  /// No description provided for @setupActionNeeded.
-  ///
-  /// In en, this message translates to:
-  /// **'Action needed'**
-  String get setupActionNeeded;
-
-  /// No description provided for @setupCheckAgain.
-  ///
-  /// In en, this message translates to:
-  /// **'Check again'**
-  String get setupCheckAgain;
 
   /// No description provided for @updateUpToDate.
   ///
@@ -1607,7 +1631,7 @@ abstract class AppLocalizations {
   /// No description provided for @scanQrCode.
   ///
   /// In en, this message translates to:
-  /// **'Scan a QR code'**
+  /// **'Scan a pairing code'**
   String get scanQrCode;
 
   /// No description provided for @orJoinManually.
@@ -1805,19 +1829,19 @@ abstract class AppLocalizations {
   /// No description provided for @shareNearby.
   ///
   /// In en, this message translates to:
-  /// **'Share to nearby'**
+  /// **'Share to a nearby device'**
   String get shareNearby;
 
   /// No description provided for @shareNearbyHint.
   ///
   /// In en, this message translates to:
-  /// **'Find devices that are waiting to receive.'**
+  /// **'Pick a device that is waiting to receive.'**
   String get shareNearbyHint;
 
   /// No description provided for @scanQrHint.
   ///
   /// In en, this message translates to:
-  /// **'Read a receiver\'s code instead of waiting for it to appear.'**
+  /// **'Scan the code shown on the receiving device to connect right away.'**
   String get scanQrHint;
 
   /// No description provided for @sendToGroup.

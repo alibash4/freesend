@@ -1,6 +1,13 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/theme/app_theme.dart';
+
+/// Bottom scroll clearance that keeps the last items reachable above the
+/// floating pill: pill height + its gap + the system inset + a small buffer.
+double floatingNavClearance(BuildContext context) =>
+    MediaQuery.paddingOf(context).bottom + 72;
 
 /// A destination in [AppBottomNav]. Eva Icons provides both outline and fill
 /// variants, so the active tab uses the filled icon without a pill or ripple.
@@ -17,6 +24,53 @@ class AppNavItem {
   final IconData activeIcon;
 }
 
+/// Nav icon that crossfades between the muted outline glyph and the accent
+/// solid glyph when [selected] flips.
+class AnimatedNavIcon extends StatelessWidget {
+  const AnimatedNavIcon({
+    super.key,
+    required this.item,
+    required this.selected,
+    this.size = 23,
+  });
+
+  final AppNavItem item;
+  final bool selected;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: selected ? 1 : 0),
+      duration: AppMotion.base,
+      curve: AppMotion.standard,
+      builder: (context, t, _) => SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Opacity(
+              opacity: 1 - t,
+              child: Icon(item.icon, size: size, color: idle),
+            ),
+            Opacity(
+              opacity: t,
+              child: Icon(
+                item.activeIcon,
+                size: size,
+                color: AppColors.accent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Custom bottom navigation. No Material `NavigationBar`, indicator pill, ink
 /// splash, or ripple. The bar is full-width with a single top hairline.
 class AppBottomNav extends StatelessWidget {
@@ -25,15 +79,98 @@ class AppBottomNav extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelected,
+    this.floating = false,
   });
 
   final List<AppNavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
+  /// When true the bar floats as a frosted-glass pill with a soft shadow
+  /// instead of docking edge-to-edge behind a hairline.
+  final bool floating;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final itemsRow = SizedBox(
+      height: 56,
+      child: Row(
+        children: [
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: _AppNavItemView(
+                item: items[i],
+                selected: i == selectedIndex,
+                floating: floating,
+                onTap: () => onSelected(i),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (floating) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            0,
+            AppSpacing.md,
+            AppSpacing.sm,
+          ),
+          child: ClipRRect(
+            // Concentric with the selected item's pill: AppRadii.field (10)
+            // plus the ~5.5px gap between the 45px pill and the 56px bar.
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  color: scheme.surface.withValues(
+                    alpha: dark ? 0.55 : 0.60,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: dark
+                        ? Colors.white.withValues(alpha: 0.08)
+                        : scheme.hairline,
+                  ),
+                  boxShadow: dark
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.30),
+                            blurRadius: 24,
+                            spreadRadius: -8,
+                            offset: const Offset(0, 8),
+                          ),
+                        ]
+                      : const [
+                          // All-around ambient shadow: a tight core plus a
+                          // wide soft falloff, so the island lifts evenly.
+                          BoxShadow(
+                            color: Color(0x14000000),
+                            blurRadius: 10,
+                            spreadRadius: -4,
+                          ),
+                          BoxShadow(
+                            color: Color(0x0F000000),
+                            blurRadius: 32,
+                            spreadRadius: -12,
+                          ),
+                        ],
+                ),
+                child: itemsRow,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surface,
@@ -41,24 +178,7 @@ class AppBottomNav extends StatelessWidget {
           top: BorderSide(color: scheme.hairline, width: 1),
         ),
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 56,
-          child: Row(
-            children: [
-              for (var i = 0; i < items.length; i++)
-                Expanded(
-                  child: _AppNavItemView(
-                    item: items[i],
-                    selected: i == selectedIndex,
-                    onTap: () => onSelected(i),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+      child: SafeArea(top: false, child: itemsRow),
     );
   }
 }
@@ -68,23 +188,29 @@ class _AppNavItemView extends StatelessWidget {
     required this.item,
     required this.selected,
     required this.onTap,
+    this.floating = false,
   });
 
   final AppNavItem item;
   final bool selected;
   final VoidCallback onTap;
+  final bool floating;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final color = selected ? AppColors.accent : scheme.onSurfaceVariant;
-    final labelColor = selected ? scheme.onSurface : scheme.onSurfaceVariant;
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    final labelColor = selected ? scheme.onSurface : idle;
     final activeBackground = dark
         ? Colors.white.withValues(
             alpha: scheme.isBlackVariant ? 0.05 : 0.08,
           )
-        : AppColors.neutral100;
+        // The floating island needs a firmer tint to stay visible through
+        // its translucent fill; the docked bar keeps the softer wash.
+        : floating
+            ? AppColors.neutral200
+            : AppColors.neutral100;
     return Semantics(
       button: true,
       selected: selected,
@@ -121,11 +247,7 @@ class _AppNavItemView extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Icon(
-                              selected ? item.activeIcon : item.icon,
-                              size: 23,
-                              color: color,
-                            ),
+                            AnimatedNavIcon(item: item, selected: selected),
                             const SizedBox(height: 2),
                             FittedBox(
                               fit: BoxFit.scaleDown,

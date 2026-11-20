@@ -22,8 +22,6 @@ dependencies:
   qr_flutter: ^4.1.0
   scroll_animator: ^0.3.0
   mobile_scanner: ^7.5.0
-  uicons: ^1.0.1
-  uicons_brands: ^1.0.0
   http: ^1.6.0
   tray_manager: ^0.5.3
   window_manager: ^0.5.2
@@ -69,3 +67,12 @@ flutter:
           weight: 600
         - asset: assets/fonts/Cairo-Bold.ttf
           weight: 700
+    - family: uicons-regular-rounded
+      fonts:
+        - asset: assets/fonts/uicons-rr.ttf
+    - family: uicons-solid-rounded
+      fonts:
+        - asset: assets/fonts/uicons-sr.ttf
+    - family: uicons-brands
+      fonts:
+        - asset: assets/fonts/uicons-brands.ttf

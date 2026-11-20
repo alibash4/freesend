@@ -321,6 +321,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stop => 'Stop';
 
   @override
+  String get waitingNotificationTitle => 'Waiting for files';
+
+  @override
   String get cancelTransfer => 'Cancel transfer';
 
   @override
@@ -476,6 +479,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'A deeper dark made for OLED screens: easy on the eyes, easy on battery.';
 
   @override
+  String get floatingNav => 'Floating navigation';
+
+  @override
+  String get floatingNavSubtitle =>
+      'A frosted-glass pill that hovers above the content instead of docking to the edge.';
+
+  @override
   String get hapticFeedback => 'Tap feedback';
 
   @override
@@ -516,6 +526,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get platform => 'Platform';
+
+  @override
+  String get iconGallery => 'Icon gallery';
 
   @override
   String get saveLocationUpdated => 'Save location updated';
@@ -592,6 +605,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Android needs location services on to run the hotspot a transfer uses. Turn location on and come back - this check repeats automatically.';
 
   @override
+  String get vpnWarningTitle => 'A VPN is on';
+
+  @override
+  String get vpnWarningBody =>
+      'It usually still works, but if the other device cannot find you, turn the VPN off - or connect both devices to the same network.';
+
+  @override
   String get setupOptional => 'Optional';
 
   @override
@@ -602,12 +622,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setupDone => 'Done';
-
-  @override
-  String get setupActionNeeded => 'Action needed';
-
-  @override
-  String get setupCheckAgain => 'Check again';
 
   @override
   String get updateUpToDate => 'You\'re on the latest version.';
@@ -906,7 +920,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get scanQrCode => 'Scan a QR code';
+  String get scanQrCode => 'Scan a pairing code';
 
   @override
   String get orJoinManually => 'Or join manually';
@@ -1012,14 +1026,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unreachable => 'Unreachable';
 
   @override
-  String get shareNearby => 'Share to nearby';
+  String get shareNearby => 'Share to a nearby device';
 
   @override
-  String get shareNearbyHint => 'Find devices that are waiting to receive.';
+  String get shareNearbyHint => 'Pick a device that is waiting to receive.';
 
   @override
   String get scanQrHint =>
-      'Read a receiver\'s code instead of waiting for it to appear.';
+      'Scan the code shown on the receiving device to connect right away.';
 
   @override
   String get sendToGroup => 'Send to a group';

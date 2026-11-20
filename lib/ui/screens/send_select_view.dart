@@ -39,12 +39,9 @@ class _SendSelectViewState extends State<SendSelectView> {
   bool _loadingApps = false;
   List<InstalledApp> _apps = const [];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadApps();
-  }
-
+  /// App enumeration is expensive, so it stays lazy: only
+  /// [_selectCategory] kicks it off, and only on Android where the APK
+  /// category exists.
   Future<void> _loadApps() async {
     if (_loadingApps || _apps.isNotEmpty) return;
     setState(() => _loadingApps = true);
@@ -60,8 +57,17 @@ class _SendSelectViewState extends State<SendSelectView> {
     final effectiveExtensions = extensions ??
         (type == FileType.custom
             ? const [
-                'pdf', 'doc', 'docx', 'txt', 'md', 'rtf', 'xls', 'xlsx',
-                'csv', 'ppt', 'pptx',
+                'pdf',
+                'doc',
+                'docx',
+                'txt',
+                'md',
+                'rtf',
+                'xls',
+                'xlsx',
+                'csv',
+                'ppt',
+                'pptx',
               ]
             : null);
     final picked = await FilePicker.pickFiles(
@@ -110,15 +116,12 @@ class _SendSelectViewState extends State<SendSelectView> {
         .where((recent) => File(recent.path).existsSync())
         .toList(growable: false);
     return switch (_category) {
-      _SendCategory.music => all
-          .where((recent) => _isMusic(recent.name))
-          .toList(growable: false),
-      _SendCategory.docs => all
-          .where((recent) => _isDocument(recent.name))
-          .toList(growable: false),
-      _SendCategory.videos => all
-          .where((recent) => _isVideo(recent.name))
-          .toList(growable: false),
+      _SendCategory.music =>
+        all.where((recent) => _isMusic(recent.name)).toList(growable: false),
+      _SendCategory.docs =>
+        all.where((recent) => _isDocument(recent.name)).toList(growable: false),
+      _SendCategory.videos =>
+        all.where((recent) => _isVideo(recent.name)).toList(growable: false),
       _SendCategory.large => all
           .where((recent) => recent.size >= 100 * 1024 * 1024)
           .toList(growable: false),
@@ -135,29 +138,28 @@ class _SendSelectViewState extends State<SendSelectView> {
     final l10n = AppLocalizations.of(context);
     final controller = widget.controller;
     final wide = MediaQuery.sizeOf(context).width >= 840;
-    final recents = _categoryRecents();
+    // Recents stat every file synchronously, so only resolve them for the
+    // categories that actually render them.
+    final needsRecents = _category != _SendCategory.files &&
+        _category != _SendCategory.folders &&
+        _category != _SendCategory.apk;
+    final recents = needsRecents ? _categoryRecents() : const <RecentFile>[];
     final selected = controller.items;
+    // APK bundles only exist on Android; other platforms never show the tab.
+    final categories = _SendCategory.values
+        .where(
+            (category) => category != _SendCategory.apk || Platform.isAndroid)
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.zero,
-            itemCount: _SendCategory.values.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-            itemBuilder: (context, index) {
-              final category = _SendCategory.values[index];
-              return _CategoryChip(
-                label: _categoryLabel(l10n, category),
-                icon: _categoryIcon(category),
-                selected: _category == category,
-                onTap: () => _selectCategory(category),
-              );
-            },
-          ),
+        const SizedBox(height: AppSpacing.md),
+        _CategoryTabs(
+          categories: categories,
+          selected: _category,
+          onSelected: _selectCategory,
+          labelBuilder: (category) => _categoryLabel(l10n, category),
         ),
         const SizedBox(height: AppSpacing.lg),
         Row(
@@ -215,9 +217,7 @@ class _SendSelectViewState extends State<SendSelectView> {
               ),
             ),
             FilledButton.icon(
-              onPressed: selected.isEmpty
-                  ? null
-                  : () => widget.onStart(),
+              onPressed: selected.isEmpty ? null : () => widget.onStart(),
               icon: Icon(AppIcons.send, size: 17),
               label: Text(l10n.startSharing),
             ),
@@ -235,10 +235,10 @@ class _SendSelectViewState extends State<SendSelectView> {
     if (items.isEmpty) {
       return _empty(
         l10n,
+        _category == _SendCategory.folders ? l10n.addFolder : l10n.addFiles,
         _category == _SendCategory.folders
-            ? l10n.addFolder
-            : l10n.addFiles,
-        _category == _SendCategory.folders ? _addFolder : () => _addFiles(FileType.any),
+            ? _addFolder
+            : () => _addFiles(FileType.any),
       );
     }
     return _contentLayout(
@@ -283,9 +283,8 @@ class _SendSelectViewState extends State<SendSelectView> {
               }
               _togglePath(recent.path);
             },
-            longPress: (!wide)
-                ? () => setState(() => _selectionMode = true)
-                : null,
+            longPress:
+                (!wide) ? () => setState(() => _selectionMode = true) : null,
             grid: _grid,
             wide: wide,
           ),
@@ -318,9 +317,8 @@ class _SendSelectViewState extends State<SendSelectView> {
               }
               _togglePath(app.path);
             },
-            longPress: (!wide)
-                ? () => setState(() => _selectionMode = true)
-                : null,
+            longPress:
+                (!wide) ? () => setState(() => _selectionMode = true) : null,
             grid: _grid,
             wide: wide,
           ),
@@ -362,7 +360,8 @@ class _SendSelectViewState extends State<SendSelectView> {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       child: Column(
         children: [
-          Icon(AppIcons.folderOpen, size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(AppIcons.folderOpen,
+              size: 28, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: AppSpacing.sm),
           Text(l10n.emptyCategory),
           const SizedBox(height: AppSpacing.md),
@@ -377,16 +376,34 @@ class _SendSelectViewState extends State<SendSelectView> {
   }
 
   bool _isMusic(String name) => const {
-        'mp3', 'wav', 'flac', 'm4a', 'ogg', 'aac',
+        'mp3',
+        'wav',
+        'flac',
+        'm4a',
+        'ogg',
+        'aac',
       }.contains(_extension(name));
 
   bool _isDocument(String name) => const {
-        'pdf', 'doc', 'docx', 'txt', 'md', 'rtf', 'xls', 'xlsx', 'csv',
-        'ppt', 'pptx',
+        'pdf',
+        'doc',
+        'docx',
+        'txt',
+        'md',
+        'rtf',
+        'xls',
+        'xlsx',
+        'csv',
+        'ppt',
+        'pptx',
       }.contains(_extension(name));
 
   bool _isVideo(String name) => const {
-        'mp4', 'mkv', 'mov', 'avi', 'webm',
+        'mp4',
+        'mkv',
+        'mov',
+        'avi',
+        'webm',
       }.contains(_extension(name));
 
   String _extension(String name) {
@@ -432,51 +449,279 @@ class _SendSelectViewState extends State<SendSelectView> {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
+/// Scrollable category tabs with a sliding accent indicator - the same
+/// 20x3 pill the bottom navigation uses, animated with the app's standard
+/// motion curve.
+class _CategoryTabs extends StatefulWidget {
+  const _CategoryTabs({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+    required this.labelBuilder,
+  });
+
+  final List<_SendCategory> categories;
+  final _SendCategory selected;
+  final ValueChanged<_SendCategory> onSelected;
+  final String Function(_SendCategory) labelBuilder;
+
+  @override
+  State<_CategoryTabs> createState() => _CategoryTabsState();
+}
+
+class _CategoryTabsState extends State<_CategoryTabs> {
+  final _stackKey = GlobalKey();
+  final _tabKeys = <_SendCategory, GlobalKey>{};
+
+  /// Lazily created so a preserved [State] across hot reload still gets a
+  /// working controller (field initializers don't re-run on reload).
+  ScrollController? _scrollControllerInstance;
+  ScrollController get _scrollController =>
+      _scrollControllerInstance ??= ScrollController();
+
+  /// Left edge of the indicator inside the strip; -1 hides it until the
+  /// first measurement lands.
+  double _indicatorX = -1;
+
+  /// Whether more content is hidden past each visual edge, driving the
+  /// gradient fades.
+  bool _fadeLeft = false;
+  bool _fadeRight = false;
+  bool _scrollListening = false;
+
+  void _listenToScroll() {
+    if (_scrollListening) return;
+    _scrollListening = true;
+    _scrollController.addListener(_updateEdgeFades);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToScroll();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncIndicator();
+      _updateEdgeFades();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Direction flips swap which scroll edge is "start", so recompute.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateEdgeFades());
+  }
+
+  @override
+  void dispose() {
+    _scrollControllerInstance?.dispose();
+    _scrollControllerInstance = null;
+    super.dispose();
+  }
+
+  void _updateEdgeFades() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final atStart = position.pixels <= position.minScrollExtent + 0.5;
+    final atEnd = position.pixels >= position.maxScrollExtent - 0.5;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // The scroll "start" sits on the left in LTR and on the right in RTL.
+    final fadeLeft = rtl ? !atEnd : !atStart;
+    final fadeRight = rtl ? !atStart : !atEnd;
+    if (fadeLeft != _fadeLeft || fadeRight != _fadeRight) {
+      setState(() {
+        _fadeLeft = fadeLeft;
+        _fadeRight = fadeRight;
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(_CategoryTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncIndicator());
+    }
+  }
+
+  /// Measures the selected tab's centre relative to the strip so the
+  /// indicator can slide to it. Both boxes live inside the same scroll
+  /// view, so the difference is scroll-independent.
+  void _syncIndicator() {
+    final stripBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final tabBox = _tabKeys[widget.selected]?.currentContext?.findRenderObject()
+        as RenderBox?;
+    if (stripBox == null ||
+        tabBox == null ||
+        !stripBox.hasSize ||
+        !tabBox.hasSize) {
+      return;
+    }
+    final stripOrigin = stripBox.localToGlobal(Offset.zero);
+    final tabOrigin = tabBox.localToGlobal(Offset.zero);
+    final centerX = tabOrigin.dx - stripOrigin.dx + tabBox.size.width / 2;
+    final left = centerX - 10;
+    if ((left - _indicatorX).abs() > 0.5) {
+      setState(() => _indicatorX = left);
+    }
+  }
+
+  void _select(_SendCategory category) {
+    widget.onSelected(category);
+    final tabContext = _tabKeys[category]?.currentContext;
+    if (tabContext != null) {
+      Scrollable.ensureVisible(
+        tabContext,
+        alignment: 0.5,
+        duration: AppMotion.base,
+        curve: AppMotion.standard,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Recompute after every layout so the fades stay correct across hot
+    // reloads, resizes, and locale/direction flips; the scroll listener
+    // covers live updates while dragging.
+    _listenToScroll();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateEdgeFades());
+    return Material(
+      type: MaterialType.transparency,
+      child: SizedBox(
+        height: 40,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              child: Stack(
+                key: _stackKey,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final category in widget.categories)
+                        _CategoryTab(
+                          key: _tabKeys.putIfAbsent(category, GlobalKey.new),
+                          label: widget.labelBuilder(category),
+                          selected: category == widget.selected,
+                          onTap: () => _select(category),
+                        ),
+                    ],
+                  ),
+                  if (_indicatorX >= 0)
+                    AnimatedPositioned(
+                      duration: AppMotion.base,
+                      curve: AppMotion.standard,
+                      left: _indicatorX,
+                      bottom: 5,
+                      child: Container(
+                        width: 20,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(AppRadii.pill),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (_fadeLeft || _fadeRight)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      if (_fadeLeft)
+                        SizedBox(
+                          width: AppSpacing.xl,
+                          child: _EdgeFade(
+                            edge: Alignment.centerLeft,
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                      const Spacer(),
+                      if (_fadeRight)
+                        SizedBox(
+                          width: AppSpacing.xl,
+                          child: _EdgeFade(
+                            edge: Alignment.centerRight,
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A one-sided fade from the page background into transparency, used to
+/// hint that the tab strip scrolls.
+class _EdgeFade extends StatelessWidget {
+  const _EdgeFade({required this.edge, required this.color});
+
+  final Alignment edge;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: edge,
+          end: edge == Alignment.centerLeft
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          colors: [color, color.withValues(alpha: 0)],
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryTab extends StatelessWidget {
+  const _CategoryTab({
+    super.key,
     required this.label,
-    required this.icon,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
-  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: selected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppRadii.pill),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: 8,
+    final dark = theme.brightness == Brightness.dark;
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    final color = selected ? AppColors.accent : idle;
+    return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.field),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 9,
+        ),
+        child: AnimatedDefaultTextStyle(
+          duration: AppMotion.base,
+          curve: AppMotion.standard,
+          style: theme.textTheme.labelLarge!.copyWith(
+            fontSize: 15,
+            color: color,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
           ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: selected ? scheme.onPrimaryContainer : scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
+          child: Text(label),
         ),
       ),
     );
@@ -547,7 +792,8 @@ class _SelectableTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -589,4 +835,3 @@ class _SelectableTile extends StatelessWidget {
     );
   }
 }
-

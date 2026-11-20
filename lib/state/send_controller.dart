@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/permissions/network_probe.dart';
 import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/core/format.dart';
@@ -53,6 +54,10 @@ class SendController extends ChangeNotifier {
 
   SendPhase phase = SendPhase.idle;
   HotspotInfo? hotspot;
+
+  /// Advisory only: a VPN on a desktop usually still works, so this warns
+  /// instead of blocking the way the Android gate does.
+  bool vpnWarning = false;
 
   /// The transport the next session will use.
   ShareLink link = ShareLink.wifi;
@@ -110,6 +115,16 @@ class SendController extends ChangeNotifier {
 
   /// The entry the user picked from the send control.
   SendMode mode = SendMode.nearby;
+
+  /// A receiver code scanned before the session exists. It is knocked once
+  /// the session reaches `waitingForPeer`, so picking "scan a code" can open
+  /// the camera before any files are chosen.
+  PairingCode? pendingScan;
+
+  void setPendingScan(PairingCode? code) {
+    pendingScan = code;
+    notifyListeners();
+  }
 
   /// Receivers ticked in group mode.
   final Set<String> selected = {};
@@ -281,6 +296,10 @@ class SendController extends ChangeNotifier {
       item.done = false;
       item.status = TransferStatus.pending;
     }
+    vpnWarning = !Platform.isAndroid && await NetworkProbe.vpnIsOn;
+    if (vpnWarning) {
+      AppLog.warn('send', 'VPN detected - advising the user');
+    }
     notifyListeners();
 
     try {
@@ -293,12 +312,35 @@ class SendController extends ChangeNotifier {
           return;
         }
         bindAddress = wired;
-      } else {
-        // Nobody hosts on the sender's side: phones host whenever one is
-        // involved (R4) and desktop pairs share a network (R5). The sender
-        // advertises whatever address this device already has, and joins the
-        // receiver's hotspot when the user scans its code.
+      } else if (PlatformEnv.kind == PlatformKind.android) {
+        // A phone hosts its own link: the other device - usually a desktop
+        // with no camera - joins it instead of scanning anything. The name and
+        // password are shown on the hunting screen for that side to use.
         await ensureHotspotPermissions();
+        try {
+          hotspot = await _hotspotService.start(
+            deviceName: appState.deviceName,
+          );
+          AppLog.info('hotspot', 'sender hosting "${hotspot!.ssid}"');
+          if (hotspot!.note != null) {
+            debugPrint('FreeSend: ${hotspot!.note}');
+          }
+        } on HotspotException catch (error) {
+          // Hosting is the fast path, not the only one: stay on the shared
+          // network so the radar keeps working.
+          AppLog.warn(
+              'hotspot',
+              'could not host, staying on Wi-Fi: '
+                  '${error.message}');
+          errorMessage = error.message;
+        }
+        bindAddress = hotspot?.ip ?? await localIpv4();
+        if (bindAddress == null) {
+          _fail(_l10n.noLocalAddressSend);
+          return;
+        }
+      } else {
+        // Desktops share an existing network (R5) and never host for a phone.
         bindAddress = await localIpv4();
         if (bindAddress == null) {
           _fail(_l10n.noLocalAddressSend);
@@ -345,6 +387,12 @@ class SendController extends ChangeNotifier {
 
       phase = SendPhase.waitingForPeer;
       notifyListeners();
+
+      final pending = pendingScan;
+      if (pending != null) {
+        pendingScan = null;
+        unawaited(knockScanned(pending));
+      }
     } on HotspotException catch (error) {
       _fail(error.message);
     } on SocketException catch (error) {
@@ -391,6 +439,7 @@ class SendController extends ChangeNotifier {
   }
 
   void _onPeerError(String peerId, String message) {
+    AppLog.error('send', 'peer $peerId failed: $message');
     peers = [
       for (final peer in peers)
         if (peer.id == peerId)
@@ -410,6 +459,7 @@ class SendController extends ChangeNotifier {
   Future<void> pauseTransfer() async {
     if (phase != SendPhase.transferring || paused) return;
     paused = true;
+    AppLog.info('send', 'pause tapped by user');
     notifyListeners();
     await _host?.pauseTransfer();
   }
@@ -417,6 +467,7 @@ class SendController extends ChangeNotifier {
   Future<void> resumeTransfer() async {
     if (!paused) return;
     paused = false;
+    AppLog.info('send', 'resume tapped by user');
     notifyListeners();
     await _host?.resumeTransfer();
   }
@@ -461,6 +512,10 @@ class SendController extends ChangeNotifier {
   }
 
   void _onFinished(int fileCount, int bytes, Duration elapsed) {
+    AppLog.info(
+        'send',
+        'session finished: $fileCount files, '
+            '${formatBytes(bytes)} in $elapsed');
     // The host reports completion once per receiver. In a group session the
     // first receiver finishing must not end the UI while others are still
     // streaming; the transfer ends when every receiver is done or failed.
@@ -491,6 +546,7 @@ class SendController extends ChangeNotifier {
 
   void _onHostError(String message) {
     if (phase == SendPhase.completed || phase == SendPhase.cancelled) return;
+    AppLog.error('send', 'host error: $message');
     _fail(message);
   }
 
@@ -504,6 +560,10 @@ class SendController extends ChangeNotifier {
 
   Future<void> cancelSession() async {
     if (phase == SendPhase.idle) return;
+    AppLog.info(
+        'send',
+        'session cancelled by user '
+            '(${formatBytes(sentBytes)} sent so far)');
     final bytes = sentBytes;
     final files = items.where((item) => item.transferred > 0).length;
     phase = SendPhase.cancelled;
@@ -563,6 +623,10 @@ class SendController extends ChangeNotifier {
   Future<void> knockScanned(PairingCode code) async {
     final host = code.host;
     if (host == null) return;
+    AppLog.info(
+        'send',
+        'scanned code -> $host:${code.port}'
+            '${code.hasHotspot ? ' (join "${code.ssid}")' : ''}');
     if (code.hasHotspot) {
       final joined = await _joinReceiverHotspot(code);
       if (!joined) return;
@@ -654,6 +718,7 @@ class SendController extends ChangeNotifier {
       fileServerHost: address,
       fileServerPort: port,
     );
+    AppLog.info('send', 'knock to $ip:$consentPort -> ${outcome.name}');
     peerStates[id] = switch (outcome) {
       KnockOutcome.accepted => AuthState.accepted,
       KnockOutcome.declined => AuthState.declined,
@@ -663,6 +728,7 @@ class SendController extends ChangeNotifier {
   }
 
   Future<void> _teardown() async {
+    AppLog.info('send', 'tearing down session');
     await _foreground.stop();
     await _candidateSub?.cancel();
     _candidateSub = null;
@@ -692,6 +758,7 @@ class SendController extends ChangeNotifier {
     currentFileName = null;
     _lastSampleAt = null;
     _lastSampleBytes = 0;
+    pendingScan = null;
     for (final item in items) {
       item.transferred = 0;
       item.done = false;

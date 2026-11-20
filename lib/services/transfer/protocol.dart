@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:free_send/services/app_logger.dart';
+
 /// Frame layout: `[type: u8][payloadLength: u32 BE][payload]`.
 ///
 /// Data frames carry raw bytes; every other frame carries UTF-8 JSON. TCP is
@@ -19,24 +21,56 @@ abstract final class FrameType {
   static const ackAll = 9;
   static const error = 10;
   static const cancel = 11;
+
   /// The sender is stopping the current file but keeping the session alive.
   static const pause = 12;
+
   /// The receiver wants the current file continued from its current offset.
   static const resume = 13;
+
   /// Per-file status for UI that is not the active transfer screen.
   static const fileStatus = 14;
+
   /// Server's ephemeral key and identity signature for the encrypted handshake.
   static const helloAck = 15;
+
   /// Receiver acknowledges the ephemeral key, so the host can start sending
   /// encrypted frames only after both sides have switched ciphers.
   static const helloConfirm = 16;
+
   /// Outer envelope for an encrypted frame. The payload is the sealed frame.
   static const secure = 17;
+
   /// A sender asking a receiver to accept files. Carries identity, file count,
   /// size, and the sender's file-server address so the receiver can dial back.
   static const knock = 18;
+
   /// The receiver's answer to a knock.
   static const knockReply = 19;
+
+  /// Human-readable name for logs and diagnostics.
+  static String nameOf(int type) => switch (type) {
+        hello => 'hello',
+        session => 'session',
+        accept => 'accept',
+        fileHeader => 'fileHeader',
+        data => 'data',
+        fileEnd => 'fileEnd',
+        transferEnd => 'transferEnd',
+        ackFile => 'ackFile',
+        ackAll => 'ackAll',
+        error => 'error',
+        cancel => 'cancel',
+        pause => 'pause',
+        resume => 'resume',
+        fileStatus => 'fileStatus',
+        helloAck => 'helloAck',
+        helloConfirm => 'helloConfirm',
+        secure => 'secure',
+        knock => 'knock',
+        knockReply => 'knockReply',
+        _ => 'type$type',
+      };
 }
 
 class Frame {
@@ -133,7 +167,8 @@ class FrameReader {
       grown *= 2;
     }
     final next = Uint8List(grown);
-    next.setRange(0, _end - _start, Uint8List.sublistView(_buffer, _start, _end));
+    next.setRange(
+        0, _end - _start, Uint8List.sublistView(_buffer, _start, _end));
     _end -= _start;
     _start = 0;
     next.setRange(_end, _end + chunk.length, chunk);
@@ -151,7 +186,8 @@ class FrameReader {
     // Reclaim the consumed prefix once it dominates the buffer.
     if (_start > 256 * 1024 && _start * 2 > _buffer.length) {
       final remaining = _end - _start;
-      _buffer.setRange(0, remaining, Uint8List.sublistView(_buffer, _start, _end));
+      _buffer.setRange(
+          0, remaining, Uint8List.sublistView(_buffer, _start, _end));
       _start = 0;
       _end = remaining;
     }
@@ -160,9 +196,12 @@ class FrameReader {
 
 /// Buffered writer that never awaits a syscall per chunk.
 class FrameWriter {
-  FrameWriter(this._socket);
+  FrameWriter(this._socket, {this.tag});
 
   final Socket _socket;
+
+  /// Log prefix identifying which side of the link this writer belongs to.
+  final String? tag;
   int _pending = 0;
   static const _flushThreshold = 4 * 1024 * 1024;
   Future<Uint8List> Function(Uint8List)? _encrypt;
@@ -186,6 +225,15 @@ class FrameWriter {
   }
 
   Future<void> _write(Uint8List frame) async {
+    final type = frame[0];
+    // Data frames arrive once per 512 KiB chunk; logging each would drown the
+    // control frames that actually explain a failure.
+    if (type != FrameType.data) {
+      AppLog.debug(
+          'wire',
+          '${tag ?? 'tx'} > ${FrameType.nameOf(type)} '
+              '(${frame.length}B)');
+    }
     final encrypt = _encrypt;
     if (encrypt == null) {
       _socket.add(frame);
@@ -199,6 +247,7 @@ class FrameWriter {
   }
 
   void beginDataFrame(int length) {
+    AppLog.debug('wire', '${tag ?? 'tx'} > data header ($length B)');
     _socket.add(FrameCodec.header(FrameType.data, length));
   }
 

@@ -15,10 +15,12 @@ import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/widgets/vpn_warning.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
+import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
@@ -27,9 +29,31 @@ import 'package:free_send/services/discovery_service.dart';
 import 'package:free_send/ui/widgets/scan_radar.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({super.key, this.onBack});
+  const SendScreen({super.key, this.onBack, this.initialMode});
 
   final VoidCallback? onBack;
+
+  /// The entry already chosen from the send control, so this screen does not
+  /// raise the chooser a second time.
+  final SendMode? initialMode;
+
+  /// Raises the send control where the user is, and returns what they picked.
+  ///
+  /// A sheet on mobile, a centered dialog on desktop. Null means dismissed, in
+  /// which case nothing should navigate.
+  static Future<SendMode?> choose(BuildContext context) {
+    return PlatformEnv.isDesktop
+        ? showDialog<SendMode>(
+            context: context,
+            builder: (context) => const _SendChooserDialog(),
+          )
+        : showModalBottomSheet<SendMode>(
+            context: context,
+            isScrollControlled: true,
+            showDragHandle: true,
+            builder: (context) => const _SendChooserSheet(),
+          );
+  }
 
   @override
   State<SendScreen> createState() => _SendScreenState();
@@ -45,7 +69,14 @@ class _SendScreenState extends State<SendScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _chooseMode());
+    final initial = widget.initialMode;
+    if (initial != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted) await _applyMode(initial);
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _chooseMode());
+    }
   }
 
   /// The send control: nearby, scan a code, or a group. A sheet on mobile, a
@@ -53,32 +84,48 @@ class _SendScreenState extends State<SendScreen> {
   Future<void> _chooseMode() async {
     if (_chooserShown) return;
     _chooserShown = true;
-    final controller = context.read<SendController>();
-    final mode = PlatformEnv.isDesktop
-        ? await showDialog<SendMode>(
-            context: context,
-            builder: (context) => const _SendChooserDialog(),
-          )
-        : await showModalBottomSheet<SendMode>(
-            context: context,
-            isScrollControlled: true,
-            builder: (context) => const _SendChooserSheet(),
-          );
+    final mode = await SendScreen.choose(context);
     if (!mounted) return;
     if (mode == null) {
       widget.onBack?.call();
       return;
     }
-    controller.setMode(mode);
+    await _applyMode(mode);
   }
 
-  /// Scanning a receiver's QR hands us its doorbell address.
+  /// Applies the chosen mode; scan mode opens the camera right away and the
+  /// code waits for the session to start.
+  Future<void> _applyMode(SendMode mode) async {
+    final controller = context.read<SendController>();
+    controller.setMode(mode);
+    if (mode == SendMode.scanCode) await _scanReceiver(controller);
+  }
+
+  /// Scanning a receiver's QR hands us its doorbell address. Mid-session it
+  /// knocks immediately; before a session exists the code is parked and the
+  /// controller knocks it once the session is waiting. Refusing camera access
+  /// before a session leaves the send flow for the main screen.
   Future<void> _scanReceiver(SendController controller) async {
-    final code = await ScanScreen.open(context);
-    if (code == null || !mounted) return;
+    controller.setPendingScan(null);
+    final live = controller.phase == SendPhase.waitingForPeer ||
+        controller.phase == SendPhase.transferring;
+    var denied = false;
+    final code = await ScanScreen.open(
+      context,
+      onDenied: () => denied = true,
+    );
+    if (code == null) {
+      if (denied && !live && widget.onBack != null) widget.onBack!();
+      return;
+    }
+    if (!mounted) return;
     final host = code.host;
     if (host == null) return;
-    await controller.knockScanned(code);
+    if (live) {
+      await controller.knockScanned(code);
+    } else {
+      controller.setPendingScan(code);
+    }
   }
 
   late final ScrollController _scrollController = AnimatedScrollController(
@@ -274,6 +321,9 @@ class _SendScreenState extends State<SendScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<SendController>();
     final l10n = AppLocalizations.of(context);
+    final floatingNav = context.select<AppState, bool>(
+      (state) => state.floatingNav,
+    );
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -285,7 +335,7 @@ class _SendScreenState extends State<SendScreen> {
         appBar: AppBar(
           title: Text(l10n.sendTitle),
           leading: IconButton(
-            icon: Icon(backGlyph),
+            icon: Icon(backGlyph(context), size: 25),
             mouseCursor: SystemMouseCursors.click,
             onPressed: () async {
               context.read<AppState>().tick();
@@ -297,7 +347,10 @@ class _SendScreenState extends State<SendScreen> {
         body: SafeArea(
           child: ListView(
             controller: _scrollController,
-            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+            padding: EdgeInsets.only(
+              bottom: AppSpacing.xl +
+                  (floatingNav ? floatingNavClearance(context) : 0),
+            ),
             children: [
               Padding(
                 padding: kPagePadding,
@@ -620,6 +673,17 @@ class _SessionView extends StatelessWidget {
             },
             style: theme.textTheme.titleMedium,
           ),
+          if (controller.vpnWarning) ...[
+            const VpnWarning(),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          if (controller.hotspot != null) ...[
+            _HostedLinkCard(
+              ssid: controller.hotspot!.ssid,
+              password: controller.hotspot!.password,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           const SizedBox(height: AppSpacing.md),
           Center(
             child: ScanRadar(
@@ -1245,13 +1309,14 @@ class _SendChooserBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     final entries = <(SendMode, String, String, IconData)>[
       (
         SendMode.nearby,
         l10n.shareNearby,
         l10n.shareNearbyHint,
-        AppIcons.radar,
+        AppIcons.dataTransfer,
       ),
       if (showScanEntry(PlatformEnv.kind))
         (
@@ -1264,7 +1329,7 @@ class _SendChooserBody extends StatelessWidget {
         SendMode.group,
         l10n.sendToGroup,
         l10n.sendToGroupHint,
-        AppIcons.device,
+        AppIcons.group,
       ),
     ];
     return Column(
@@ -1273,71 +1338,236 @@ class _SendChooserBody extends StatelessWidget {
       children: [
         Text(l10n.howToSend, style: theme.textTheme.titleLarge),
         const SizedBox(height: AppSpacing.md),
-        for (final (mode, title, body, icon) in entries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pop(mode),
-                icon: Icon(icon, size: 18),
-                label: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title),
-                      Text(
-                        body,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
+        SurfaceCard(
+          padding: EdgeInsets.zero,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < entries.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: scheme.hairline),
+                    _ChooserOption(
+                      icon: entries[i].$4,
+                      title: entries[i].$2,
+                      subtitle: entries[i].$3,
+                      onTap: () {
+                        context.read<AppState>().tick();
+                        Navigator.of(context).pop(entries[i].$1);
+                      },
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
+        ),
       ],
     );
   }
 }
 
+/// One send mode as a self-explaining row: icon, title, hint, chevron.
+/// Hover fills the row with the theme hover color and turns the title and
+/// chevron accent.
+class _ChooserOption extends StatefulWidget {
+  const _ChooserOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  State<_ChooserOption> createState() => _ChooserOptionState();
+}
+
+class _ChooserOptionState extends State<_ChooserOption> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Container(
+        color: _hovered ? theme.hoverColor : null,
+        child: InkWell(
+          mouseCursor: SystemMouseCursors.click,
+          hoverColor: Colors.transparent,
+          splashColor: scheme.accentText.withValues(alpha: 0.10),
+          highlightColor: scheme.onSurface.withValues(alpha: 0.04),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(widget.icon, size: 20, color: scheme.onSurfaceVariant),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: _hovered ? AppColors.accent : null,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(widget.subtitle, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                Icon(
+                  chevronGlyph(context),
+                  size: 18,
+                  color: _hovered ? AppColors.accent : scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Mobile: a bottom sheet that opens at half height and drags taller.
+
+/// Shows the link this phone is hosting so a device with no camera can join.
+class _HostedLinkCard extends StatelessWidget {
+  const _HostedLinkCard({required this.ssid, required this.password});
+
+  final String ssid;
+  final String? password;
+
+  Future<void> _copy(BuildContext context, String value, String label) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('$label copied')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(AppIcons.wifi,
+                  size: 16, color: theme.colorScheme.accentText),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Your hotspot is on',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'On the other device, join this network '
+            '${password == null ? '' : 'with the password below'} '
+            'and look for this name.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _credentialRow(context, 'Name', ssid),
+          if (password != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _credentialRow(context, 'Password', password!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _credentialRow(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        SizedBox(
+          width: 74,
+          child: Text(label, style: theme.textTheme.bodySmall),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Copy $label',
+          onPressed: () => _copy(context, value, label),
+          icon: Icon(AppIcons.copy, size: 16),
+        ),
+      ],
+    );
+  }
+}
+
 class _SendChooserSheet extends StatelessWidget {
   const _SendChooserSheet();
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
-          AppSpacing.md,
+          AppSpacing.sm,
           AppSpacing.lg,
           AppSpacing.lg,
         ),
-        child: _SendChooserBody(),
+        child: const _SendChooserBody(),
       ),
     );
   }
 }
 
-/// Desktop: a centered modal with a Close control.
+/// Desktop: the same plain dialog chrome as the device-name editor.
 class _SendChooserDialog extends StatelessWidget {
   const _SendChooserDialog();
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l10n.sendTitle),
-      content: SizedBox(width: 380, child: _SendChooserBody()),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.close),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: 48,
+        vertical: 24,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: const Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: _SendChooserBody(),
         ),
-      ],
+      ),
     );
   }
 }

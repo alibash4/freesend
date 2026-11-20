@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:free_send/core/platform_env.dart';
+import 'package:free_send/services/app_logger.dart';
 
 /// Result of bringing a hotspot up or joining one.
 class HotspotInfo {
@@ -46,6 +47,12 @@ abstract class HotspotService {
   /// Whether this app can join a hotspot with SSID + password.
   bool get canJoin;
 
+  /// Nearby network names worth offering as the other side's hotspot.
+  ///
+  /// Only Linux can enumerate; every other platform answers empty and the UI
+  /// falls back to the manual code path.
+  Future<List<String>> survey();
+
   Future<HotspotInfo> start({required String deviceName});
   Future<void> stop();
 
@@ -74,6 +81,10 @@ class ManualHotspotService implements HotspotService {
   @override
   Future<HotspotInfo> start({required String deviceName}) async {
     final ip = await localIpv4();
+    AppLog.info(
+        'hotspot',
+        'manual host over current network '
+            '(device name "$deviceName", ip $ip)');
     return HotspotInfo(
       ssid: deviceName,
       ip: ip,
@@ -87,6 +98,9 @@ class ManualHotspotService implements HotspotService {
               'the other device to it.',
     );
   }
+
+  @override
+  Future<List<String>> survey() async => const [];
 
   @override
   Future<void> stop() async {}
@@ -107,11 +121,13 @@ class ManualHotspotService implements HotspotService {
     if (password != null && password.isNotEmpty) args.add(password);
     final result = await _run(['networksetup', ...args]);
     if (result.$1 != 0) {
+      AppLog.error('hotspot', 'join "$ssid" failed: ${result.$2}');
       throw HotspotException(
         'Could not join "$ssid": ${result.$2}'.trim(),
         manual: true,
       );
     }
+    AppLog.info('hotspot', 'joined "$ssid" via networksetup');
     return HotspotInfo(ssid: ssid, ip: await localIpv4());
   }
 
@@ -164,6 +180,7 @@ class LinuxHotspotService implements HotspotService {
   Future<HotspotInfo> start({required String deviceName}) async {
     final iface = _iface ??= await _firstWifiInterface();
     if (iface == null) {
+      AppLog.error('hotspot', 'no Wi-Fi interface for hotspot');
       throw HotspotException(
         'No Wi-Fi adapter found. Connect to the other device\'s hotspot instead.',
       );
@@ -171,6 +188,7 @@ class LinuxHotspotService implements HotspotService {
     final ssid = _makeSsid(deviceName);
     final password = _makePassword();
     _connectionName = ssid;
+    AppLog.info('hotspot', 'nmcli hotspot on $iface ssid "$ssid"');
     final result = await _run([
       'nmcli',
       'device',
@@ -184,10 +202,15 @@ class LinuxHotspotService implements HotspotService {
       password,
     ], timeout: const Duration(seconds: 40));
     if (result.$1 != 0) {
+      AppLog.error(
+          'hotspot',
+          'nmcli hotspot failed (${result.$1}): '
+              '${result.$2}');
       throw HotspotException('Could not start the hotspot: ${result.$2}');
     }
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     final ip = await _addressFor(iface);
+    AppLog.info('hotspot', 'hotspot "$ssid" up on $iface ip=$ip');
     return HotspotInfo(
       ssid: ssid,
       password: password,
@@ -207,16 +230,46 @@ class LinuxHotspotService implements HotspotService {
 
   @override
   Future<HotspotInfo> join(String ssid, String? password) async {
+    AppLog.info('hotspot', 'nmcli connect "$ssid"');
     final args = ['nmcli', 'device', 'wifi', 'connect', ssid];
     if (password != null && password.isNotEmpty) {
       args.addAll(['password', password]);
     }
     final result = await _run(args, timeout: const Duration(seconds: 35));
     if (result.$1 != 0) {
+      AppLog.error(
+          'hotspot',
+          'nmcli connect "$ssid" failed '
+              '(${result.$1}): ${result.$2}');
       throw HotspotException('Could not join "$ssid": ${result.$2}');
     }
     await Future<void>.delayed(const Duration(milliseconds: 900));
+    AppLog.info('hotspot', 'joined "$ssid"');
     return HotspotInfo(ssid: ssid, ip: await localIpv4());
+  }
+
+  @override
+  Future<List<String>> survey() async {
+    // Phone hotspots carry the vendor prefix, so those are what we offer; a
+    // FreeSend-named network is ours from a Linux host.
+    const markers = ['AndroidShare', 'FreeSend-', 'AndroidAP', 'Direct-'];
+    final result = await _run([
+      'nmcli',
+      '-t',
+      '-f',
+      'SSID',
+      'device',
+      'wifi',
+      'list',
+    ], timeout: const Duration(seconds: 12));
+    if (result.$1 != 0) return const [];
+    final matches = <String>[];
+    for (final line in result.$2.split('\n')) {
+      final ssid = line.trim();
+      if (ssid.isEmpty || matches.contains(ssid)) continue;
+      if (markers.any(ssid.contains)) matches.add(ssid);
+    }
+    return matches;
   }
 
   @override
@@ -265,8 +318,9 @@ class LinuxHotspotService implements HotspotService {
   String _makeSsid(String deviceName) {
     final base = deviceName.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '').trim();
     final name = base.isEmpty ? 'FreeSend' : base;
-    final short =
-        name.replaceAll(' ', '-').substring(0, name.length > 14 ? 14 : name.length);
+    final short = name
+        .replaceAll(' ', '-')
+        .substring(0, name.length > 14 ? 14 : name.length);
     // The suffix keeps two nearby devices with the same name apart, and gives
     // the other side something stable to filter on.
     return 'FreeSend-$short-${_hotspotSuffix(name)}';
@@ -288,7 +342,8 @@ class LinuxHotspotService implements HotspotService {
     final seed = '$random${DateTime.now().hashCode}';
     final buffer = StringBuffer();
     for (var i = 0; i < 12; i++) {
-      buffer.write(alphabet[(seed.codeUnitAt(i % seed.length) + i * 7) % alphabet.length]);
+      buffer.write(alphabet[
+          (seed.codeUnitAt(i % seed.length) + i * 7) % alphabet.length]);
     }
     return buffer.toString();
   }
@@ -307,13 +362,19 @@ class AndroidHotspotService implements HotspotService {
 
   @override
   Future<HotspotInfo> start({required String deviceName}) async {
+    AppLog.info('hotspot', 'requesting LocalOnlyHotspot as "$deviceName"');
     try {
       final result = await _channel.invokeMapMethod<String, Object?>('start', {
         'name': deviceName,
       });
       if (result == null) {
+        AppLog.error('hotspot', 'start returned null');
         throw HotspotException('The system did not return hotspot details.');
       }
+      AppLog.info(
+          'hotspot',
+          'hotspot up: ssid="${result['ssid']}" '
+              'ip=${result['ip']}');
       return HotspotInfo(
         ssid: (result['ssid'] as String?) ?? 'FreeSend',
         password: result['password'] as String?,
@@ -322,6 +383,10 @@ class AndroidHotspotService implements HotspotService {
         note: result['note'] as String?,
       );
     } on PlatformException catch (error) {
+      AppLog.error(
+          'hotspot',
+          'start failed [${error.code}]: '
+              '${error.message} (details: ${error.details})');
       throw HotspotException(
         error.message ?? 'Could not start the hotspot.',
         manual: true,
@@ -331,26 +396,34 @@ class AndroidHotspotService implements HotspotService {
 
   @override
   Future<void> stop() async {
+    AppLog.debug('hotspot', 'stop requested');
     try {
       await _channel.invokeMethod<void>('stop');
-    } on PlatformException {
+    } on PlatformException catch (error) {
+      AppLog.warn('hotspot', 'stop failed [${error.code}]: ${error.message}');
       // Nothing else to do: the reservation is gone either way.
     }
   }
 
   @override
   Future<HotspotInfo> join(String ssid, String? password) async {
+    AppLog.info('hotspot', 'joining "$ssid" via WifiNetworkSpecifier');
     try {
       final result = await _channel.invokeMapMethod<String, Object?>('join', {
         'ssid': ssid,
         'password': password,
       });
+      AppLog.info('hotspot', 'join "$ssid" ok ip=${result?['ip']}');
       return HotspotInfo(
         ssid: ssid,
         ip: result?['ip'] as String?,
         note: result?['note'] as String?,
       );
     } on PlatformException catch (error) {
+      AppLog.error(
+          'hotspot',
+          'join "$ssid" failed [${error.code}]: '
+              '${error.message} (details: ${error.details})');
       throw HotspotException(
         error.message ?? 'Could not join "$ssid".',
         manual: true,
@@ -360,12 +433,17 @@ class AndroidHotspotService implements HotspotService {
 
   @override
   Future<void> leave() async {
+    AppLog.debug('hotspot', 'leave requested');
     try {
       await _channel.invokeMethod<void>('leave');
-    } on PlatformException {
+    } on PlatformException catch (error) {
+      AppLog.warn('hotspot', 'leave failed [${error.code}]: ${error.message}');
       // Ignore.
     }
   }
+
+  @override
+  Future<List<String>> survey() async => const [];
 
   @override
   Future<void> dispose() async {

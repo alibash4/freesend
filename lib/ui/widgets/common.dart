@@ -12,14 +12,13 @@ const clickCursorStyle = ButtonStyle(
   mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
 );
 
-/// The back arrow, matching the AppBar's default [BackButtonIcon]: the iOS
-/// chevron on Apple platforms, the Material arrow elsewhere. Both carry
-/// `matchTextDirection`, so they mirror themselves in RTL.
-IconData get backGlyph {
-  final apple = PlatformEnv.kind == PlatformKind.ios ||
-      PlatformEnv.kind == PlatformKind.macOS;
-  return apple ? Icons.arrow_back_ios_new_rounded : Icons.arrow_back;
-}
+/// The back arrow used by in-app navigation: the UIcons arrow-small glyph,
+/// pointing left in LTR and right in RTL. `matchTextDirection` is not relied
+/// on because the material_ui `Icon` does not honour it.
+IconData backGlyph(BuildContext context) =>
+    Directionality.of(context) == TextDirection.rtl
+        ? AppIcons.chevronRight
+        : AppIcons.chevronLeft;
 
 /// A "go deeper" chevron that points with the reading direction: right in LTR,
 /// left in RTL.

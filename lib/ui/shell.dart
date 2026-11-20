@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
+import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/app_navigation.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/ui/kit/app_bottom_nav.dart';
@@ -33,9 +37,43 @@ class _AppShellState extends State<AppShell> {
   /// content fades on nav taps while physical swipes stay unanimated.
   bool _animatePageSwap = false;
 
+  /// The entry chosen from the send control, handed to the overlay screen.
+  SendMode? _sendMode;
+
+  /// The send control comes first; the overlay only opens once something is
+  /// chosen.
+  Future<void> _openSend() async {
+    final mode = await SendScreen.choose(context);
+    if (mode == null || !mounted) return;
+    setState(() => _sendMode = mode);
+    _setIndex(5);
+  }
+
+  StreamSubscription<AppOverlay>? _navSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Requests can arrive before this state exists (a cold start through the
+    // notification), so drain the pending slot and then follow the stream.
+    _applyOverlay(appNavigation.takePending());
+    _navSubscription = appNavigation.requests.listen(_applyOverlay);
+  }
+
+  void _applyOverlay(AppOverlay? overlay) {
+    switch (overlay) {
+      case AppOverlay.receive:
+        _setIndex(6);
+      case AppOverlay.send:
+      case null:
+        break;
+    }
+  }
+
   void _setIndex(int index) {
     // Valid pages: 0-3 are the nav tabs, 5-6 the send/receive overlays.
     if (index < 0 || index > 6 || index == 4) return;
+    if (index != 5) _sendMode = null;
     _animatePageSwap = true;
     if (index < 4) {
       _pageController.jumpToPage(index);
@@ -50,6 +88,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    unawaited(_navSubscription?.cancel());
     _pageController.dispose();
     super.dispose();
   }
@@ -65,7 +104,7 @@ class _AppShellState extends State<AppShell> {
       ),
       AppNavItem(
         label: l10n.navTransfers,
-        icon: AppIcons.zap,
+        icon: AppIcons.transfers,
         activeIcon: AppIcons.transfersActive,
       ),
       AppNavItem(
@@ -83,6 +122,9 @@ class _AppShellState extends State<AppShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 840;
+        final floatingNav = context.select<AppState, bool>(
+          (state) => state.floatingNav,
+        );
         final content = AppPageContainer(
           child: Stack(
             children: [
@@ -103,7 +145,7 @@ class _AppShellState extends State<AppShell> {
                     },
                     children: [
                       HomeScreen(
-                        onOpenSend: () => _setIndex(5),
+                        onOpenSend: _openSend,
                         onOpenReceive: () => _setIndex(6),
                       ),
                       const TransfersScreen(),
@@ -117,7 +159,10 @@ class _AppShellState extends State<AppShell> {
                 child: FadeOnChange(
                   index: _index,
                   child: _index == 5
-                      ? SendScreen(onBack: () => _setIndex(0))
+                      ? SendScreen(
+                          initialMode: _sendMode,
+                          onBack: () => _setIndex(0),
+                        )
                       : _index == 6
                           ? ReceiveScreen(onBack: () => _setIndex(0))
                           : const SizedBox.shrink(),
@@ -128,7 +173,7 @@ class _AppShellState extends State<AppShell> {
         );
 
         return Scaffold(
-          extendBody: false,
+          extendBody: floatingNav,
           body: SafeArea(
             bottom: false,
             child: wide
@@ -147,6 +192,7 @@ class _AppShellState extends State<AppShell> {
           bottomNavigationBar: wide
               ? null
               : AppBottomNav(
+                  floating: floatingNav,
                   selectedIndex: _index < 4 ? _index : -1,
                   onSelected: (index) {
                     context.read<AppState>().tick();

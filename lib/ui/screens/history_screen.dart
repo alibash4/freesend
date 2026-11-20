@@ -9,6 +9,7 @@ import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/kit/app_page_title.dart';
+import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
@@ -66,7 +67,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return ListView(
       controller: _scrollController,
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+      padding: EdgeInsets.only(
+        bottom: AppSpacing.xl +
+            (appState.floatingNav ? floatingNavClearance(context) : 0),
+      ),
       children: [
         Padding(
           padding: kPagePadding.copyWith(top: AppSpacing.md),

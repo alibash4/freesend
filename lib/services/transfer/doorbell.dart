@@ -94,14 +94,26 @@ class ConsentDoorbell {
     if (_server != null) return;
     final server = await ServerSocket.bind(InternetAddress.anyIPv4, port ?? 0);
     _server = server;
-    server.listen(_handle, onError: (_) {});
+    server.listen(_handle, onError: (Object error) {
+      AppLog.error('knock', 'doorbell listener failed: $error');
+    });
+    AppLog.info('knock', 'doorbell listening on :${server.port}');
   }
 
   void _handle(Socket socket) {
+    AppLog.debug(
+        'knock',
+        'connection from '
+            '${socket.remoteAddress.address}:${socket.remotePort}');
     final reader = FrameReader(
       (frame) {
         final knock = Knock.tryParse(frame, socket);
         if (knock == null) {
+          AppLog.warn(
+              'knock',
+              'dropped malformed frame '
+                  'type=${FrameType.nameOf(frame.type)} from '
+                  '${socket.remoteAddress.address}');
           socket.destroy();
           return;
         }
@@ -109,15 +121,28 @@ class ConsentDoorbell {
         AppLog.info(
           'knock',
           '${knock.senderName} asks for ${knock.fileCount} files '
-          '(${knock.totalBytes} bytes)',
+              '(${knock.totalBytes} bytes) -> '
+              '${knock.senderHost}:${knock.senderPort} '
+              '[${knock.requestId}]',
         );
         onKnock?.call(knock);
       },
-      onError: (_) => socket.destroy(),
+      onError: (Object error) {
+        AppLog.warn(
+            'knock',
+            'bad frame from '
+                '${socket.remoteAddress.address}: $error');
+        socket.destroy();
+      },
     );
     socket.listen(
       reader.add,
-      onError: (_) {},
+      onError: (Object error) {
+        AppLog.debug(
+            'knock',
+            'knocker '
+                '${socket.remoteAddress.address} went away: $error');
+      },
       onDone: () {},
       cancelOnError: true,
     );
@@ -131,7 +156,8 @@ class ConsentDoorbell {
       AppLog.warn('consent', 'answer for unknown request $requestId');
       return false;
     }
-    AppLog.info('consent', 'answered $requestId: ${accepted ? 'accept' : 'decline'}');
+    AppLog.info(
+        'consent', 'answered $requestId: ${accepted ? 'accept' : 'decline'}');
     try {
       socket.add(
         FrameCodec.json(FrameType.knockReply, {
@@ -140,8 +166,13 @@ class ConsentDoorbell {
         }),
       );
       await socket.flush();
-    } on Object {
+      AppLog.debug(
+          'knock',
+          'reply for $requestId sent '
+              '(${accepted ? 'accept' : 'decline'})');
+    } on Object catch (error) {
       // The sender hung up; there is nobody to answer.
+      AppLog.debug('knock', 'reply for $requestId failed: $error');
     } finally {
       socket.destroy();
     }
@@ -177,8 +208,14 @@ abstract final class KnockClient {
   }) async {
     final requestId = DateTime.now().microsecondsSinceEpoch.toString();
     Socket? socket;
+    AppLog.info(
+        'knock',
+        'knocking $host:$port as "$senderName" '
+            '($fileCount files, $totalBytes bytes, file server '
+            '$fileServerHost:$fileServerPort)');
     try {
       socket = await Socket.connect(host, port, timeout: timeout);
+      AppLog.debug('knock', 'connected to $host:$port, waiting for answer');
       final answer = Completer<Frame>();
       final reader = FrameReader(
         (frame) {
@@ -214,10 +251,18 @@ abstract final class KnockClient {
       );
       await socket.flush();
       final frame = await answer.future.timeout(timeout);
-      if (frame.type != FrameType.knockReply) return KnockOutcome.declined;
+      if (frame.type != FrameType.knockReply) {
+        AppLog.warn(
+            'knock',
+            '$host:$port replied with unexpected '
+                '${FrameType.nameOf(frame.type)}');
+        return KnockOutcome.declined;
+      }
       final accepted = frame.json()['ok'] == true;
-      AppLog.info('consent', '$host:$port answered '
-          '${accepted ? 'accepted' : 'declined'}');
+      AppLog.info(
+          'consent',
+          '$host:$port answered '
+              '${accepted ? 'accepted' : 'declined'}');
       return accepted ? KnockOutcome.accepted : KnockOutcome.declined;
     } on SocketException catch (error) {
       AppLog.warn('knock', 'no answer from $host:$port ($error)');
