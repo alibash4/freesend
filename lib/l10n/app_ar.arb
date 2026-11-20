@@ -131,6 +131,8 @@
   "keepRunningInTray": "إبقاء FreeSend يعمل في منطقة النظام عند إغلاق النافذة.",
   "black": "وضع OLED",
   "blackThemeSubtitle": "وضع داكن أعمق لشاشات OLED: مريح للعين ويوفّر البطارية.",
+  "floatingNav": "شريط تنقل عائم",
+  "floatingNavSubtitle": "شريط زجاجي شفاف يطفو فوق المحتوى بدل الارتكاز على الحافة.",
   "hapticFeedback": "الاستجابة عند اللمس",
   "hapticFeedbackSubtitle": "شعور بنقرة خفيفة عند التنقل بين الأقسام.",
   "hapticIntensity": "الشدة",

@@ -1,9 +1,12 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:provider/provider.dart';
 import 'package:scroll_animator/scroll_animator.dart';
 import 'package:free_send/theme/uicons.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/state/app_state.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/recent_transfers.dart';
@@ -61,14 +64,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final floatingNav = context.select<AppState, bool>(
+      (state) => state.floatingNav,
+    );
     return SafeArea(
       child: SingleChildScrollView(
         controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           AppSpacing.md,
           AppSpacing.md,
           AppSpacing.md,
-          AppSpacing.xl,
+          AppSpacing.xl + (floatingNav ? floatingNavClearance(context) : 0),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

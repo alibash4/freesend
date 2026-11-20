@@ -884,6 +884,18 @@ abstract class AppLocalizations {
   /// **'A deeper dark made for OLED screens: easy on the eyes, easy on battery.'**
   String get blackThemeSubtitle;
 
+  /// No description provided for @floatingNav.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating navigation'**
+  String get floatingNav;
+
+  /// No description provided for @floatingNavSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A frosted-glass pill that hovers above the content instead of docking to the edge.'**
+  String get floatingNavSubtitle;
+
   /// No description provided for @hapticFeedback.
   ///
   /// In en, this message translates to:

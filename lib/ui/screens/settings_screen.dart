@@ -14,6 +14,7 @@ import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/update_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/collapsing_title.dart';
 import 'package:free_send/ui/widgets/common.dart';
@@ -304,7 +305,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         controller: _scrollController,
         padding: EdgeInsets.only(
           top: CollapsingHeader.expandedHeight + AppSpacing.md,
-          bottom: AppSpacing.xl,
+          bottom: AppSpacing.xl +
+              (appState.floatingNav ? floatingNavClearance(context) : 0),
         ),
         children: [
           const SizedBox(height: AppSpacing.lg),
@@ -503,6 +505,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: l10n.blackThemeSubtitle,
                   value: appState.blackTheme,
                   onChanged: (value) => appState.setBlackTheme(value),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                _UpdateRow(
+                  label: l10n.floatingNav,
+                  subtitle: l10n.floatingNavSubtitle,
+                  value: appState.floatingNav,
+                  onChanged: (value) => appState.setFloatingNav(value),
                 ),
                 if (PlatformEnv.kind == PlatformKind.android ||
                     PlatformEnv.kind == PlatformKind.ios) ...[

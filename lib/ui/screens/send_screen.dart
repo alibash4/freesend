@@ -20,6 +20,7 @@ import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
+import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
@@ -320,6 +321,9 @@ class _SendScreenState extends State<SendScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<SendController>();
     final l10n = AppLocalizations.of(context);
+    final floatingNav = context.select<AppState, bool>(
+      (state) => state.floatingNav,
+    );
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -343,7 +347,10 @@ class _SendScreenState extends State<SendScreen> {
         body: SafeArea(
           child: ListView(
             controller: _scrollController,
-            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+            padding: EdgeInsets.only(
+              bottom: AppSpacing.xl +
+                  (floatingNav ? floatingNavClearance(context) : 0),
+            ),
             children: [
               Padding(
                 padding: kPagePadding,

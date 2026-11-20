@@ -491,6 +491,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'وضع داكن أعمق لشاشات OLED: مريح للعين ويوفّر البطارية.';
 
   @override
+  String get floatingNav => 'شريط تنقل عائم';
+
+  @override
+  String get floatingNavSubtitle =>
+      'شريط زجاجي شفاف يطفو فوق المحتوى بدل الارتكاز على الحافة.';
+
+  @override
   String get hapticFeedback => 'الاستجابة عند اللمس';
 
   @override

@@ -39,6 +39,9 @@ class AppState extends ChangeNotifier {
   /// meaningful while the effective theme is dark.
   bool blackTheme = false;
 
+  /// Whether the bottom navigation floats as a frosted-glass pill.
+  bool floatingNav = false;
+
   /// Identifies this app run so the scanner ignores its own beacons.
   final String instanceId = _randomId(12);
 
@@ -74,6 +77,7 @@ class AppState extends ChangeNotifier {
     haptics = store.haptics;
     hapticIntensity = store.hapticIntensity;
     blackTheme = store.blackTheme;
+    floatingNav = store.floatingNav;
     _ready = true;
     notifyListeners();
   }
@@ -106,6 +110,12 @@ class AppState extends ChangeNotifier {
     blackTheme = value;
     notifyListeners();
     await store.setBlackTheme(value);
+  }
+
+  Future<void> setFloatingNav(bool value) async {
+    floatingNav = value;
+    notifyListeners();
+    await store.setFloatingNav(value);
   }
 
   /// True when the resolved theme is a dark variant, including system mode

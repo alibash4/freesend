@@ -479,6 +479,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'A deeper dark made for OLED screens: easy on the eyes, easy on battery.';
 
   @override
+  String get floatingNav => 'Floating navigation';
+
+  @override
+  String get floatingNavSubtitle =>
+      'A frosted-glass pill that hovers above the content instead of docking to the edge.';
+
+  @override
   String get hapticFeedback => 'Tap feedback';
 
   @override

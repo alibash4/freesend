@@ -27,6 +27,7 @@ class LocalStore {
   static const _kHaptics = 'haptics';
   static const _kHapticIntensity = 'haptic_intensity';
   static const _kBlackTheme = 'black_theme';
+  static const _kFloatingNav = 'floating_nav';
 
   late SharedPreferences _prefs;
 
@@ -99,6 +100,14 @@ class LocalStore {
 
   Future<void> setBlackTheme(bool value) async {
     await _prefs.setBool(_kBlackTheme, value);
+  }
+
+  /// Whether the bottom navigation floats as a frosted-glass pill instead of
+  /// docking to the screen edge.
+  bool get floatingNav => _prefs.getBool(_kFloatingNav) ?? false;
+
+  Future<void> setFloatingNav(bool value) async {
+    await _prefs.setBool(_kFloatingNav, value);
   }
 
   /// Whether the mobile permission gate has been shown at least once.

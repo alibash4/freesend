@@ -131,6 +131,8 @@
   "keepRunningInTray": "Keep FreeSend running in the tray when the window is closed.",
   "black": "OLED Mode",
   "blackThemeSubtitle": "A deeper dark made for OLED screens: easy on the eyes, easy on battery.",
+  "floatingNav": "Floating navigation",
+  "floatingNavSubtitle": "A frosted-glass pill that hovers above the content instead of docking to the edge.",
   "hapticFeedback": "Tap feedback",
   "hapticFeedbackSubtitle": "Feel a light tap when you switch sections.",
   "hapticIntensity": "Intensity",

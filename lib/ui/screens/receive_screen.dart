@@ -22,6 +22,7 @@ import 'package:free_send/ui/widgets/collapsing_title.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/services/permissions/transfer_setup.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
+import 'package:free_send/ui/kit/app_bottom_nav.dart';
 import 'package:free_send/ui/shell.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
@@ -159,6 +160,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       return Scaffold(backgroundColor: Theme.of(context).colorScheme.surface);
     }
     final controller = context.watch<ReceiveController>();
+    final floatingNav = context.select<AppState, bool>(
+      (state) => state.floatingNav,
+    );
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -189,9 +193,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
             ),
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.only(
+              padding: EdgeInsets.only(
                 top: CollapsingHeader.expandedHeight + AppSpacing.md,
-                bottom: AppSpacing.xl,
+                bottom: AppSpacing.xl +
+                    (floatingNav ? floatingNavClearance(context) : 0),
               ),
               children: [
                 Padding(

@@ -122,6 +122,9 @@ class _AppShellState extends State<AppShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 840;
+        final floatingNav = context.select<AppState, bool>(
+          (state) => state.floatingNav,
+        );
         final content = AppPageContainer(
           child: Stack(
             children: [
@@ -170,7 +173,7 @@ class _AppShellState extends State<AppShell> {
         );
 
         return Scaffold(
-          extendBody: false,
+          extendBody: floatingNav,
           body: SafeArea(
             bottom: false,
             child: wide
@@ -189,6 +192,7 @@ class _AppShellState extends State<AppShell> {
           bottomNavigationBar: wide
               ? null
               : AppBottomNav(
+                  floating: floatingNav,
                   selectedIndex: _index < 4 ? _index : -1,
                   onSelected: (index) {
                     context.read<AppState>().tick();
