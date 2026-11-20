@@ -179,7 +179,7 @@ class _SendSelectViewState extends State<SendSelectView> {
             IconButton(
               tooltip: _grid ? l10n.listView : l10n.gridView,
               onPressed: () => setState(() => _grid = !_grid),
-              icon: Icon(_grid ? Icons.view_list : Icons.grid_view),
+              icon: Icon(_grid ? AppIcons.list : AppIcons.grid),
             ),
           ],
         ),
@@ -590,9 +590,9 @@ class _CategoryTabsState extends State<_CategoryTabs> {
       type: MaterialType.transparency,
       child: SizedBox(
         height: 40,
-        child: Stack(
-          children: [
-            SingleChildScrollView(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scrollable = SingleChildScrollView(
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.zero,
@@ -628,58 +628,50 @@ class _CategoryTabsState extends State<_CategoryTabs> {
                     ),
                 ],
               ),
-            ),
-            if (_fadeLeft || _fadeRight)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Row(
-                    children: [
-                      if (_fadeLeft)
-                        SizedBox(
-                          width: AppSpacing.xl,
-                          child: _EdgeFade(
-                            edge: Alignment.centerLeft,
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                          ),
-                        ),
-                      const Spacer(),
-                      if (_fadeRight)
-                        SizedBox(
-                          width: AppSpacing.xl,
-                          child: _EdgeFade(
-                            edge: Alignment.centerRight,
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+            );
+            if (!_fadeLeft && !_fadeRight) return scrollable;
 
-/// A one-sided fade from the page background into transparency, used to
-/// hint that the tab strip scrolls.
-class _EdgeFade extends StatelessWidget {
-  const _EdgeFade({required this.edge, required this.color});
-
-  final Alignment edge;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: edge,
-          end: edge == Alignment.centerLeft
-              ? Alignment.centerRight
-              : Alignment.centerLeft,
-          colors: [color, color.withValues(alpha: 0)],
+            // dstIn masks the child's alpha, so the tabs themselves fade
+            // into the page - no dependence on the colour behind them.
+            final fade = (AppSpacing.xl / constraints.maxWidth)
+                .clamp(0.05, 0.5)
+                .toDouble();
+            final List<Color> colors;
+            final List<double> stops;
+            if (_fadeLeft && _fadeRight) {
+              colors = const [
+                Colors.transparent,
+                Colors.white,
+                Colors.white,
+                Colors.transparent,
+              ];
+              stops = [0, fade, 1 - fade, 1];
+            } else if (_fadeLeft) {
+              colors = const [
+                Colors.transparent,
+                Colors.white,
+                Colors.white,
+              ];
+              stops = [0, fade, 1];
+            } else {
+              colors = const [
+                Colors.white,
+                Colors.white,
+                Colors.transparent,
+              ];
+              stops = [0, 1 - fade, 1];
+            }
+            return ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (bounds) => LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: colors,
+                stops: stops,
+              ).createShader(bounds),
+              child: scrollable,
+            );
+          },
         ),
       ),
     );
