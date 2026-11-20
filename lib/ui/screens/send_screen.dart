@@ -1408,7 +1408,7 @@ class _ChooserOptionState extends State<_ChooserOption> {
             ),
             child: Row(
               children: [
-                Icon(widget.icon, size: 18, color: scheme.onSurfaceVariant),
+                Icon(widget.icon, size: 20, color: scheme.onSurfaceVariant),
                 const SizedBox(width: AppSpacing.lg),
                 Expanded(
                   child: Column(
@@ -1428,7 +1428,7 @@ class _ChooserOptionState extends State<_ChooserOption> {
                 ),
                 Icon(
                   chevronGlyph(context),
-                  size: 16,
+                  size: 18,
                   color: _hovered ? AppColors.accent : scheme.onSurfaceVariant,
                 ),
               ],

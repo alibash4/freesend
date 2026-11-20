@@ -56,8 +56,8 @@ abstract final class AppIcons {
     matchTextDirection: true,
   );
   static final IconData forward = UIcons.regularRounded.arrow_right;
-  static final IconData chevronRight = UIcons.regularRounded.angle_right;
-  static final IconData chevronLeft = UIcons.regularRounded.angle_left;
+  static final IconData chevronRight = UIcons.regularRounded.arrow_small_right;
+  static final IconData chevronLeft = UIcons.regularRounded.arrow_small_left;
   static final IconData close = UIcons.regularRounded.x;
   static final IconData refresh = UIcons.regularRounded.refresh;
   static final IconData spinner = UIcons.regularRounded.spinner;
