@@ -331,7 +331,7 @@ class _SendScreenState extends State<SendScreen> {
         appBar: AppBar(
           title: Text(l10n.sendTitle),
           leading: IconButton(
-            icon: Icon(backGlyph, size: 25),
+            icon: Icon(backGlyph(context), size: 25),
             mouseCursor: SystemMouseCursors.click,
             onPressed: () async {
               context.read<AppState>().tick();

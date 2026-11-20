@@ -160,7 +160,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
             offset: const Offset(-7, 0),
             child: IconButton(
               onPressed: _leave,
-              icon: Icon(backGlyph, size: 25),
+              icon: Icon(backGlyph(context), size: 25),
               mouseCursor: SystemMouseCursors.click,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 40, minHeight: 40),

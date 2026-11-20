@@ -38,7 +38,6 @@ import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
-import 'package:free_send/ui/widgets/common.dart';
 import 'package:free_send/ui/widgets/knock_gate.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
@@ -186,7 +185,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await capture(tester, '02-send-empty');
 
-    await tester.tap(find.byIcon(backGlyph));
+    await tester.tap(find.byIcon(AppIcons.chevronLeft));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Receive File').first);
@@ -195,7 +194,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await capture(tester, '03-receive-scan');
 
-    await tester.tap(find.byIcon(backGlyph));
+    await tester.tap(find.byIcon(AppIcons.chevronLeft));
     await tester.pumpAndSettle();
 
     // Settings and History copy is owned by other work in progress; this test

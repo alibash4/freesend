@@ -18,7 +18,7 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/vpn_warning.dart';
-import 'package:free_send/ui/kit/app_page_title.dart';
+import 'package:free_send/ui/widgets/collapsing_title.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/services/permissions/transfer_setup.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
@@ -165,73 +165,102 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         if (!didPop) widget.onBack?.call();
       },
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: Icon(backGlyph, size: 25),
-            mouseCursor: SystemMouseCursors.click,
-            onPressed: () {
-              context.read<AppState>().tick();
-              widget.onBack?.call();
-            },
-          ),
-        ),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: SafeArea(
-          child: ListView(
+          child: CollapsingHeader(
             controller: _scrollController,
-            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-            children: [
-              Padding(
-                padding: kPagePadding,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: switch (controller.phase) {
-                    ReceivePhase.idle ||
-                    ReceivePhase.scanning ||
-                    ReceivePhase.joining =>
-                      _WaitingView(
-                        key: const ValueKey('scan'),
-                        controller: controller,
-                        onJoin: () => _openJoinSheet(controller),
-                        onManual: () => _openManualConnect(controller),
-                        onScan: () => _openScanner(controller),
-                        onPaste: () => _enterCode(controller),
-                      ),
-                    ReceivePhase.reviewing => _ReviewView(
-                        key: const ValueKey('review'),
-                        controller: controller,
-                      ),
-                    ReceivePhase.transferring => _ProgressView(
-                        key: const ValueKey('progress'),
-                        controller: controller,
-                      ),
-                    ReceivePhase.completed => _DoneView(
-                        key: const ValueKey('done'),
-                        controller: controller,
-                        onDone: () async {
-                          await controller.reset();
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                      ),
-                    ReceivePhase.failed || ReceivePhase.cancelled => _ErrorView(
-                        key: const ValueKey('error'),
-                        controller: controller,
-                        onRetry: () async {
-                          await controller.reset();
-                          if (context.mounted) {
-                            await controller.startWaiting(
-                              host: PlatformEnv.kind == PlatformKind.android,
-                            );
-                          }
-                        },
-                      ),
-                  },
-                ),
+            title: _titleFor(context, controller),
+            leading: Transform.translate(
+              offset: const Offset(-7, 0),
+              child: IconButton(
+                onPressed: () {
+                  context.read<AppState>().tick();
+                  widget.onBack?.call();
+                },
+                icon: Icon(backGlyph(context), size: 25),
+                mouseCursor: SystemMouseCursors.click,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                alignment: Alignment.centerLeft,
               ),
-            ],
+            ),
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.only(
+                top: CollapsingHeader.expandedHeight + AppSpacing.md,
+                bottom: AppSpacing.xl,
+              ),
+              children: [
+                Padding(
+                  padding: kPagePadding,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: switch (controller.phase) {
+                      ReceivePhase.idle ||
+                      ReceivePhase.scanning ||
+                      ReceivePhase.joining =>
+                        _WaitingView(
+                          key: const ValueKey('scan'),
+                          controller: controller,
+                          onJoin: () => _openJoinSheet(controller),
+                          onManual: () => _openManualConnect(controller),
+                          onScan: () => _openScanner(controller),
+                          onPaste: () => _enterCode(controller),
+                        ),
+                      ReceivePhase.reviewing => _ReviewView(
+                          key: const ValueKey('review'),
+                          controller: controller,
+                        ),
+                      ReceivePhase.transferring => _ProgressView(
+                          key: const ValueKey('progress'),
+                          controller: controller,
+                        ),
+                      ReceivePhase.completed => _DoneView(
+                          key: const ValueKey('done'),
+                          controller: controller,
+                          onDone: () async {
+                            await controller.reset();
+                            if (context.mounted) Navigator.of(context).pop();
+                          },
+                        ),
+                      ReceivePhase.failed ||
+                      ReceivePhase.cancelled =>
+                        _ErrorView(
+                          key: const ValueKey('error'),
+                          controller: controller,
+                          onRetry: () async {
+                            await controller.reset();
+                            if (context.mounted) {
+                              await controller.startWaiting(
+                                host: PlatformEnv.kind == PlatformKind.android,
+                              );
+                            }
+                          },
+                        ),
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// The header title follows the transfer phase, mirroring what the body
+  /// used to show as its in-content page title.
+  String _titleFor(BuildContext context, ReceiveController controller) {
+    final l10n = AppLocalizations.of(context);
+    return switch (controller.phase) {
+      ReceivePhase.reviewing =>
+        controller.manifest?.hostName ?? l10n.waitingForDevice,
+      ReceivePhase.transferring => l10n.receivingFilesTitle,
+      ReceivePhase.completed => l10n.filesReceivedTitle,
+      ReceivePhase.failed => l10n.couldNotConnect,
+      ReceivePhase.cancelled => l10n.transferCancelled,
+      _ => l10n.waitingForDevice,
+    };
   }
 }
 
@@ -258,22 +287,6 @@ class _WaitingView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: AppPageTitle(l10n.waitingForDevice),
-            ),
-            if (controller.phase == ReceivePhase.joining)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            else
-              const PulsingDots(),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
         Text(
           controller.isWaiting ? l10n.waitingHintOpen : l10n.waitingHintReady,
           style: theme.textTheme.bodySmall,
@@ -321,6 +334,16 @@ class _WaitingView extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(height: AppSpacing.lg),
+        Center(
+          child: controller.phase == ReceivePhase.joining
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const PulsingDots(),
+        ),
         const SizedBox(height: AppSpacing.lg),
         switch (controller.presence) {
           ReceiverPresence.qr => _QrPanel(
@@ -534,9 +557,17 @@ class _QrPanel extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           TextButton.icon(
             style: clickCursorStyle,
-            onPressed: () {
+            onPressed: () async {
               context.read<AppState>().tick();
-              Clipboard.setData(ClipboardData(text: payload));
+              await Clipboard.setData(ClipboardData(text: payload));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.labelCopied(l10n.pairingCodeLabel)),
+                  ),
+                );
             },
             icon: Icon(AppIcons.copy, size: 16),
             label: Text(l10n.copyCode),
@@ -752,8 +783,6 @@ class _ReviewView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppPageTitle(manifest.hostName),
-        const SizedBox(height: AppSpacing.xs),
         Text(
           l10n.offeringSummary(
             l10n.fileCount(manifest.items.length),
@@ -1078,10 +1107,6 @@ class _DoneView extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
-        Center(
-            child: AppPageTitle(l10n.filesReceivedTitle,
-                textAlign: TextAlign.center)),
         const SizedBox(height: AppSpacing.xs),
         Center(
           child: Text(
@@ -1208,13 +1233,6 @@ class _ErrorView extends StatelessWidget {
               size: 30,
               color: theme.colorScheme.error,
             ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Center(
-          child: AppPageTitle(
-            cancelled ? l10n.transferCancelled : l10n.couldNotConnect,
-            textAlign: TextAlign.center,
           ),
         ),
         if (controller.errorMessage != null) ...[

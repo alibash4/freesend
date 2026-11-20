@@ -12,9 +12,13 @@ const clickCursorStyle = ButtonStyle(
   mouseCursor: WidgetStatePropertyAll(SystemMouseCursors.click),
 );
 
-/// The back arrow used by in-app navigation: the UIcons arrow-small-left
-/// glyph, which mirrors itself in RTL via `matchTextDirection`.
-IconData get backGlyph => AppIcons.backSmall;
+/// The back arrow used by in-app navigation: the UIcons arrow-small glyph,
+/// pointing left in LTR and right in RTL. `matchTextDirection` is not relied
+/// on because the material_ui `Icon` does not honour it.
+IconData backGlyph(BuildContext context) =>
+    Directionality.of(context) == TextDirection.rtl
+        ? AppIcons.chevronRight
+        : AppIcons.chevronLeft;
 
 /// A "go deeper" chevron that points with the reading direction: right in LTR,
 /// left in RTL.
