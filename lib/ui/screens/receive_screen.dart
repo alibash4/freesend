@@ -390,7 +390,7 @@ class _OtherWaysToConnect extends StatelessWidget {
         children: [
           if (ScanScreen.isSupported)
             _ConnectOption(
-              icon: AppIcons.scan,
+              icon: AppIcons.qr,
               title: l10n.scanPairingCode,
               subtitle: l10n.scanPairingCodeHint,
               onTap: () {
@@ -399,7 +399,7 @@ class _OtherWaysToConnect extends StatelessWidget {
               },
             ),
           _ConnectOption(
-            icon: AppIcons.paste,
+            icon: AppIcons.pairingLock,
             title: l10n.enterPairingCode,
             subtitle: l10n.enterPairingCodeHint,
             onTap: () {
@@ -408,7 +408,7 @@ class _OtherWaysToConnect extends StatelessWidget {
             },
           ),
           _ConnectOption(
-            icon: AppIcons.address,
+            icon: AppIcons.ipAddress,
             title: l10n.connectByAddress,
             subtitle: l10n.connectByAddressHint,
             onTap: () {

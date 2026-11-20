@@ -28,6 +28,8 @@ abstract final class AppIcons {
   static final IconData copy = UIcons.regularRounded.copy;
   static final IconData paste = UIcons.regularRounded.clipboard_list;
   static final IconData address = UIcons.regularRounded.keyboard;
+  static final IconData pairingLock = UIcons.regularRounded.password_lock;
+  static final IconData ipAddress = UIcons.regularRounded.ip_address;
 
   // Files.
   static final IconData folder = UIcons.regularRounded.folder;
@@ -126,6 +128,8 @@ abstract final class AppIcons {
     'copy': copy,
     'paste': paste,
     'address': address,
+    'pairingLock': pairingLock,
+    'ipAddress': ipAddress,
     'folder': folder,
     'folderOpen': folderOpen,
     'add': add,
