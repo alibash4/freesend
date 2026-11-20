@@ -1309,7 +1309,7 @@ class _SendChooserBody extends StatelessWidget {
         SendMode.nearby,
         l10n.shareNearby,
         l10n.shareNearbyHint,
-        AppIcons.share,
+        AppIcons.dataTransfer,
       ),
       if (showScanEntry(PlatformEnv.kind))
         (
@@ -1322,7 +1322,7 @@ class _SendChooserBody extends StatelessWidget {
         SendMode.group,
         l10n.sendToGroup,
         l10n.sendToGroupHint,
-        AppIcons.users,
+        AppIcons.group,
       ),
     ];
     return Column(

@@ -329,7 +329,7 @@ class _SetupRow extends StatelessWidget {
                       // A fixed slot keeps the spinner centered without
                       // resizing the button between labels.
                       ? const SizedBox(
-                          width: 56,
+                          width: 28,
                           height: 20,
                           child: Center(child: SpinnerIcon(size: 12)),
                         )
