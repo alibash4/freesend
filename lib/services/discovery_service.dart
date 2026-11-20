@@ -63,16 +63,23 @@ class SessionBroadcaster {
       // Binding to the hotspot's own address keeps beacons on the hotspot
       // interface; binding to anyIPv4 would follow the default route (cellular
       // or ethernet) and the peer would never see them.
-      final bindTo = bindAddress == null ? null : InternetAddress.tryParse(bindAddress);
+      final bindTo =
+          bindAddress == null ? null : InternetAddress.tryParse(bindAddress);
       final socket = await RawDatagramSocket.bind(
         bindTo ?? InternetAddress.anyIPv4,
         0,
       );
       socket.broadcastEnabled = true;
       _socket = socket;
-    } on SocketException {
+      AppLog.info(
+          'seeker',
+          'beacon socket bound, broadcasting session '
+              '"$deviceName" ($fileCount files) every '
+              '${AppConstants.beaconInterval.inSeconds}s');
+    } on SocketException catch (error) {
       // Broadcasting is unavailable (some locked-down desktop stacks); the
       // receiver can still connect by IP, so this is not fatal.
+      AppLog.warn('seeker', 'beacon broadcast unavailable: ${error.message}');
       return;
     }
     _send();
@@ -84,10 +91,15 @@ class SessionBroadcaster {
     if (socket == null) return;
     try {
       final data = utf8.encode(jsonEncode(_payload));
-      socket.send(data, InternetAddress('255.255.255.255'), AppConstants.discoveryPort);
+      socket.send(
+          data, InternetAddress('255.255.255.255'), AppConstants.discoveryPort);
       // Some hotspot stacks drop the limited broadcast; also try the usual
       // gateway addresses so at least one copy lands.
-      for (final target in const ['192.168.43.255', '192.168.49.255', '10.42.0.255']) {
+      for (final target in const [
+        '192.168.43.255',
+        '192.168.49.255',
+        '10.42.0.255'
+      ]) {
         socket.send(data, InternetAddress(target), AppConstants.discoveryPort);
       }
     } on Object {
@@ -131,19 +143,31 @@ class SessionScanner {
         reuseAddress: true,
         reusePort: true,
       );
-    } on SocketException {
+    } on SocketException catch (first) {
       try {
         // reusePort is not supported everywhere; retry without it.
+        AppLog.debug(
+            'responder',
+            'reusePort unsupported '
+                '(${first.message}), retrying without it');
         _socket = await RawDatagramSocket.bind(
           address,
           AppConstants.discoveryPort,
           reuseAddress: true,
         );
-      } on SocketException {
+      } on SocketException catch (second) {
+        AppLog.error(
+            'responder',
+            'cannot listen for beacons on '
+                '${address.address}:${AppConstants.discoveryPort}: $second');
         _socket = null;
         return false;
       }
     }
+    AppLog.info(
+        'responder',
+        'listening for beacons on '
+            '${address.address}:${AppConstants.discoveryPort}');
     final socket = _socket!;
     socket.listen(
       (event) {
@@ -176,6 +200,13 @@ class SessionScanner {
         totalBytes: (decoded['bytes'] as num?)?.toInt() ?? 0,
         lastSeen: DateTime.now(),
       );
+      if (!_sessions.containsKey(session.id)) {
+        AppLog.info(
+            'responder',
+            'beacon from ${session.deviceName} '
+                '(${session.platform}) at ${session.ip}:${session.port} '
+                'offering ${session.fileCount} files');
+      }
       _sessions[session.id] = session;
       _emit();
     } on Object {
@@ -278,8 +309,15 @@ class SessionSeeker {
         reuseAddress: true,
         reusePort: true,
       );
-    } on SocketException {
+    } on SocketException catch (first) {
+      AppLog.debug(
+          'seeker',
+          'reusePort unsupported (${first.message}), '
+              'retrying without it');
       _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+    } on Object catch (error) {
+      AppLog.error('seeker', 'cannot open seek socket: $error');
+      return false;
     }
     final socket = _socket!;
     socket.broadcastEnabled = true;
@@ -359,7 +397,7 @@ class SessionSeeker {
         AppLog.info(
           'seeker',
           'found ${candidate.deviceName} (${candidate.platform}) at '
-          '${candidate.ip}:${candidate.consentPort}',
+              '${candidate.ip}:${candidate.consentPort}',
         );
       }
       _emit();
@@ -427,18 +465,27 @@ class PresenceResponder {
         reuseAddress: true,
         reusePort: true,
       );
-    } on SocketException {
+    } on SocketException catch (first) {
       try {
+        AppLog.debug(
+            'responder',
+            'reusePort unsupported '
+                '(${first.message}), retrying without it');
         _socket = await RawDatagramSocket.bind(
           InternetAddress.anyIPv4,
           port,
           reuseAddress: true,
         );
-      } on SocketException {
+      } on SocketException catch (second) {
+        AppLog.error(
+            'responder',
+            'cannot bind presence port '
+                '$port: $second');
         _socket = null;
         return false;
       }
     }
+    AppLog.info('responder', 'presence replies on :$port');
     _payload = {
       'app': 'free-send',
       'v': AppConstants.protocolVersion,
@@ -457,8 +504,10 @@ class PresenceResponder {
       },
       onError: (_) {},
     );
-    AppLog.info('responder', 'answering seekers as "$deviceName" '
-        '(doorbell :$consentPort)');
+    AppLog.info(
+        'responder',
+        'answering seekers as "$deviceName" '
+            '(doorbell :$consentPort)');
     return true;
   }
 
@@ -477,10 +526,14 @@ class PresenceResponder {
       final now = DateTime.now();
       final last = _lastReply[seeker];
       if (last != null && now.difference(last) < const Duration(seconds: 1)) {
+        AppLog.debug('responder', 'seek from $seeker rate-limited');
         return;
       }
       _lastReply[seeker] = now;
-      AppLog.debug('responder', 'answered seeker $seeker');
+      AppLog.debug(
+          'responder',
+          'answered seeker $seeker '
+              'from ${datagram.address.address}:${datagram.port}');
       _socket?.send(
         utf8.encode(jsonEncode(_payload)),
         datagram.address,

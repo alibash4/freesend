@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:free_send/core/app_constants.dart';
 import 'package:free_send/models/trusted_device.dart';
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/services/device_identity.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/core/format.dart';
@@ -78,8 +79,10 @@ class TransferClient {
     int port, {
     Duration timeout = const Duration(seconds: 12),
   }) async {
+    AppLog.info('client', 'dialing $host:$port');
     final socket = await Socket.connect(host, port, timeout: timeout);
-    final channel = FrameChannel(socket);
+    AppLog.info('client', 'connected to $host:$port');
+    final channel = FrameChannel(socket, tag: 'client');
     _channel = channel;
     try {
       final handshake = await SecureHandshake.create();
@@ -93,6 +96,7 @@ class TransferClient {
         'caps': const ['checksums', 'resume', 'encryption'],
       });
       await channel.writer.flush();
+      AppLog.debug('client', 'hello sent as "$deviceName"');
 
       var frame = await channel.next(timeout: timeout);
       if (frame.type == FrameType.helloAck) {
@@ -113,11 +117,14 @@ class TransferClient {
               .toList(growable: false);
           if (trusted != null && trusted.isNotEmpty) {
             if (trusted.first.publicKey != identity) {
+              AppLog.error(
+                  'client', 'host identity changed for $instance - refusing');
               throw ProtocolException(
                 'This sender\'s identity changed. Stop and verify the device '
                 'before sending anything.',
               );
             }
+            AppLog.info('client', 'host $instance is a remembered device');
           } else {
             final valid = await DeviceIdentity.verify(
               signed,
@@ -125,8 +132,15 @@ class TransferClient {
               identity,
             );
             if (!valid) {
-              throw ProtocolException('The sender\'s identity signature is invalid');
+              AppLog.error(
+                  'client', 'host $instance signature invalid - refusing');
+              throw ProtocolException(
+                  'The sender\'s identity signature is invalid');
             }
+            AppLog.info(
+                'client',
+                'host $instance identity verified '
+                    '(${(ack['fingerprint'] as String?) ?? 'no fingerprint'})');
             if (store != null) {
               await store!.trustDevice(TrustedDevice(
                 instanceId: instance,
@@ -148,7 +162,8 @@ class TransferClient {
 
       if (frame.type == FrameType.error) {
         throw ProtocolException(
-          frame.json()['message'] as String? ?? 'The other device refused the connection',
+          frame.json()['message'] as String? ??
+              'The other device refused the connection',
         );
       }
       if (frame.type != FrameType.session) {
@@ -159,6 +174,12 @@ class TransferClient {
           .whereType<Map<String, Object?>>()
           .map(TransferItem.fromWire)
           .toList();
+      AppLog.info(
+          'client',
+          'manifest from ${json['name'] ?? 'host'}: '
+              '${files.length} files, '
+              '${files.fold<int>(0, (sum, item) => sum + item.size)} bytes, '
+              'encrypted=${channel.isEncrypted}');
       return TransferManifest(
         hostName: (json['name'] as String?) ?? 'Nearby device',
         hostPlatform: json['platform'] as String?,
@@ -167,7 +188,8 @@ class TransferClient {
         encrypted: channel.isEncrypted,
         securityCode: json['fingerprint'] as String?,
       );
-    } on Object {
+    } on Object catch (error) {
+      AppLog.error('client', 'connect to $host:$port failed: $error');
       await channel.close();
       _channel = null;
       rethrow;
@@ -197,6 +219,10 @@ class TransferClient {
       'caps': const ['checksums', 'resume'],
     });
     await channel.writer.flush();
+    AppLog.info(
+        'client',
+        'accept sent for ${ids.length} files '
+            '(${resumeOffsets.length} resume offsets)');
 
     RandomAccessFile? handle;
     TransferItem? current;
@@ -223,9 +249,8 @@ class TransferClient {
             final retryPath = retryPaths[id];
             final resumePath = resumePaths[id];
             final reusePath = retryPath ?? resumePath;
-            var offset = retryPath != null
-                ? 0
-                : (resumeOffsets[id] ?? 0).clamp(0, size);
+            var offset =
+                retryPath != null ? 0 : (resumeOffsets[id] ?? 0).clamp(0, size);
             final root = Directory(downloadRoot);
             if (!await root.exists()) {
               await root.create(recursive: true);
@@ -311,6 +336,11 @@ class TransferClient {
               status: TransferStatus.active,
             );
             expectedSha = json['sha256'] as String?;
+            AppLog.info(
+                'client',
+                'receiving "$name" -> $targetPath '
+                    '(${formatBytes(size)}'
+                    '${offset > 0 ? ', resuming at ${formatBytes(offset)}' : ''})');
             events.onStatus?.call(current);
             break;
 
@@ -332,9 +362,8 @@ class TransferClient {
             if (file != null) {
               final json = frame.json();
               final digest = hash?.finish();
-              final wanted = (json['sha256'] as String?) ??
-                  expectedSha ??
-                  file.sha256;
+              final wanted =
+                  (json['sha256'] as String?) ?? expectedSha ?? file.sha256;
               if (file.transferred != file.size) {
                 // A short file is corrupt; surface it rather than silently
                 // leaving a truncated file on disk.
@@ -344,10 +373,18 @@ class TransferClient {
                 );
               }
               if (wanted != null && digest != null && wanted != digest) {
+                AppLog.error(
+                    'client',
+                    '"${file.name}" checksum mismatch: '
+                        'got $digest, want $wanted');
                 throw ProtocolException(
                   '${file.name} failed its checksum; the copy is corrupt.',
                 );
               }
+              AppLog.info(
+                  'client',
+                  '"${file.name}" verified '
+                      '(${formatBytes(file.size)})');
               file.done = true;
               file.status = TransferStatus.done;
               file.sha256 = digest ?? wanted;
@@ -360,7 +397,8 @@ class TransferClient {
             current = null;
             hash = null;
             expectedSha = null;
-            await channel.writer.json(FrameType.ackFile, {'id': file?.id ?? ''});
+            await channel.writer
+                .json(FrameType.ackFile, {'id': file?.id ?? ''});
             await channel.writer.flush();
             break;
 
@@ -385,7 +423,8 @@ class TransferClient {
             // deliver the courtesy ack must not turn a good transfer bad.
             if (!channel.isClosed) {
               try {
-                await channel.writer.json(FrameType.ackAll, {'bytes': receivedBytes});
+                await channel.writer
+                    .json(FrameType.ackAll, {'bytes': receivedBytes});
                 await channel.writer.flush();
               } on Object {
                 // The host may already have closed its side.
@@ -393,12 +432,18 @@ class TransferClient {
             }
             stopwatch.stop();
             _finished = true;
-            events.onFinished?.call(receivedFiles, receivedBytes, stopwatch.elapsed);
+            AppLog.info(
+                'client',
+                'transfer complete: $receivedFiles files, '
+                    '${formatBytes(receivedBytes)} in ${stopwatch.elapsed}');
+            events.onFinished
+                ?.call(receivedFiles, receivedBytes, stopwatch.elapsed);
             return;
 
           case FrameType.error:
             throw ProtocolException(
-              frame.json()['message'] as String? ?? 'The other device reported an error',
+              frame.json()['message'] as String? ??
+                  'The other device reported an error',
             );
 
           case FrameType.cancel:
@@ -411,6 +456,7 @@ class TransferClient {
       }
       throw ProtocolException('Transfer cancelled');
     } on ProtocolException catch (error) {
+      AppLog.error('client', 'receive failed: ${error.message}');
       await handle?.close();
       handle = null;
       if (current != null) {
@@ -424,6 +470,7 @@ class TransferClient {
       }
       rethrow;
     } on SocketException catch (error) {
+      AppLog.error('client', 'connection lost: ${error.message}');
       await handle?.close();
       handle = null;
       if (current != null) {
@@ -444,12 +491,14 @@ class TransferClient {
   Future<void> pause() async {
     if (_pausedByReceiver) return;
     _pausedByReceiver = true;
+    AppLog.info('client', 'paused by receiver');
     final channel = _channel;
     if (channel == null) return;
     channel.pause();
     if (!channel.isClosed) {
       try {
-        await channel.writer.json(FrameType.pause, {'reason': 'Paused by receiver'});
+        await channel.writer
+            .json(FrameType.pause, {'reason': 'Paused by receiver'});
         await channel.writer.flush();
       } on Object {
         // The peer may already be gone; the local pause still holds.
@@ -460,6 +509,7 @@ class TransferClient {
   Future<void> resume() async {
     if (!_pausedByReceiver) return;
     _pausedByReceiver = false;
+    AppLog.info('client', 'resumed');
     final waiter = _resumeWaiter;
     _resumeWaiter = null;
     final channel = _channel;
@@ -477,6 +527,7 @@ class TransferClient {
 
   Future<void> cancel() async {
     _cancelled = true;
+    AppLog.info('client', 'cancelled by receiver');
     final waiter = _resumeWaiter;
     _resumeWaiter = null;
     if (waiter != null && !waiter.isCompleted) waiter.complete();

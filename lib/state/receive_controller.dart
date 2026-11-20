@@ -12,7 +12,6 @@ import 'package:free_send/core/transfer_flow.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/models/transfer_record.dart';
 import 'package:free_send/services/discovery_service.dart';
-import 'package:free_send/services/permissions/network_probe.dart';
 import 'package:free_send/services/hotspot/hotspot_permissions.dart';
 import 'package:free_send/services/hotspot/hotspot_service.dart';
 import 'package:free_send/services/pairing_code.dart';
@@ -436,6 +435,10 @@ class ReceiveController extends ChangeNotifier {
 
     final client = _newClient();
     _client = client;
+    AppLog.info(
+        'receive',
+        'dialing back to $ip:$port'
+            '${label != null ? ' ("$label")' : ''}');
     try {
       final manifest = await client.connect(ip, port);
       await _scanner.stop();
@@ -444,6 +447,10 @@ class ReceiveController extends ChangeNotifier {
       this.manifest = manifest;
       encrypted = manifest.encrypted;
       securityCode = manifest.securityCode;
+      AppLog.info(
+          'receive',
+          'manifest accepted: '
+              '${manifest.items.length} files from $ip:$port');
       receivedItems
         ..clear()
         ..addAll(manifest.items);
@@ -454,12 +461,14 @@ class ReceiveController extends ChangeNotifier {
       saveLocation = await appState.store.ensureDownloadDir();
       await _loadRecovery();
       phase = ReceivePhase.reviewing;
-    } on SocketException {
+    } on SocketException catch (error) {
+      AppLog.error('receive', 'dial $ip:$port refused: ${error.message}');
       errorMessage = _l10n.couldNotReachAddress('$ip:$port');
       phase = ReceivePhase.failed;
       await client.dispose();
       _client = null;
     } on Object catch (error) {
+      AppLog.error('receive', 'dial $ip:$port failed: $error');
       errorMessage = _describe(error);
       phase = ReceivePhase.failed;
       await client.dispose();
@@ -535,6 +544,10 @@ class ReceiveController extends ChangeNotifier {
     _recoveryDone = false;
     _recovery ??= TransferRecovery(saveLocation);
     phase = ReceivePhase.transferring;
+    AppLog.info(
+        'receive',
+        'transfer started: ${selectedIds.length} files '
+            '-> $saveLocation (${formatBytes(totalBytes)})');
     await _foreground.start(
       title: _l10n.receivingFilesTitle,
       text:
@@ -687,6 +700,7 @@ class ReceiveController extends ChangeNotifier {
       _lastSampleAt = null;
       _lastSampleBytes = receivedBytes;
       phase = ReceivePhase.transferring;
+      AppLog.info('receive', 'retrying ${retryIds.length} failed files');
       await _foreground.start(
         title: _l10n.retryingTransferTitle,
         text: _l10n.retryFailedFiles(retryIds.length),
@@ -769,6 +783,10 @@ class ReceiveController extends ChangeNotifier {
   }
 
   void _onFinished(int fileCount, int bytes, Duration elapsed) {
+    AppLog.info(
+        'receive',
+        'transfer finished: $fileCount files, '
+            '${formatBytes(bytes)} in $elapsed');
     _stopwatch?.stop();
     for (final item in receivedItems) {
       if (selectedIds.contains(item.id) && item.transferred >= item.size) {
@@ -790,6 +808,10 @@ class ReceiveController extends ChangeNotifier {
   }
 
   void _onStatus(TransferItem item) {
+    AppLog.debug(
+        'receive',
+        '"${item.name}" -> ${item.status.name} '
+            '(${formatBytes(item.transferred)}/${formatBytes(item.size)})');
     _mergeItem(item);
     if (item.status == TransferStatus.done) {
       _recoveryEntries.remove(item.id);
@@ -810,6 +832,7 @@ class ReceiveController extends ChangeNotifier {
     final client = _client;
     if (client == null) return;
     pausedByMe = true;
+    AppLog.info('receive', 'pause tapped by user');
     speedBytesPerSecond = 0;
     for (final item in receivedItems) {
       if (item.status == TransferStatus.active) {
@@ -823,6 +846,7 @@ class ReceiveController extends ChangeNotifier {
   Future<void> resume() async {
     if (!pausedByMe) return;
     pausedByMe = false;
+    AppLog.info('receive', 'resume tapped by user');
     _lastSampleAt = null;
     _lastSampleBytes = receivedBytes;
     for (final item in receivedItems) {
@@ -836,6 +860,7 @@ class ReceiveController extends ChangeNotifier {
 
   void _onError(String message) {
     if (phase == ReceivePhase.completed) return;
+    AppLog.error('receive', 'transfer failed: $message');
     for (final item in receivedItems) {
       if (!item.done) item.status = TransferStatus.failed;
     }
@@ -880,6 +905,10 @@ class ReceiveController extends ChangeNotifier {
 
   Future<void> cancel() async {
     if (phase == ReceivePhase.transferring) {
+      AppLog.info(
+          'receive',
+          'cancelled by user '
+              '(${formatBytes(receivedBytes)} received so far)');
       final bytes = receivedBytes;
       final files = receivedItems.where((item) => item.done).length;
       pausedByMe = false;

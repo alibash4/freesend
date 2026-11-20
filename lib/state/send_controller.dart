@@ -439,6 +439,7 @@ class SendController extends ChangeNotifier {
   }
 
   void _onPeerError(String peerId, String message) {
+    AppLog.error('send', 'peer $peerId failed: $message');
     peers = [
       for (final peer in peers)
         if (peer.id == peerId)
@@ -458,6 +459,7 @@ class SendController extends ChangeNotifier {
   Future<void> pauseTransfer() async {
     if (phase != SendPhase.transferring || paused) return;
     paused = true;
+    AppLog.info('send', 'pause tapped by user');
     notifyListeners();
     await _host?.pauseTransfer();
   }
@@ -465,6 +467,7 @@ class SendController extends ChangeNotifier {
   Future<void> resumeTransfer() async {
     if (!paused) return;
     paused = false;
+    AppLog.info('send', 'resume tapped by user');
     notifyListeners();
     await _host?.resumeTransfer();
   }
@@ -509,6 +512,10 @@ class SendController extends ChangeNotifier {
   }
 
   void _onFinished(int fileCount, int bytes, Duration elapsed) {
+    AppLog.info(
+        'send',
+        'session finished: $fileCount files, '
+            '${formatBytes(bytes)} in $elapsed');
     // The host reports completion once per receiver. In a group session the
     // first receiver finishing must not end the UI while others are still
     // streaming; the transfer ends when every receiver is done or failed.
@@ -539,6 +546,7 @@ class SendController extends ChangeNotifier {
 
   void _onHostError(String message) {
     if (phase == SendPhase.completed || phase == SendPhase.cancelled) return;
+    AppLog.error('send', 'host error: $message');
     _fail(message);
   }
 
@@ -552,6 +560,10 @@ class SendController extends ChangeNotifier {
 
   Future<void> cancelSession() async {
     if (phase == SendPhase.idle) return;
+    AppLog.info(
+        'send',
+        'session cancelled by user '
+            '(${formatBytes(sentBytes)} sent so far)');
     final bytes = sentBytes;
     final files = items.where((item) => item.transferred > 0).length;
     phase = SendPhase.cancelled;
@@ -611,6 +623,10 @@ class SendController extends ChangeNotifier {
   Future<void> knockScanned(PairingCode code) async {
     final host = code.host;
     if (host == null) return;
+    AppLog.info(
+        'send',
+        'scanned code -> $host:${code.port}'
+            '${code.hasHotspot ? ' (join "${code.ssid}")' : ''}');
     if (code.hasHotspot) {
       final joined = await _joinReceiverHotspot(code);
       if (!joined) return;
@@ -702,6 +718,7 @@ class SendController extends ChangeNotifier {
       fileServerHost: address,
       fileServerPort: port,
     );
+    AppLog.info('send', 'knock to $ip:$consentPort -> ${outcome.name}');
     peerStates[id] = switch (outcome) {
       KnockOutcome.accepted => AuthState.accepted,
       KnockOutcome.declined => AuthState.declined,
@@ -711,6 +728,7 @@ class SendController extends ChangeNotifier {
   }
 
   Future<void> _teardown() async {
+    AppLog.info('send', 'tearing down session');
     await _foreground.stop();
     await _candidateSub?.cancel();
     _candidateSub = null;

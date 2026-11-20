@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:free_send/core/app_constants.dart';
+import 'package:free_send/core/format.dart';
 import 'package:free_send/models/peer_info.dart';
 import 'package:free_send/models/transfer_item.dart';
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/services/device_identity.dart';
 import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/transfer/checksum.dart';
@@ -42,7 +44,8 @@ class HostEvents {
 
   /// Snapshot of every receiver, including per-peer progress and status.
   final void Function(List<PeerInfo> peers)? onPeersChanged;
-  final void Function(String peerId, int fileCount, int bytes, Duration elapsed)?
+  final void Function(
+          String peerId, int fileCount, int bytes, Duration elapsed)?
       onPeerFinished;
   final void Function(String peerId, String message)? onPeerError;
 }
@@ -77,7 +80,8 @@ class TransferHost {
   Future<DeviceIdentity> _deviceIdentity() {
     final existing = _identity;
     if (existing != null) return Future<DeviceIdentity>.value(existing);
-    return DeviceIdentity.load(identityStore).then((value) => _identity = value);
+    return DeviceIdentity.load(identityStore)
+        .then((value) => _identity = value);
   }
 
   bool get isListening => _server != null;
@@ -99,14 +103,22 @@ class TransferHost {
         _server = await ServerSocket.bind(InternetAddress.anyIPv4, candidate);
         _port = candidate;
         _server!.listen(_onConnection, onError: (Object error) {
+          AppLog.error('host', 'listener failed: $error');
           events.onError?.call('Listener problem: $error');
         });
+        AppLog.info(
+            'host',
+            'listening on :$_port '
+                '(${items.length} files, '
+                '${items.fold<int>(0, (sum, item) => sum + item.size)} bytes)');
         events.onListening?.call(_port);
         return _port;
       } on SocketException catch (error) {
+        AppLog.debug('host', 'port $candidate busy: ${error.message}');
         lastError = error;
       }
     }
+    AppLog.error('host', 'no free transfer port: $lastError');
     throw SocketException('No free transfer port ($lastError)');
   }
 
@@ -115,7 +127,12 @@ class TransferHost {
       socket.destroy();
       return;
     }
-    final peer = _HostPeer('p${_peerCounter++}', FrameChannel(socket));
+    final id = 'p${_peerCounter++}';
+    final peer = _HostPeer(id, FrameChannel(socket, tag: 'host:$id'));
+    AppLog.info(
+        'host',
+        'connection from '
+            '${socket.remoteAddress.address}:${socket.remotePort} ($id)');
     _peers[peer.id] = peer;
     _emitPeers();
     unawaited(_serve(peer));
@@ -144,6 +161,10 @@ class TransferHost {
           : 'Nearby device';
       peer.platform = payload['platform'] as String?;
       peer.connected = true;
+      AppLog.info(
+          'host',
+          '${peer.id}: ${peer.name} '
+              '(${peer.platform ?? '?'}) spoke protocol v$version');
       events.onPeerConnected?.call(peer.name, peer.platform);
       _emitPeers();
 
@@ -154,7 +175,8 @@ class TransferHost {
         );
         final handshake = await SecureHandshake.withSalt(salt);
         final hostPublicKey = await handshake.publicKey;
-        final cipher = SecureChannel(await handshake.derive(base64.decode(clientKey)));
+        final cipher =
+            SecureChannel(await handshake.derive(base64.decode(clientKey)));
 
         final identity = await _deviceIdentity();
         final signedMessage = utf8.encode(
@@ -176,10 +198,13 @@ class TransferHost {
         channel.useCipher(encrypt: cipher.seal, decrypt: cipher.open);
         channel.resume();
         peer.encrypted = true;
-        final confirm = await channel.next(timeout: const Duration(seconds: 20));
+        AppLog.info('host', '${peer.id}: encrypted session established');
+        final confirm =
+            await channel.next(timeout: const Duration(seconds: 20));
         if (confirm.type != FrameType.helloConfirm) {
           throw ProtocolException('The receiver did not confirm the key');
         }
+        AppLog.debug('host', '${peer.id}: key confirmed');
       }
 
       await channel.writer.json(FrameType.session, {
@@ -194,6 +219,10 @@ class TransferHost {
         'fingerprint': _identity?.fingerprint,
       });
       await channel.writer.flush();
+      AppLog.info(
+          'host',
+          '${peer.id}: manifest sent '
+              '(${items.length} files offered)');
 
       final accept = await channel.next(timeout: const Duration(minutes: 2));
       if (accept.type == FrameType.cancel) {
@@ -227,6 +256,11 @@ class TransferHost {
       }
       final selected =
           items.where((item) => ids.contains(item.id)).toList(growable: false);
+      AppLog.info(
+          'host',
+          '${peer.id}: receiver selected '
+              '${selected.length}/${items.length} files '
+              '(${offsets.length} resume offsets)');
       if (selected.isEmpty) {
         await channel.writer.error('No files were selected');
         await channel.close();
@@ -244,6 +278,11 @@ class TransferHost {
       peer.status = TransferStatus.active;
       _emitPeers();
       events.onSelectionAccepted?.call(selected);
+      AppLog.info(
+          'host',
+          '${peer.id}: transfer started '
+              '(${selected.length} files, '
+              '${selected.fold<int>(0, (sum, item) => sum + item.size)} bytes)');
 
       final stopwatch = Stopwatch()..start();
       for (final item in selected) {
@@ -265,12 +304,14 @@ class TransferHost {
         throw ProtocolException('The other device disconnected');
       }
 
-      final total = selected.fold<int>(0, (sum, item) => sum + item.transferred);
+      final total =
+          selected.fold<int>(0, (sum, item) => sum + item.transferred);
       await channel.writer.json(FrameType.transferEnd, {
         'files': selected.length,
         'bytes': total,
       });
       await channel.writer.flush();
+      AppLog.info('host', '${peer.id}: all bytes sent, waiting for ackAll');
 
       // Wait for the receiver's *final* acknowledgement. Per-file acks arrive
       // on the same socket, so keep reading until ackAll (or the peer closes);
@@ -288,7 +329,10 @@ class TransferHost {
                 'The other device reported an error',
           );
         }
-        if (ack.type == FrameType.ackAll) break;
+        if (ack.type == FrameType.ackAll) {
+          AppLog.info('host', '${peer.id}: receiver confirmed all files');
+          break;
+        }
       }
       peer.transferred = total;
       peer.completedFiles = selected.length;
@@ -304,23 +348,32 @@ class TransferHost {
       events.onFinished?.call(selected.length, total, stopwatch.elapsed);
       await channel.close();
     } on TimeoutException {
+      AppLog.error(
+          'host', '${peer.id}: timed out - $peer.name stopped responding');
       _peerFailed(peer, 'The other device stopped responding');
       await channel.close();
     } on ProtocolException catch (error) {
+      AppLog.error('host', '${peer.id}: protocol error - ${error.message}');
       _peerFailed(peer, error.message);
       await channel.close();
     } on SocketException catch (error) {
+      AppLog.error('host', '${peer.id}: socket error - ${error.message}');
       if (!peer.aborted) {
         _peerFailed(peer, 'Connection lost: ${error.message}');
       }
       await channel.close();
     } on Object catch (error) {
+      AppLog.error('host', '${peer.id}: transfer failed - $error');
       _peerFailed(peer, 'Transfer failed: $error');
       await channel.close();
     } finally {
       peer.sending = false;
       peer.finished = true;
       if (_peers.remove(peer.id) != null) {
+        AppLog.info(
+            'host',
+            '${peer.id}: ${peer.name} session ended '
+                '(${peer.completedFiles} files done)');
         if (peer.connected) {
           events.onPeerDisconnected?.call(peer.name, peer.platform);
         }
@@ -389,9 +442,7 @@ class TransferHost {
       final relativeSegments =
           item.relativePath?.split('/') ?? const <String>[];
       final relativeDir = relativeSegments.length > 1
-          ? relativeSegments
-              .sublist(0, relativeSegments.length - 1)
-              .join('/')
+          ? relativeSegments.sublist(0, relativeSegments.length - 1).join('/')
           : null;
       await channel.writer.json(FrameType.fileHeader, {
         'id': item.id,
@@ -406,6 +457,11 @@ class TransferHost {
       peer.currentFile = item.name;
       peer.status = TransferStatus.active;
       _emitPeers();
+      AppLog.info(
+          'host',
+          '${peer.id}: sending "${item.name}" '
+              '(${formatBytes(item.size)}'
+              '${offset > 0 ? ', resuming at ${formatBytes(offset)}' : ''})');
 
       var completed = false;
       while (!peer.aborted && !channel.isClosed) {
@@ -444,11 +500,20 @@ class TransferHost {
         peer.completedFiles++;
         peer.currentFile = null;
         _emitPeers();
+        AppLog.info(
+            'host',
+            '${peer.id}: "${item.name}" sent '
+                '(${formatBytes(sent + offset)})');
       }
       return sent;
     } on FileSystemException catch (error) {
+      AppLog.error(
+          'host',
+          '${peer.id}: cannot read "${item.name}": '
+              '${error.message}');
       item.status = TransferStatus.failed;
-      await channel.writer.error('Read error on ${item.name}: ${error.message}');
+      await channel.writer
+          .error('Read error on ${item.name}: ${error.message}');
       await channel.writer.flush();
       return sent;
     } finally {
@@ -472,6 +537,7 @@ class TransferHost {
   Future<void> pauseTransfer({String reason = 'Paused by sender'}) async {
     if (_paused || _disposed) return;
     _paused = true;
+    AppLog.info('host', 'pause requested: $reason');
     for (final peer in _peers.values) {
       if (peer.finished || peer.channel.isClosed) continue;
       try {
@@ -486,6 +552,7 @@ class TransferHost {
   Future<void> resumeTransfer() async {
     if (!_paused) return;
     _paused = false;
+    AppLog.info('host', 'resume requested');
     for (final peer in _peers.values) {
       if (peer.finished || peer.channel.isClosed) continue;
       try {
@@ -503,6 +570,7 @@ class TransferHost {
   /// Aborts the in-flight transfer but keeps the listener alive.
   Future<void> abortTransfer() async {
     _paused = false;
+    AppLog.info('host', 'abort requested');
     final waiter = _resumeWaiter;
     _resumeWaiter = null;
     if (waiter != null && !waiter.isCompleted) waiter.complete();
@@ -511,7 +579,8 @@ class TransferHost {
       peer.aborted = true;
       peer.status = TransferStatus.failed;
       try {
-        await peer.channel.writer.json(FrameType.cancel, {'reason': 'cancelled'});
+        await peer.channel.writer
+            .json(FrameType.cancel, {'reason': 'cancelled'});
         await peer.channel.writer.flush();
       } on Object {
         // Peer may already be gone.
@@ -528,6 +597,7 @@ class TransferHost {
     await _server?.close();
     _server = null;
   }
+
   void _emitPeers() {
     final snapshots = peers;
     events.onPeersChanged?.call(snapshots);

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:free_send/services/app_logger.dart';
 import 'package:free_send/services/transfer/protocol.dart';
 
 /// Turns a socket into an await-able sequence of frames plus a buffered writer.
@@ -8,13 +9,13 @@ import 'package:free_send/services/transfer/protocol.dart';
 /// Reading is pull-based (`next()`), which serialises file writes on the
 /// receiving side and gives natural backpressure through TCP.
 class FrameChannel {
-  FrameChannel(this.socket) {
+  FrameChannel(this.socket, {this.tag}) {
     try {
       socket.setOption(SocketOption.tcpNoDelay, true);
     } on Object {
       // Not fatal: some desktop stacks ignore this option.
     }
-    writer = FrameWriter(socket);
+    writer = FrameWriter(socket, tag: tag);
     // A write to a reset socket surfaces on `done`; with no listener that error
     // escapes as an unhandled async error in the app's zone.
     unawaited(socket.done.then<void>((_) {}, onError: (Object _) {}));
@@ -31,6 +32,9 @@ class FrameChannel {
   }
 
   final Socket socket;
+
+  /// Log prefix identifying which side of the link this channel belongs to.
+  final String? tag;
   late final FrameWriter writer;
   late final FrameReader _reader;
   late final StreamSubscription<Uint8List> _subscription;
@@ -63,12 +67,14 @@ class FrameChannel {
   void pause() {
     if (_paused || _closed) return;
     _paused = true;
+    AppLog.debug('wire', '${tag ?? 'link'} read-paused');
     _subscription.pause();
   }
 
   void resume() {
     if (!_paused) return;
     _paused = false;
+    AppLog.debug('wire', '${tag ?? 'link'} read-resumed');
     _subscription.resume();
     final waiter = _resumeWaiter;
     _resumeWaiter = null;
@@ -88,7 +94,8 @@ class FrameChannel {
     }
     if (_error != null) return Future.error(_error!);
     if (_closed) {
-      return Future.error(ProtocolException('The other device closed the connection'));
+      return Future.error(
+          ProtocolException('The other device closed the connection'));
     }
     final completer = Completer<Frame>();
     _waiter = completer;
@@ -107,7 +114,8 @@ class FrameChannel {
     if (frame.type == FrameType.secure) {
       final decrypt = _decrypt;
       if (decrypt == null) {
-        _fail(ProtocolException('Encrypted frame arrived before the handshake'));
+        _fail(
+            ProtocolException('Encrypted frame arrived before the handshake'));
         return;
       }
       try {
@@ -117,6 +125,14 @@ class FrameChannel {
         _fail(error);
         return;
       }
+    }
+    // Data frames are per-chunk bulk; the control frames around them carry
+    // the story, so only those get a line each.
+    if (frame.type != FrameType.data) {
+      AppLog.debug(
+          'wire',
+          '${tag ?? 'rx'} < ${FrameType.nameOf(frame.type)} '
+              '(${frame.payload.length}B)');
     }
     if (_error != null || _closed) return;
     final waiter = _waiter;
@@ -133,6 +149,7 @@ class FrameChannel {
     _error = error is ProtocolException
         ? error
         : ProtocolException(error.toString());
+    AppLog.warn('wire', '${tag ?? 'link'} failed: $_error');
     final waiter = _waiter;
     _waiter = null;
     if (waiter != null && !waiter.isCompleted) {
@@ -142,6 +159,7 @@ class FrameChannel {
 
   void _markClosed() {
     _closed = true;
+    AppLog.debug('wire', '${tag ?? 'link'} closed by peer');
     final waiter = _waiter;
     _waiter = null;
     if (waiter != null && !waiter.isCompleted) {
@@ -152,7 +170,8 @@ class FrameChannel {
   }
 
   /// Returns the next frame, or null when the peer closes cleanly.
-  Future<Frame?> nextOrNull({Duration timeout = const Duration(seconds: 30)}) async {
+  Future<Frame?> nextOrNull(
+      {Duration timeout = const Duration(seconds: 30)}) async {
     try {
       return await next(timeout: timeout);
     } catch (_) {

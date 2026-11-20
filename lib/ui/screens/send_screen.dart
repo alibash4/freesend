@@ -102,15 +102,24 @@ class _SendScreenState extends State<SendScreen> {
 
   /// Scanning a receiver's QR hands us its doorbell address. Mid-session it
   /// knocks immediately; before a session exists the code is parked and the
-  /// controller knocks it once the session is waiting.
+  /// controller knocks it once the session is waiting. Refusing camera access
+  /// before a session leaves the send flow for the main screen.
   Future<void> _scanReceiver(SendController controller) async {
     controller.setPendingScan(null);
-    final code = await ScanScreen.open(context);
-    if (code == null || !mounted) return;
-    final host = code.host;
-    if (host == null) return;
     final live = controller.phase == SendPhase.waitingForPeer ||
         controller.phase == SendPhase.transferring;
+    var denied = false;
+    final code = await ScanScreen.open(
+      context,
+      onDenied: () => denied = true,
+    );
+    if (code == null) {
+      if (denied && !live && widget.onBack != null) widget.onBack!();
+      return;
+    }
+    if (!mounted) return;
+    final host = code.host;
+    if (host == null) return;
     if (live) {
       await controller.knockScanned(code);
     } else {
@@ -1389,6 +1398,8 @@ class _ChooserOptionState extends State<_ChooserOption> {
         child: InkWell(
           mouseCursor: SystemMouseCursors.click,
           hoverColor: Colors.transparent,
+          splashColor: scheme.accentText.withValues(alpha: 0.10),
+          highlightColor: scheme.onSurface.withValues(alpha: 0.04),
           onTap: widget.onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(

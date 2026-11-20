@@ -14,6 +14,7 @@ import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -65,6 +66,7 @@ class HotspotBridge(
     // ---------------------------------------------------------------- hosting
 
     private fun startHotspot(result: MethodChannel.Result) {
+        Log.i(TAG, "startHotspot requested")
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             result.error(
                 "unsupported",
@@ -109,6 +111,7 @@ class HotspotBridge(
         try {
             wifi.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
                 override fun onStarted(res: WifiManager.LocalOnlyHotspotReservation) {
+                    Log.i(TAG, "LocalOnlyHotspot started: ssid=${ssidOf(res)}")
                     reservation = res
                     handler.post {
                         if (replied) {
@@ -128,6 +131,7 @@ class HotspotBridge(
                 }
 
                 override fun onStopped() {
+                    Log.w(TAG, "LocalOnlyHotspot stopped by system")
                     handler.post {
                         if (replied) return@post
                         replied = true
@@ -136,10 +140,16 @@ class HotspotBridge(
                 }
 
                 override fun onFailed(reason: Int) {
+                    Log.e(TAG, "LocalOnlyHotspot failed, reason=$reason "
+                        + "(${reasonName(reason)})")
                     handler.post {
                         if (replied) return@post
                         replied = true
-                        result.error("failed", failureMessage(reason), null)
+                        result.error(
+                            "failed",
+                            failureMessage(reason),
+                            mapOf("reason" to reason, "reasonName" to reasonName(reason)),
+                        )
                     }
                 }
             }, handler)
@@ -199,11 +209,19 @@ class HotspotBridge(
         else -> "The system could not start a hotspot."
     }
 
+    private fun reasonName(reason: Int): String = when (reason) {
+        WifiManager.LocalOnlyHotspotCallback.ERROR_INCOMPATIBLE_MODE -> "INCOMPATIBLE_MODE"
+        WifiManager.LocalOnlyHotspotCallback.ERROR_TETHERING_DISALLOWED -> "TETHERING_DISALLOWED"
+        WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL -> "NO_CHANNEL"
+        else -> "UNKNOWN"
+    }
+
     // ---------------------------------------------------------------- joining
 
     private fun joinHotspot(call: MethodCall, result: MethodChannel.Result) {
         val ssid = call.argument<String>("ssid")
         val password = call.argument<String>("password")
+        Log.i(TAG, "joinHotspot requested: ssid=$ssid")
         if (ssid.isNullOrEmpty()) {
             result.error("argument", "A hotspot name is required.", null)
             return
@@ -240,6 +258,7 @@ class HotspotBridge(
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 // Route every socket in this process over the hotspot link.
+                Log.i(TAG, "joined network available: $network")
                 manager.bindProcessToNetwork(network)
                 boundNetwork = network
                 handler.post {
@@ -255,6 +274,7 @@ class HotspotBridge(
             }
 
             override fun onUnavailable() {
+                Log.w(TAG, "join to $ssid unavailable")
                 handler.post {
                     if (replied) return@post
                     replied = true
@@ -267,6 +287,7 @@ class HotspotBridge(
             }
 
             override fun onLost(network: Network) {
+                Log.w(TAG, "joined network lost: $network")
                 if (boundNetwork == network) {
                     manager.bindProcessToNetwork(null)
                     boundNetwork = null
@@ -377,5 +398,6 @@ class HotspotBridge(
 
     companion object {
         private const val CHANNEL = "com.freesend.free_send/hotspot"
+        private const val TAG = "FreeSendHotspot"
     }
 }
