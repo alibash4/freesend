@@ -154,23 +154,12 @@ class _SendSelectViewState extends State<SendSelectView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.zero,
-            itemCount: categories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-            itemBuilder: (context, index) {
-              final category = categories[index];
-              return _CategoryChip(
-                label: _categoryLabel(l10n, category),
-                icon: _categoryIcon(category),
-                selected: _category == category,
-                onTap: () => _selectCategory(category),
-              );
-            },
-          ),
+        const SizedBox(height: AppSpacing.md),
+        _CategoryTabs(
+          categories: categories,
+          selected: _category,
+          onSelected: _selectCategory,
+          labelBuilder: (category) => _categoryLabel(l10n, category),
         ),
         const SizedBox(height: AppSpacing.lg),
         Row(
@@ -460,55 +449,166 @@ class _SendSelectViewState extends State<SendSelectView> {
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
+/// Scrollable category tabs with a sliding accent indicator - the same
+/// 20x3 pill the bottom navigation uses, animated with the app's standard
+/// motion curve.
+class _CategoryTabs extends StatefulWidget {
+  const _CategoryTabs({
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+    required this.labelBuilder,
+  });
+
+  final List<_SendCategory> categories;
+  final _SendCategory selected;
+  final ValueChanged<_SendCategory> onSelected;
+  final String Function(_SendCategory) labelBuilder;
+
+  @override
+  State<_CategoryTabs> createState() => _CategoryTabsState();
+}
+
+class _CategoryTabsState extends State<_CategoryTabs> {
+  final _stackKey = GlobalKey();
+  final _tabKeys = <_SendCategory, GlobalKey>{};
+
+  /// Left edge of the indicator inside the strip; -1 hides it until the
+  /// first measurement lands.
+  double _indicatorX = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncIndicator());
+  }
+
+  @override
+  void didUpdateWidget(_CategoryTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncIndicator());
+    }
+  }
+
+  /// Measures the selected tab's centre relative to the strip so the
+  /// indicator can slide to it. Both boxes live inside the same scroll
+  /// view, so the difference is scroll-independent.
+  void _syncIndicator() {
+    final stripBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final tabBox = _tabKeys[widget.selected]?.currentContext?.findRenderObject()
+        as RenderBox?;
+    if (stripBox == null ||
+        tabBox == null ||
+        !stripBox.hasSize ||
+        !tabBox.hasSize) {
+      return;
+    }
+    final stripOrigin = stripBox.localToGlobal(Offset.zero);
+    final tabOrigin = tabBox.localToGlobal(Offset.zero);
+    final centerX = tabOrigin.dx - stripOrigin.dx + tabBox.size.width / 2;
+    final left = centerX - 10;
+    if ((left - _indicatorX).abs() > 0.5) {
+      setState(() => _indicatorX = left);
+    }
+  }
+
+  void _select(_SendCategory category) {
+    widget.onSelected(category);
+    final tabContext = _tabKeys[category]?.currentContext;
+    if (tabContext != null) {
+      Scrollable.ensureVisible(
+        tabContext,
+        alignment: 0.5,
+        duration: AppMotion.base,
+        curve: AppMotion.standard,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: SizedBox(
+        height: 40,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.zero,
+          child: Stack(
+            key: _stackKey,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final category in widget.categories)
+                    _CategoryTab(
+                      key: _tabKeys.putIfAbsent(category, GlobalKey.new),
+                      label: widget.labelBuilder(category),
+                      selected: category == widget.selected,
+                      onTap: () => _select(category),
+                    ),
+                ],
+              ),
+              if (_indicatorX >= 0)
+                AnimatedPositioned(
+                  duration: AppMotion.base,
+                  curve: AppMotion.standard,
+                  left: _indicatorX,
+                  bottom: 5,
+                  child: Container(
+                    width: 20,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(AppRadii.pill),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryTab extends StatelessWidget {
+  const _CategoryTab({
+    super.key,
     required this.label,
-    required this.icon,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
-  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: selected ? scheme.primaryContainer : scheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(AppRadii.pill),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        mouseCursor: SystemMouseCursors.click,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: 8,
+    final dark = theme.brightness == Brightness.dark;
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    final color = selected ? AppColors.accent : idle;
+    return InkWell(
+      mouseCursor: SystemMouseCursors.click,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.field),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: 9,
+        ),
+        child: AnimatedDefaultTextStyle(
+          duration: AppMotion.base,
+          curve: AppMotion.standard,
+          style: theme.textTheme.labelLarge!.copyWith(
+            fontSize: 15,
+            color: color,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
           ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: selected
-                    ? scheme.onPrimaryContainer
-                    : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: selected
-                      ? scheme.onPrimaryContainer
-                      : scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
+          child: Text(label),
         ),
       ),
     );
