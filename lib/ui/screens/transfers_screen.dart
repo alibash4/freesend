@@ -85,7 +85,7 @@ class _TransfersScreenState extends State<TransfersScreen> {
           Padding(
             padding: kPagePadding,
             child: EmptyState(
-              icon: AppIcons.zap,
+              icon: AppIcons.transfers,
               title: l10n.nothingTransferring,
               message: l10n.nothingTransferringMessage,
             ),

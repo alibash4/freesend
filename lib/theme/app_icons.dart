@@ -18,6 +18,7 @@ abstract final class AppIcons {
   static final IconData link = UIcons.regularRounded.link;
   static final IconData unlink = UIcons.regularRounded.link_slash;
   static final IconData zap = UIcons.regularRounded.bolt;
+  static final IconData transfers = UIcons.regularRounded.cloud_back_up;
   static final IconData device = UIcons.regularRounded.screen;
   static final IconData group = UIcons.regularRounded.network_user;
   static final IconData phone = UIcons.regularRounded.smartphone;
@@ -102,7 +103,7 @@ abstract final class AppIcons {
 
   // Bottom navigation: regular when idle, solid when active.
   static final IconData homeActive = UIcons.solidRounded.home;
-  static final IconData transfersActive = UIcons.solidRounded.bolt;
+  static final IconData transfersActive = UIcons.solidRounded.cloud_back_up;
   static final IconData historyActive = UIcons.solidRounded.time_past;
   static final IconData settingsActive = UIcons.solidRounded.settings;
 
@@ -120,6 +121,7 @@ abstract final class AppIcons {
     'link': link,
     'unlink': unlink,
     'zap': zap,
+    'transfers': transfers,
     'device': device,
     'group': group,
     'phone': phone,

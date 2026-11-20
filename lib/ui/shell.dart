@@ -104,7 +104,7 @@ class _AppShellState extends State<AppShell> {
       ),
       AppNavItem(
         label: l10n.navTransfers,
-        icon: AppIcons.zap,
+        icon: AppIcons.transfers,
         activeIcon: AppIcons.transfersActive,
       ),
       AppNavItem(
