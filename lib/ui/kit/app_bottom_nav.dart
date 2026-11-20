@@ -24,6 +24,53 @@ class AppNavItem {
   final IconData activeIcon;
 }
 
+/// Nav icon that crossfades between the muted outline glyph and the accent
+/// solid glyph when [selected] flips.
+class AnimatedNavIcon extends StatelessWidget {
+  const AnimatedNavIcon({
+    super.key,
+    required this.item,
+    required this.selected,
+    this.size = 23,
+  });
+
+  final AppNavItem item;
+  final bool selected;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: selected ? 1 : 0),
+      duration: AppMotion.base,
+      curve: AppMotion.standard,
+      builder: (context, t, _) => SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Opacity(
+              opacity: 1 - t,
+              child: Icon(item.icon, size: size, color: idle),
+            ),
+            Opacity(
+              opacity: t,
+              child: Icon(
+                item.activeIcon,
+                size: size,
+                color: AppColors.accent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Custom bottom navigation. No Material `NavigationBar`, indicator pill, ink
 /// splash, or ripple. The bar is full-width with a single top hairline.
 class AppBottomNav extends StatelessWidget {
@@ -151,7 +198,6 @@ class _AppNavItemView extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
-    final color = selected ? AppColors.accent : idle;
     final labelColor = selected ? scheme.onSurface : idle;
     final activeBackground = dark
         ? Colors.white.withValues(
@@ -194,11 +240,7 @@ class _AppNavItemView extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Icon(
-                              selected ? item.activeIcon : item.icon,
-                              size: 23,
-                              color: color,
-                            ),
+                            AnimatedNavIcon(item: item, selected: selected),
                             const SizedBox(height: 2),
                             FittedBox(
                               fit: BoxFit.scaleDown,

@@ -100,7 +100,6 @@ class _SidebarItemView extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final idle = dark ? AppColors.neutral300 : AppColors.neutral700;
-    final color = selected ? AppColors.accent : idle;
     final labelColor = selected ? scheme.onSurface : idle;
     final hoverColor = dark
         ? Colors.white.withValues(alpha: 0.06)
@@ -157,10 +156,10 @@ class _SidebarItemView extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          selected ? item.activeIcon : item.icon,
+                        AnimatedNavIcon(
+                          item: item,
+                          selected: selected,
                           size: 21,
-                          color: color,
                         ),
                         const SizedBox(width: AppSpacing.md),
                         Expanded(
