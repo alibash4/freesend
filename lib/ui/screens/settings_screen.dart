@@ -301,10 +301,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return CollapsingHeader(
       controller: _scrollController,
       title: l10n.settings,
+      alwaysCollapsed: true,
       child: ListView(
         controller: _scrollController,
         padding: EdgeInsets.only(
-          top: CollapsingHeader.expandedHeight + AppSpacing.md,
+          top: CollapsingHeader.collapsedHeight + AppSpacing.md,
           bottom: AppSpacing.xl +
               (appState.floatingNav ? floatingNavClearance(context) : 0),
         ),

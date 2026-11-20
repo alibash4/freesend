@@ -21,6 +21,7 @@ class CollapsingHeader extends StatefulWidget {
     required this.title,
     required this.child,
     this.leading,
+    this.alwaysCollapsed = false,
   });
 
   /// Header height fully expanded and fully collapsed.
@@ -43,6 +44,9 @@ class CollapsingHeader extends StatefulWidget {
   /// The scrollable content, typically a [ListView] using [controller].
   final Widget child;
 
+  /// Pins the header in its collapsed state: no morph, just the compact bar.
+  final bool alwaysCollapsed;
+
   @override
   State<CollapsingHeader> createState() => _CollapsingHeaderState();
 }
@@ -53,7 +57,7 @@ class _CollapsingHeaderState extends State<CollapsingHeader> {
   @override
   void initState() {
     super.initState();
-    widget.controller.addListener(_update);
+    if (!widget.alwaysCollapsed) widget.controller.addListener(_update);
   }
 
   @override
@@ -61,13 +65,13 @@ class _CollapsingHeaderState extends State<CollapsingHeader> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_update);
-      widget.controller.addListener(_update);
+      if (!widget.alwaysCollapsed) widget.controller.addListener(_update);
     }
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_update);
+    if (!widget.alwaysCollapsed) widget.controller.removeListener(_update);
     super.dispose();
   }
 
@@ -80,7 +84,7 @@ class _CollapsingHeaderState extends State<CollapsingHeader> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final t = _t;
+    final t = widget.alwaysCollapsed ? 1.0 : _t;
     final height = lerpDouble(
       CollapsingHeader.expandedHeight,
       CollapsingHeader.collapsedHeight,
