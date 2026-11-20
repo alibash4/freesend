@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:scroll_animator/scroll_animator.dart';
-import 'package:uicons/uicons.dart';
+import 'package:free_send/theme/uicons.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -84,17 +84,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 final gap = compact ? AppSpacing.md : AppSpacing.xl;
                 final available = constraints.maxWidth;
                 // The two actions always sit inline; the cards scale to fit.
-                final width =
-                    ((available - gap) / 2).clamp(compact ? 110.0 : 150.0, 230.0);
+                final width = ((available - gap) / 2)
+                    .clamp(compact ? 110.0 : 150.0, 230.0);
                 final tabs = [
                   _FolderAction(
                     icon: UIcons.solidRounded.upload,
                     title: l10n.sendFile,
                     subtitle: l10n.transferData,
                     width: width,
-                    fill: dark
-                        ? AppColors.accentWashDark
-                        : AppColors.accentWash,
+                    fill:
+                        dark ? AppColors.accentWashDark : AppColors.accentWash,
                     ink: dark ? AppColors.accentInkDark : AppColors.accentInk,
                     onTap: _openSend,
                   ),
@@ -106,10 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     fill: dark
                         ? AppColors.successWashDark
                         : AppColors.successWash,
-                    ink: dark
-                        ? AppColors.successInkDark
-                        : AppColors.successInk,
-                    onTap: () => _open(widget.onOpenReceive, const ReceiveScreen()),
+                    ink: dark ? AppColors.successInkDark : AppColors.successInk,
+                    onTap: () =>
+                        _open(widget.onOpenReceive, const ReceiveScreen()),
                   ),
                 ];
                 final rowWidth = width * 2 + gap;
@@ -172,8 +170,7 @@ class _FolderAction extends StatelessWidget {
     final dark = theme.brightness == Brightness.dark;
     final cardFill =
         fill ?? (dark ? AppColors.neutral800 : AppColors.neutral100);
-    final cardInk =
-        ink ?? (dark ? AppColors.neutral100 : AppColors.neutral800);
+    final cardInk = ink ?? (dark ? AppColors.neutral100 : AppColors.neutral800);
     final height = width * 0.85;
 
     return Semantics(

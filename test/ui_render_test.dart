@@ -39,6 +39,7 @@ import 'package:free_send/ui/screens/send_screen.dart';
 import 'package:free_send/ui/widgets/pairing_card.dart';
 import 'package:free_send/ui/widgets/peer_list.dart';
 import 'package:free_send/ui/widgets/common.dart';
+import 'package:free_send/ui/widgets/knock_gate.dart';
 import 'package:free_send/ui/widgets/update_sheet.dart';
 
 /// Renders the real screens at phone size so layout overflow and missing
@@ -56,18 +57,12 @@ void main() {
       'Roboto-Bold.ttf',
     ]);
     await _loadFont('MaterialIcons', ['MaterialIcons-Regular.otf']);
-    // Package fonts are not part of the test bundle, so the two UIcons builds
-    // the app icons use are registered by hand.
-    await _loadPackageFont(
-      family: 'uicons_regular_rounded',
-      package: 'uicons_regular_rounded',
-      asset: 'font/uicons_regular_rounded.ttf',
-    );
-    await _loadPackageFont(
-      family: 'uicons_solid_rounded',
-      package: 'uicons_solid_rounded',
-      asset: 'font/uicons_solid_rounded.ttf',
-    );
+    // Icon fonts ship as plain project assets, so they are registered by
+    // hand for the test bundle.
+    await _loadAssetFont(
+        'uicons-regular-rounded', 'assets/fonts/uicons-rr.ttf');
+    await _loadAssetFont('uicons-solid-rounded', 'assets/fonts/uicons-sr.ttf');
+    await _loadAssetFont('uicons-brands', 'assets/fonts/uicons-brands.ttf');
   });
 
   setUp(() async {
@@ -124,7 +119,7 @@ void main() {
             locale: const Locale('en'),
             supportedLocales: const [Locale('en'), Locale('ar')],
             localizationsDelegates: [AppLocalizations.delegate],
-            home: home,
+            home: KnockGate(child: home),
           ),
         ),
       ),
@@ -486,12 +481,21 @@ void main() {
           fileCount: 12,
           totalBytes: 1024,
           fileServerHost: InternetAddress.loopbackIPv4.address,
-          fileServerPort: 47811,
+          // A remembered device dials straight back; port 9 is never bound,
+          // so the attempt refuses instantly instead of racing a real host.
+          fileServerPort: 9,
           timeout: const Duration(seconds: 5),
         ));
     await settle(tester);
     expect(find.text('Accept files from Desk Mini?'), findsNothing);
     expect(controller.activeKnock, isNull);
+
+    // The remembered device dials straight back without asking; the refused
+    // connection runs on a real socket, so give it a window to fail cleanly.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 800)),
+    );
+    await settle(tester);
   });
 
   testWidgets('the logs screen shows entries and can copy them', (
@@ -736,24 +740,8 @@ ThemeData _withFont(ThemeData base) => base.copyWith(
       primaryTextTheme: base.primaryTextTheme.apply(fontFamily: 'Roboto'),
     );
 
-Future<void> _loadPackageFont({
-  required String family,
-  required String package,
-  required String asset,
-}) async {
-  // flutter_test cannot resolve package URIs, so the package root comes from
-  // the project's own package config.
-  final config = File('.dart_tool/package_config.json');
-  if (!config.existsSync()) return;
-  final decoded =
-      jsonDecode(await config.readAsString()) as Map<String, Object?>;
-  final packages =
-      (decoded['packages'] as List<Object?>).cast<Map<String, Object?>>();
-  final match = packages.where((entry) => entry['name'] == package);
-  if (match.isEmpty) return;
-  final root = config.uri.resolve(match.first['rootUri']! as String);
-  final rootPath = root.toFilePath().replaceAll(RegExp(r'/+$'), '');
-  final file = File('$rootPath/$asset');
+Future<void> _loadAssetFont(String family, String path) async {
+  final file = File(path);
   if (!await file.exists()) return;
   final bytes = await file.readAsBytes();
   final loader = FontLoader(family)

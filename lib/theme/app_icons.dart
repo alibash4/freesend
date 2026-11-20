@@ -1,10 +1,10 @@
-import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart';
 
-import 'package:uicons/uicons.dart';
-import 'package:uicons_brands/uicons_brands.dart';
+import 'uicons.dart';
 
 /// Icon set for the whole app: UIcons Regular Rounded. Screens never reach
-/// into the package directly, so the style is decided in exactly one place.
+/// into the font classes directly, so the style is decided in exactly one
+/// place.
 abstract final class AppIcons {
   // Transfer.
   static final IconData send = UIcons.regularRounded.arrow_up_right;
@@ -12,7 +12,9 @@ abstract final class AppIcons {
   static final IconData share = UIcons.regularRounded.share;
   static final IconData receive = UIcons.regularRounded.arrow_down;
   static final IconData hotspot = UIcons.regularRounded.signal_alt;
-  static final IconData wifi = UIcons.regularRounded.wifi_alt;
+  static final IconData wifi = UIcons.regularRounded.wifi;
+  static final IconData devices = UIcons.regularRounded.laptop_mobile;
+  static final IconData vpnShield = UIcons.regularRounded.shield_keyhole;
   static final IconData link = UIcons.regularRounded.link;
   static final IconData unlink = UIcons.regularRounded.link_slash;
   static final IconData zap = UIcons.regularRounded.bolt;
@@ -60,7 +62,7 @@ abstract final class AppIcons {
   static final IconData checkCircle = UIcons.regularRounded.checkbox;
   static final IconData circle = UIcons.regularRounded.circle;
   static final IconData package = UIcons.regularRounded.package;
-  static final IconData android = const UIconsBrands().android;
+  static final IconData android = UIcons.brands.android;
   static final IconData lock = UIcons.regularRounded.lock;
   static final IconData stop = UIcons.regularRounded.stop;
   static final IconData pause = UIcons.regularRounded.pause;
@@ -79,8 +81,7 @@ abstract final class AppIcons {
   static final IconData auto = UIcons.regularRounded.screen;
 
   // System states.
-  static final IconData shieldAlert = UIcons.regularRounded.shield_exclamation;
-  static final IconData locationPin = UIcons.regularRounded.location_alt;
+  static final IconData locationPin = UIcons.regularRounded.marker;
 
   // Settings sections.
   static final IconData deviceMobile = UIcons.regularRounded.smartphone;
@@ -96,4 +97,83 @@ abstract final class AppIcons {
   static final IconData transfersActive = UIcons.solidRounded.bolt;
   static final IconData historyActive = UIcons.solidRounded.time_past;
   static final IconData settingsActive = UIcons.solidRounded.settings;
+
+  /// Every icon in the set, keyed by field name — drives the debug icon
+  /// gallery screen.
+  static final Map<String, IconData> catalog = {
+    'send': send,
+    'sendPlane': sendPlane,
+    'share': share,
+    'receive': receive,
+    'hotspot': hotspot,
+    'wifi': wifi,
+    'devices': devices,
+    'vpnShield': vpnShield,
+    'link': link,
+    'unlink': unlink,
+    'zap': zap,
+    'device': device,
+    'users': users,
+    'phone': phone,
+    'scan': scan,
+    'qr': qr,
+    'copy': copy,
+    'paste': paste,
+    'address': address,
+    'folder': folder,
+    'folderOpen': folderOpen,
+    'add': add,
+    'addCircle': addCircle,
+    'download': download,
+    'inbox': inbox,
+    'trash': trash,
+    'image': image,
+    'video': video,
+    'music': music,
+    'file': file,
+    'fileText': fileText,
+    'pdf': pdf,
+    'home': home,
+    'history': history,
+    'settings': settings,
+    'back': back,
+    'forward': forward,
+    'chevronRight': chevronRight,
+    'chevronLeft': chevronLeft,
+    'close': close,
+    'refresh': refresh,
+    'spinner': spinner,
+    'loading': loading,
+    'check': check,
+    'checkCircle': checkCircle,
+    'circle': circle,
+    'package': package,
+    'android': android,
+    'lock': lock,
+    'stop': stop,
+    'pause': pause,
+    'play': play,
+    'alert': alert,
+    'info': info,
+    'radar': radar,
+    'search': search,
+    'cameraOff': cameraOff,
+    'camera': camera,
+    'bell': bell,
+    'sun': sun,
+    'moon': moon,
+    'auto': auto,
+    'locationPin': locationPin,
+    'deviceMobile': deviceMobile,
+    'palette': palette,
+    'compress': compress,
+    'database': database,
+    'update': update,
+    'sliders': sliders,
+    'apps': apps,
+    'homeActive': homeActive,
+    'transfersActive': transfersActive,
+    'historyActive': historyActive,
+    'settingsActive': settingsActive,
+  };
 }
