@@ -46,6 +46,8 @@ abstract final class AppIcons {
   static final IconData file = UIcons.regularRounded.file;
   static final IconData fileText = UIcons.regularRounded.document;
   static final IconData pdf = UIcons.regularRounded.file_invoice;
+  static final IconData grid = UIcons.regularRounded.grid;
+  static final IconData list = UIcons.regularRounded.list;
 
   // Navigation and chrome.
   static final IconData home = UIcons.regularRounded.home;
@@ -145,6 +147,8 @@ abstract final class AppIcons {
     'file': file,
     'fileText': fileText,
     'pdf': pdf,
+    'grid': grid,
+    'list': list,
     'home': home,
     'history': history,
     'settings': settings,
