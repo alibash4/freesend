@@ -156,12 +156,16 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
         child: CollapsingHeader(
           controller: _scrollController,
           title: widget.title,
-          leading: IconButton(
-            onPressed: _leave,
-            icon: Icon(backGlyph),
-            mouseCursor: SystemMouseCursors.click,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          leading: Transform.translate(
+            offset: const Offset(-7, 0),
+            child: IconButton(
+              onPressed: _leave,
+              icon: Icon(backGlyph, size: 25),
+              mouseCursor: SystemMouseCursors.click,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              alignment: Alignment.centerLeft,
+            ),
           ),
           child: ListView(
             controller: _scrollController,
@@ -174,7 +178,7 @@ class _SetupScreenState extends State<SetupScreen> with WidgetsBindingObserver {
             children: [
               Text(
                 l10n.setupIntro,
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.start,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                   height: 1.45,

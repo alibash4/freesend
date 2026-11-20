@@ -94,10 +94,10 @@ class _CollapsingHeaderState extends State<CollapsingHeader> {
       widget.leading == null ? AppSpacing.md : AppSpacing.md + 52,
       t,
     )!;
-    final titleTop = lerpDouble(56, 16, t)!;
-    final leadingTop = lerpDouble(12, 8, t)!;
+    final titleTop = lerpDouble(72, 22, t)!;
+    const leadingTop = 12.0;
     final titleStyle = AppTypography.pageTitle.copyWith(
-      fontSize: lerpDouble(24, 20, t),
+      fontSize: lerpDouble(24, 22, t),
       color: dark ? AppColors.neutral200 : AppColors.neutral800,
     );
 

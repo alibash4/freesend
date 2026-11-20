@@ -167,7 +167,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            icon: Icon(backGlyph),
+            icon: Icon(backGlyph, size: 25),
             mouseCursor: SystemMouseCursors.click,
             onPressed: () {
               context.read<AppState>().tick();

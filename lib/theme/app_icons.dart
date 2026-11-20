@@ -49,6 +49,12 @@ abstract final class AppIcons {
   static final IconData history = UIcons.regularRounded.time_past;
   static final IconData settings = UIcons.regularRounded.settings;
   static final IconData back = UIcons.regularRounded.arrow_left;
+  // UIcons arrow-small-left (fi-rr-arrow-small-left), mirrored in RTL.
+  static final IconData backSmall = const IconData(
+    0xf19d,
+    fontFamily: 'uicons-regular-rounded',
+    matchTextDirection: true,
+  );
   static final IconData forward = UIcons.regularRounded.arrow_right;
   static final IconData chevronRight = UIcons.regularRounded.angle_right;
   static final IconData chevronLeft = UIcons.regularRounded.angle_left;
@@ -137,6 +143,7 @@ abstract final class AppIcons {
     'history': history,
     'settings': settings,
     'back': back,
+    'backSmall': backSmall,
     'forward': forward,
     'chevronRight': chevronRight,
     'chevronLeft': chevronLeft,
