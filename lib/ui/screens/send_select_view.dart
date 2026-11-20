@@ -473,14 +473,67 @@ class _CategoryTabsState extends State<_CategoryTabs> {
   final _stackKey = GlobalKey();
   final _tabKeys = <_SendCategory, GlobalKey>{};
 
+  /// Lazily created so a preserved [State] across hot reload still gets a
+  /// working controller (field initializers don't re-run on reload).
+  ScrollController? _scrollControllerInstance;
+  ScrollController get _scrollController =>
+      _scrollControllerInstance ??= ScrollController();
+
   /// Left edge of the indicator inside the strip; -1 hides it until the
   /// first measurement lands.
   double _indicatorX = -1;
 
+  /// Whether more content is hidden past each visual edge, driving the
+  /// gradient fades.
+  bool _fadeLeft = false;
+  bool _fadeRight = false;
+  bool _scrollListening = false;
+
+  void _listenToScroll() {
+    if (_scrollListening) return;
+    _scrollListening = true;
+    _scrollController.addListener(_updateEdgeFades);
+  }
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncIndicator());
+    _listenToScroll();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncIndicator();
+      _updateEdgeFades();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Direction flips swap which scroll edge is "start", so recompute.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateEdgeFades());
+  }
+
+  @override
+  void dispose() {
+    _scrollControllerInstance?.dispose();
+    _scrollControllerInstance = null;
+    super.dispose();
+  }
+
+  void _updateEdgeFades() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final atStart = position.pixels <= position.minScrollExtent + 0.5;
+    final atEnd = position.pixels >= position.maxScrollExtent - 0.5;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    // The scroll "start" sits on the left in LTR and on the right in RTL.
+    final fadeLeft = rtl ? !atEnd : !atStart;
+    final fadeRight = rtl ? !atStart : !atEnd;
+    if (fadeLeft != _fadeLeft || fadeRight != _fadeRight) {
+      setState(() {
+        _fadeLeft = fadeLeft;
+        _fadeRight = fadeRight;
+      });
+    }
   }
 
   @override
@@ -528,45 +581,105 @@ class _CategoryTabsState extends State<_CategoryTabs> {
 
   @override
   Widget build(BuildContext context) {
+    // Recompute after every layout so the fades stay correct across hot
+    // reloads, resizes, and locale/direction flips; the scroll listener
+    // covers live updates while dragging.
+    _listenToScroll();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateEdgeFades());
     return Material(
       type: MaterialType.transparency,
       child: SizedBox(
         height: 40,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.zero,
-          child: Stack(
-            key: _stackKey,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.zero,
+              child: Stack(
+                key: _stackKey,
                 children: [
-                  for (final category in widget.categories)
-                    _CategoryTab(
-                      key: _tabKeys.putIfAbsent(category, GlobalKey.new),
-                      label: widget.labelBuilder(category),
-                      selected: category == widget.selected,
-                      onTap: () => _select(category),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final category in widget.categories)
+                        _CategoryTab(
+                          key: _tabKeys.putIfAbsent(category, GlobalKey.new),
+                          label: widget.labelBuilder(category),
+                          selected: category == widget.selected,
+                          onTap: () => _select(category),
+                        ),
+                    ],
+                  ),
+                  if (_indicatorX >= 0)
+                    AnimatedPositioned(
+                      duration: AppMotion.base,
+                      curve: AppMotion.standard,
+                      left: _indicatorX,
+                      bottom: 5,
+                      child: Container(
+                        width: 20,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(AppRadii.pill),
+                        ),
+                      ),
                     ),
                 ],
               ),
-              if (_indicatorX >= 0)
-                AnimatedPositioned(
-                  duration: AppMotion.base,
-                  curve: AppMotion.standard,
-                  left: _indicatorX,
-                  bottom: 5,
-                  child: Container(
-                    width: 20,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(AppRadii.pill),
-                    ),
+            ),
+            if (_fadeLeft || _fadeRight)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      if (_fadeLeft)
+                        SizedBox(
+                          width: AppSpacing.xl,
+                          child: _EdgeFade(
+                            edge: Alignment.centerLeft,
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                      const Spacer(),
+                      if (_fadeRight)
+                        SizedBox(
+                          width: AppSpacing.xl,
+                          child: _EdgeFade(
+                            edge: Alignment.centerRight,
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A one-sided fade from the page background into transparency, used to
+/// hint that the tab strip scrolls.
+class _EdgeFade extends StatelessWidget {
+  const _EdgeFade({required this.edge, required this.color});
+
+  final Alignment edge;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: edge,
+          end: edge == Alignment.centerLeft
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          colors: [color, color.withValues(alpha: 0)],
         ),
       ),
     );
