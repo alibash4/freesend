@@ -237,9 +237,27 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     }
   }
 
+  /// On Android the shared-storage root doubles as the home directory, so
+  /// the breadcrumb anchors there instead of exposing /storage/emulated/0.
+  static const _androidHome = '/storage/emulated/0';
+
   /// Breadcrumb segments as (label, absolute path) pairs, root first.
-  List<({String label, String path})> _crumbs() {
+  List<({String label, String path})> _crumbs(String rootLabel) {
     final normalized = _dir.path.replaceAll('\\', '/');
+    if (Platform.isAndroid &&
+        (normalized == _androidHome ||
+            normalized.startsWith('$_androidHome/'))) {
+      final crumbs = <({String label, String path})>[
+        (label: rootLabel, path: _androidHome),
+      ];
+      var acc = _androidHome;
+      final rest = normalized.substring(_androidHome.length);
+      for (final part in rest.split('/').where((part) => part.isNotEmpty)) {
+        acc += '/$part';
+        crumbs.add((label: part, path: acc));
+      }
+      return crumbs;
+    }
     final parts =
         normalized.split('/').where((part) => part.isNotEmpty).toList();
     final crumbs = <({String label, String path})>[];
@@ -265,7 +283,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
   }
 
   String? get _parentPath {
-    final crumbs = _crumbs();
+    final crumbs = _crumbs('');
     return crumbs.length > 1 ? crumbs[crumbs.length - 2].path : null;
   }
 
@@ -331,7 +349,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
           child: Row(
             children: [
               IconButton(
-                icon: Icon(AppIcons.arrowUp),
+                icon: Icon(AppIcons.backSmall),
                 tooltip: l10n.up,
                 onPressed: _parentPath == null
                     ? null
@@ -339,7 +357,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
               ),
               Expanded(
                 child: _Breadcrumbs(
-                  crumbs: _crumbs(),
+                  crumbs: _crumbs(l10n.navHome),
                   onSelect: (path) => _load(Directory(path)),
                 ),
               ),

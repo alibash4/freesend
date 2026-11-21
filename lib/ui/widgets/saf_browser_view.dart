@@ -244,7 +244,7 @@ class _SafBrowserViewState extends State<SafBrowserView> {
           child: Row(
             children: [
               IconButton(
-                icon: Icon(AppIcons.arrowUp),
+                icon: Icon(AppIcons.backSmall),
                 tooltip: l10n.up,
                 onPressed:
                     _parentPath == null ? null : () => _load(_parentPath!),

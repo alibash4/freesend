@@ -8,7 +8,6 @@ import 'uicons.dart';
 abstract final class AppIcons {
   // Transfer.
   static final IconData send = UIcons.regularRounded.arrow_up_right;
-  static final IconData arrowUp = UIcons.regularRounded.arrow_up;
   static final IconData sendPlane = UIcons.regularRounded.paper_plane;
   static final IconData dataTransfer = UIcons.regularRounded.data_transfer;
   static final IconData receive = UIcons.regularRounded.arrow_down;
@@ -114,7 +113,6 @@ abstract final class AppIcons {
   /// gallery screen.
   static final Map<String, IconData> catalog = {
     'send': send,
-    'arrowUp': arrowUp,
     'sendPlane': sendPlane,
     'dataTransfer': dataTransfer,
     'receive': receive,
