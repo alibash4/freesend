@@ -1049,6 +1049,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get close => 'Close';
 
   @override
+  String get pressBackAgainToExit => 'Press back again to exit';
+
+  @override
   String get scanHint => 'Point the camera at the code on the sending device.';
 
   @override
