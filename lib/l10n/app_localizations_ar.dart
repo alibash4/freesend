@@ -1063,6 +1063,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get close => 'إغلاق';
 
   @override
+  String get pressBackAgainToExit => 'اضغط رجوع مرة أخرى للخروج';
+
+  @override
   String get scanHint => 'وجّه الكاميرا نحو الرمز على جهاز الإرسال.';
 
   @override

@@ -295,6 +295,7 @@
   "sendToGroupHint": "Pick several devices; each one accepts on its own.",
   "howToSend": "How do you want to send?",
   "close": "Close",
+  "pressBackAgainToExit": "Press back again to exit",
   "scanHint": "Point the camera at the code on the sending device.",
   "scanWrongCode": "That code is not from FreeSend. Point the camera at the code on the sending device.",
   "cameraOff": "Camera access is off",

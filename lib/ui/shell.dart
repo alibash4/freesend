@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -39,6 +40,33 @@ class _AppShellState extends State<AppShell> {
 
   /// The entry chosen from the send control, handed to the overlay screen.
   SendMode? _sendMode;
+
+  /// Timestamp of the last home-screen back press, for double-back-to-exit.
+  DateTime? _lastBackPress;
+
+  /// System back walks the overlays and tabs back to Home; on Home a second
+  /// press within two seconds exits the app.
+  void _onSystemBack() {
+    // Send/receive overlays register their own PopScope which fires after
+    // this one - they handle their own back (including leave confirms).
+    if (_index >= 5) return;
+    if (_index != 0) {
+      _setIndex(0);
+      return;
+    }
+    final now = DateTime.now();
+    final last = _lastBackPress;
+    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return;
+    }
+    _lastBackPress = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).pressBackAgainToExit),
+      ),
+    );
+  }
 
   /// The send control comes first; the overlay only opens once something is
   /// chosen.
@@ -172,34 +200,40 @@ class _AppShellState extends State<AppShell> {
           ),
         );
 
-        return Scaffold(
-          extendBody: floatingNav,
-          body: SafeArea(
-            bottom: false,
-            child: wide
-                ? Row(
-                    children: [
-                      AppSidebar(
-                        items: items,
-                        selectedIndex: _index < 4 ? _index : -1,
-                        onSelected: _selectImmediate,
-                      ),
-                      Expanded(child: content),
-                    ],
-                  )
-                : content,
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _onSystemBack();
+          },
+          child: Scaffold(
+            extendBody: floatingNav,
+            body: SafeArea(
+              bottom: false,
+              child: wide
+                  ? Row(
+                      children: [
+                        AppSidebar(
+                          items: items,
+                          selectedIndex: _index < 4 ? _index : -1,
+                          onSelected: _selectImmediate,
+                        ),
+                        Expanded(child: content),
+                      ],
+                    )
+                  : content,
+            ),
+            bottomNavigationBar: wide
+                ? null
+                : AppBottomNav(
+                    floating: floatingNav,
+                    selectedIndex: _index < 4 ? _index : -1,
+                    onSelected: (index) {
+                      context.read<AppState>().tick();
+                      _selectImmediate(index);
+                    },
+                    items: items,
+                  ),
           ),
-          bottomNavigationBar: wide
-              ? null
-              : AppBottomNav(
-                  floating: floatingNav,
-                  selectedIndex: _index < 4 ? _index : -1,
-                  onSelected: (index) {
-                    context.read<AppState>().tick();
-                    _selectImmediate(index);
-                  },
-                  items: items,
-                ),
         );
       },
     );
