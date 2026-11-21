@@ -17,6 +17,7 @@ import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/vpn_warning.dart';
+import 'package:free_send/ui/screens/file_browser_screen.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
@@ -168,10 +169,39 @@ class _SendScreenState extends State<SendScreen> {
     await _pick(controller, kind);
   }
 
+  /// Desktop picks go through the in-app filesystem browser; mobile keeps
+  /// the native picker (and SAF for folders) until the SAF browser lands.
+  Future<void> _pickViaBrowser(
+    SendController controller,
+    _SourceKind kind,
+  ) async {
+    final allowed = switch (kind) {
+      _SourceKind.photos => imageFileExtensions,
+      _SourceKind.videos => videoFileExtensions,
+      _SourceKind.audio => audioFileExtensions,
+      _SourceKind.docs => documentFileExtensions,
+      _ => null,
+    };
+    final result = await Navigator.of(context).push<FileBrowserResult>(
+      MaterialPageRoute(
+        builder: (_) => FileBrowserScreen(allowedExtensions: allowed),
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (result.files.isNotEmpty) controller.addFiles(result.files);
+    for (final directory in result.directories) {
+      await controller.addDirectory(directory);
+    }
+  }
+
   Future<void> _pick(SendController controller, _SourceKind kind) async {
     if (_picking) return;
     setState(() => _picking = true);
     try {
+      if (PlatformEnv.isDesktop) {
+        await _pickViaBrowser(controller, kind);
+        return;
+      }
       final picked = await FilePicker.pickFiles(
         type: switch (kind) {
           _SourceKind.any => FileType.any,
@@ -215,6 +245,11 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   Future<void> _pickMedia(SendController controller) async {
+    // photo_manager has no Linux backend, so the media library falls back
+    // to the filesystem browser there.
+    if (PlatformEnv.kind == PlatformKind.linux) {
+      return _pickViaBrowser(controller, _SourceKind.any);
+    }
     final files = await Navigator.of(context).push<List<File>>(
       MaterialPageRoute(builder: (_) => const MediaBrowserScreen()),
     );
@@ -247,6 +282,20 @@ class _SendScreenState extends State<SendScreen> {
 
   Future<void> _pickFolder(SendController controller) async {
     final l10n = AppLocalizations.of(context);
+    if (PlatformEnv.isDesktop) {
+      final result = await Navigator.of(context).push<FileBrowserResult>(
+        MaterialPageRoute(
+          builder: (_) => const FileBrowserScreen(
+            mode: FileBrowserMode.foldersOnly,
+          ),
+        ),
+      );
+      if (result == null || !mounted) return;
+      for (final directory in result.directories) {
+        await controller.addDirectory(directory);
+      }
+      return;
+    }
     var path = await FilePicker.getDirectoryPath(
       dialogTitle: AppLocalizations.of(context).chooseFolderToSend,
     );
