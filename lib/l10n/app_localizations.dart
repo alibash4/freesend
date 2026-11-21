@@ -626,6 +626,24 @@ abstract class AppLocalizations {
   /// **'Choose a folder to browse'**
   String get chooseFolderToBrowse;
 
+  /// No description provided for @storageAccessNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage access needed'**
+  String get storageAccessNeeded;
+
+  /// No description provided for @storageAccessBody.
+  ///
+  /// In en, this message translates to:
+  /// **'FreeSend needs permission to view the files on this device so you can pick what to send.'**
+  String get storageAccessBody;
+
+  /// No description provided for @grantStorageAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant access'**
+  String get grantStorageAccess;
+
   /// No description provided for @dropFilesToSend.
   ///
   /// In en, this message translates to:

@@ -61,6 +61,8 @@ const documentFileExtensions = {
 };
 
 Directory _homeDirectory() {
+  // Android's shared storage root; the all-files grant makes it readable.
+  if (Platform.isAndroid) return Directory('/storage/emulated/0');
   final home = Platform.environment['HOME'] ??
       Platform.environment['USERPROFILE'] ??
       Platform.environment['HOMEPATH'];

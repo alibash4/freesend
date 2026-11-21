@@ -353,7 +353,7 @@ class _SafBrowserViewState extends State<SafBrowserView> {
               FilledButton.icon(
                 onPressed: _pickingRoot ? null : _pickRoot,
                 icon: Icon(AppIcons.folder, size: 17),
-                label: Text(l10n.chooseFolderToSend),
+                label: Text(l10n.chooseFolderToBrowse),
               ),
             ],
           ),
@@ -373,7 +373,9 @@ class _SafBrowserViewState extends State<SafBrowserView> {
               Text(l10n.folderReadFailed(_error!), textAlign: TextAlign.center),
               const SizedBox(height: AppSpacing.md),
               TextButton(
-                  onPressed: _pickRoot, child: Text(l10n.chooseFolderToSend)),
+                onPressed: _pickRoot,
+                child: Text(l10n.chooseFolderToBrowse),
+              ),
             ],
           ),
         ),

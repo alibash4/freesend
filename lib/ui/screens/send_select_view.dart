@@ -10,7 +10,7 @@ import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/ui/screens/file_browser_screen.dart';
-import 'package:free_send/ui/widgets/saf_browser_view.dart';
+import 'package:free_send/services/storage_access.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -151,8 +151,9 @@ class _SendSelectViewState extends State<SendSelectView> {
     final controller = widget.controller;
     final wide = MediaQuery.sizeOf(context).width >= 840;
     // Every browsing category embeds a file browser: the raw filesystem
-    // on desktop, the SAF tree on Android. iOS keeps the old content
-    // views, and the APK list is Android-only anyway.
+    // on desktop, and on Android the same browser once the all-files
+    // grant is in place. iOS keeps the old content views, and the APK
+    // list is Android-only anyway.
     final browserMode = _category != _SendCategory.apk &&
         (PlatformEnv.isDesktop || Platform.isAndroid);
     // Recents stat every file synchronously, so only resolve them for the
@@ -282,12 +283,13 @@ class _SendSelectViewState extends State<SendSelectView> {
               allowedExtensions: allowed,
               onConfirm: _addBrowserItems,
             )
-          : SafBrowserView(
+          : _StorageGate(
               key: ValueKey(_category),
-              mode: mode,
-              allowedExtensions: allowed,
-              store: widget.controller.appState.store,
-              onConfirm: _addBrowserItems,
+              child: FileBrowserView(
+                mode: mode,
+                allowedExtensions: allowed,
+                onConfirm: _addBrowserItems,
+              ),
             ),
     );
   }
@@ -511,6 +513,97 @@ class _SendSelectViewState extends State<SendSelectView> {
       _SendCategory.apk => AppIcons.android,
       _SendCategory.large => AppIcons.info,
     };
+  }
+}
+
+/// Gates the Android file browser behind the "All files access" grant.
+/// Shows a prompt until [StorageAccess.isGranted] reports access, then
+/// reveals the normal filesystem browser. Re-checks whenever the app
+/// resumes so returning from system settings just works.
+class _StorageGate extends StatefulWidget {
+  const _StorageGate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<_StorageGate> createState() => _StorageGateState();
+}
+
+class _StorageGateState extends State<_StorageGate>
+    with WidgetsBindingObserver {
+  bool _checking = true;
+  bool _granted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final granted = await StorageAccess.isGranted();
+    if (!mounted) return;
+    setState(() {
+      _granted = granted;
+      _checking = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    if (_checking) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_granted) return widget.child;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              AppIcons.folderOpen,
+              size: 40,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              l10n.storageAccessNeeded,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              l10n.storageAccessBody,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              onPressed: () async {
+                await StorageAccess.request();
+                await _refresh();
+              },
+              icon: Icon(AppIcons.settings, size: 17),
+              label: Text(l10n.grantStorageAccess),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

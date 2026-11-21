@@ -23,6 +23,11 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- All-files access for the in-app file browser (Android 11+). Like
+         file managers, this is a special-access grant the user enables in
+         system settings; the app is distributed as a direct APK, not via
+         the Play Store, so the policy restriction does not apply. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <!-- Self-update: hand a downloaded APK to the system package installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Keep the process alive while a transfer is running in the background. -->

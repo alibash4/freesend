@@ -309,6 +309,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chooseFolderToBrowse => 'Choose a folder to browse';
 
   @override
+  String get storageAccessNeeded => 'Storage access needed';
+
+  @override
+  String get storageAccessBody =>
+      'FreeSend needs permission to view the files on this device so you can pick what to send.';
+
+  @override
+  String get grantStorageAccess => 'Grant access';
+
+  @override
   String get dropFilesToSend => 'Drop files to add them';
 
   @override
