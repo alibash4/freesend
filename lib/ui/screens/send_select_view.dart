@@ -25,10 +25,15 @@ class SendSelectView extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onStart,
+    this.browserBack,
   });
 
   final SendController controller;
   final Future<void> Function() onStart;
+
+  /// Shared with the send screen so system back can walk up directories
+  /// inside the embedded browser before leaving the screen.
+  final BrowserBackHandler? browserBack;
 
   @override
   State<SendSelectView> createState() => _SendSelectViewState();
@@ -36,7 +41,7 @@ class SendSelectView extends StatefulWidget {
 
 class _SendSelectViewState extends State<SendSelectView> {
   _SendCategory _category = _SendCategory.files;
-  bool _grid = false;
+  final bool _grid = false;
   bool _selectionMode = false;
   bool _loadingApps = false;
   List<InstalledApp> _apps = const [];
@@ -183,29 +188,6 @@ class _SendSelectViewState extends State<SendSelectView> {
           labelBuilder: (category) => _categoryLabel(l10n, category),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                _categoryLabel(l10n, _category),
-                style: theme.textTheme.titleLarge,
-              ),
-            ),
-            if (wide && !browserMode)
-              TextButton(
-                onPressed: () =>
-                    setState(() => _selectionMode = !_selectionMode),
-                child: Text(_selectionMode ? l10n.done : l10n.select),
-              ),
-            if (!browserMode)
-              IconButton(
-                tooltip: _grid ? l10n.listView : l10n.gridView,
-                onPressed: () => setState(() => _grid = !_grid),
-                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 16),
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
         if (browserMode) ...[
           if (selected.isNotEmpty) ...[
             _QueueStrip(
@@ -288,6 +270,8 @@ class _SendSelectViewState extends State<SendSelectView> {
               child: FileBrowserView(
                 mode: mode,
                 allowedExtensions: allowed,
+                showHeader: false,
+                backHandler: widget.browserBack,
                 onConfirm: _addBrowserItems,
               ),
             ),

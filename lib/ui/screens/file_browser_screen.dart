@@ -111,6 +111,14 @@ class FileBrowserResult {
 /// Whether the browser offers files, folders, or both.
 enum FileBrowserMode { filesAndFolders, foldersOnly }
 
+/// Lets an ancestor route consume system back for directory-up navigation
+/// inside an embedded [FileBrowserView]. The view registers its handler
+/// while mounted; routes check [onBack] before running their own logic.
+class BrowserBackHandler {
+  /// Returns true when the back press was consumed by the browser.
+  bool Function()? onBack;
+}
+
 /// In-app filesystem browser used as the file picker on desktop platforms.
 ///
 /// Navigates real directories with [dart:io], shows breadcrumbs, sorts
@@ -164,11 +172,20 @@ class FileBrowserView extends StatefulWidget {
     super.key,
     this.mode = FileBrowserMode.filesAndFolders,
     this.allowedExtensions,
+    this.showHeader = true,
+    this.backHandler,
     required this.onConfirm,
   });
 
   final FileBrowserMode mode;
   final Set<String>? allowedExtensions;
+
+  /// Desktop shows the breadcrumb strip; embedded mobile use hides it and
+  /// relies on [backHandler] for up-navigation instead.
+  final bool showHeader;
+
+  /// Receives the system-back handler while this view is mounted.
+  final BrowserBackHandler? backHandler;
 
   /// Called with the marked files and directories when the user taps the
   /// confirm action. The view clears its marks afterwards.
@@ -190,12 +207,49 @@ class _FileBrowserViewState extends State<FileBrowserView> {
   final Set<String> _selectedFiles = {};
   final Set<String> _selectedDirs = {};
 
+  /// Stable closure so [dispose] only unregisters its own handler.
+  late final bool Function() _backEntry = _handleSystemBack;
+  DateTime? _lastRootBack;
+
   bool get _foldersOnly => widget.mode == FileBrowserMode.foldersOnly;
 
   @override
   void initState() {
     super.initState();
+    widget.backHandler?.onBack = _backEntry;
     _load(_dir);
+  }
+
+  @override
+  void dispose() {
+    if (widget.backHandler?.onBack == _backEntry) {
+      widget.backHandler?.onBack = null;
+    }
+    super.dispose();
+  }
+
+  /// System back inside the embedded browser walks up the directory tree.
+  /// At the root the first press warns and the second lets the enclosing
+  /// screen's own back handling run.
+  bool _handleSystemBack() {
+    final parent = _parentPath;
+    if (parent != null) {
+      _load(Directory(parent));
+      return true;
+    }
+    final now = DateTime.now();
+    final last = _lastRootBack;
+    if (last != null && now.difference(last).inSeconds < 2) {
+      _lastRootBack = null;
+      return false;
+    }
+    _lastRootBack = now;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).pressBackAgainToExit),
+      ),
+    );
+    return true;
   }
 
   String _nameOf(FileSystemEntity entity) {
@@ -344,32 +398,37 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     final selectedCount = _selectedFiles.length + _selectedDirs.length;
     return Column(
       children: [
-        SizedBox(
-          height: 44,
-          child: Row(
-            children: [
-              IconButton(
-                icon: Icon(AppIcons.backSmall),
-                tooltip: l10n.up,
-                onPressed: _parentPath == null
-                    ? null
-                    : () => _load(Directory(_parentPath!)),
-              ),
-              Expanded(
-                child: _Breadcrumbs(
-                  crumbs: _crumbs(l10n.navHome),
-                  onSelect: (path) => _load(Directory(path)),
+        if (widget.showHeader) ...[
+          SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(AppIcons.backSmall),
+                  tooltip: l10n.up,
+                  onPressed: _parentPath == null
+                      ? null
+                      : () => _load(Directory(_parentPath!)),
                 ),
-              ),
-              IconButton(
-                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 16),
-                tooltip: _grid ? l10n.listView : l10n.gridView,
-                onPressed: () => setState(() => _grid = !_grid),
-              ),
-            ],
+                Expanded(
+                  child: _Breadcrumbs(
+                    crumbs: _crumbs(l10n.navHome),
+                    onSelect: (path) => _load(Directory(path)),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    _grid ? AppIcons.list : AppIcons.grid,
+                    size: 16,
+                  ),
+                  tooltip: _grid ? l10n.listView : l10n.gridView,
+                  onPressed: () => setState(() => _grid = !_grid),
+                ),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
+          const Divider(height: 1),
+        ],
         Expanded(child: _body(l10n)),
         if (selectedCount > 0)
           SafeArea(

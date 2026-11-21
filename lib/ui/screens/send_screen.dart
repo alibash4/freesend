@@ -69,6 +69,10 @@ class _SendScreenState extends State<SendScreen> {
   bool _chooserShown = false;
   bool _draggingFiles = false;
 
+  /// Lets the embedded file browser consume back presses for
+  /// directory-up navigation before the screen's own back handling runs.
+  final _browserBack = BrowserBackHandler();
+
   @override
   void initState() {
     super.initState();
@@ -404,6 +408,7 @@ class _SendScreenState extends State<SendScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (_browserBack.onBack?.call() ?? false) return;
         final leave = await _confirmLeave(controller);
         if (leave && context.mounted) widget.onBack?.call();
       },
@@ -415,6 +420,7 @@ class _SendScreenState extends State<SendScreen> {
             mouseCursor: SystemMouseCursors.click,
             onPressed: () async {
               context.read<AppState>().tick();
+              if (_browserBack.onBack?.call() ?? false) return;
               final leave = await _confirmLeave(controller);
               if (leave && context.mounted) widget.onBack?.call();
             },
@@ -437,6 +443,7 @@ class _SendScreenState extends State<SendScreen> {
                         key: const ValueKey('select'),
                         controller: controller,
                         onStart: () => _start(controller),
+                        browserBack: _browserBack,
                       ),
                     SendPhase.preparing => _BusyView(
                         key: const ValueKey('preparing'),
