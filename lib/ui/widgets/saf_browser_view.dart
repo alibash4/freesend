@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/l10n/app_localizations.dart';
+import 'package:free_send/services/local_store.dart';
 import 'package:free_send/services/saf_browser.dart';
 import 'package:free_send/services/saf_folders.dart';
 import 'package:free_send/theme/app_icons.dart';
@@ -25,11 +26,15 @@ class SafBrowserView extends StatefulWidget {
     super.key,
     this.mode = FileBrowserMode.filesAndFolders,
     this.allowedExtensions,
+    this.store,
     required this.onConfirm,
   });
 
   final FileBrowserMode mode;
   final Set<String>? allowedExtensions;
+
+  /// Persists the granted tree URI so the browser reopens the same root.
+  final LocalStore? store;
 
   /// Called with cached [File]s and [Directory]s once the picked SAF
   /// items have been copied into the app cache.
@@ -47,6 +52,7 @@ class _SafBrowserViewState extends State<SafBrowserView> {
   String _path = '';
   List<SafEntry> _entries = const [];
   bool _loading = false;
+  bool _grid = false;
   bool _pickingRoot = false;
   bool _confirming = false;
   String? _error;
@@ -63,7 +69,13 @@ class _SafBrowserViewState extends State<SafBrowserView> {
   @override
   void initState() {
     super.initState();
-    _pickRoot();
+    // Reopen the previously granted tree when we still have one; the
+    // "choose a folder" prompt only appears for first-time users.
+    final stored = widget.store?.safRootUri;
+    if (stored != null && stored.isNotEmpty) {
+      _rootUri = stored;
+      _load('');
+    }
   }
 
   String _relPath(String name) => _path.isEmpty ? name : '$_path/$name';
@@ -83,6 +95,7 @@ class _SafBrowserViewState extends State<SafBrowserView> {
       return;
     }
     await SafBrowser.persist(uri);
+    await widget.store?.setSafRootUri(uri);
     if (!mounted) return;
     setState(() {
       _rootUri = uri;
@@ -113,6 +126,12 @@ class _SafBrowserViewState extends State<SafBrowserView> {
       });
     } on Object catch (error) {
       if (!mounted) return;
+      // A revoked grant fails at the root; forget it so the next launch
+      // asks for a folder again instead of erroring forever.
+      if (path.isEmpty) {
+        final store = widget.store;
+        if (store != null) unawaited(store.setSafRootUri(null));
+      }
       setState(() {
         _loading = false;
         _error = '$error';
@@ -231,6 +250,11 @@ class _SafBrowserViewState extends State<SafBrowserView> {
                     _parentPath == null ? null : () => _load(_parentPath!),
               ),
               Expanded(child: _breadcrumbs()),
+              IconButton(
+                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 20),
+                tooltip: _grid ? l10n.listView : l10n.gridView,
+                onPressed: () => setState(() => _grid = !_grid),
+              ),
             ],
           ),
         ),
@@ -359,6 +383,19 @@ class _SafBrowserViewState extends State<SafBrowserView> {
     if (entries.isEmpty) {
       return Center(child: Text(l10n.folderEmpty));
     }
+    if (_grid) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 150,
+          childAspectRatio: 0.92,
+          crossAxisSpacing: AppSpacing.sm,
+          mainAxisSpacing: AppSpacing.sm,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) => _gridTile(entries[index]),
+      );
+    }
     return ListView.builder(
       itemCount: entries.length,
       itemBuilder: (context, index) {
@@ -382,6 +419,85 @@ class _SafBrowserViewState extends State<SafBrowserView> {
               : () => _toggle(entry),
         );
       },
+    );
+  }
+
+  Widget _gridThumb(SafEntry entry) {
+    final scheme = Theme.of(context).colorScheme;
+    if (entry.isDir) {
+      return Center(
+        child: Icon(AppIcons.folder, size: 44, color: AppColors.accent),
+      );
+    }
+    return Center(
+      child: Icon(
+        iconForFileName(entry.name),
+        size: 44,
+        color: scheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  Widget _gridTile(SafEntry entry) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = _isSelected(entry);
+    return Material(
+      color: selected ? AppColors.accentWash : scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: entry.isDir
+            ? () => _load(_relPath(entry.name))
+            : () => _toggle(entry),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _gridThumb(entry)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      if (!entry.isDir)
+                        Text(
+                          formatBytes(entry.size),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (selected)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Icon(
+                  AppIcons.checkCircle,
+                  color: AppColors.accent,
+                  size: 22,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

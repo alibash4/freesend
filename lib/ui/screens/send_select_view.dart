@@ -286,6 +286,7 @@ class _SendSelectViewState extends State<SendSelectView> {
               key: ValueKey(_category),
               mode: mode,
               allowedExtensions: allowed,
+              store: widget.controller.appState.store,
               onConfirm: _addBrowserItems,
             ),
     );

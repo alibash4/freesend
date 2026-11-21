@@ -183,6 +183,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
   Directory _dir = _homeDirectory();
   List<FileSystemEntity> _entries = const [];
   bool _loading = true;
+  bool _grid = false;
   String? _error;
   final Set<String> _selectedFiles = {};
   final Set<String> _selectedDirs = {};
@@ -340,6 +341,11 @@ class _FileBrowserViewState extends State<FileBrowserView> {
                   onSelect: (path) => _load(Directory(path)),
                 ),
               ),
+              IconButton(
+                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 20),
+                tooltip: _grid ? l10n.listView : l10n.gridView,
+                onPressed: () => setState(() => _grid = !_grid),
+              ),
             ],
           ),
         ),
@@ -398,6 +404,19 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     if (entries.isEmpty) {
       return Center(child: Text(l10n.folderEmpty));
     }
+    if (_grid) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 150,
+          childAspectRatio: 0.92,
+          crossAxisSpacing: AppSpacing.sm,
+          mainAxisSpacing: AppSpacing.sm,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) => _gridTile(entries[index]),
+      );
+    }
     return ListView.builder(
       itemCount: entries.length,
       itemBuilder: (context, index) {
@@ -420,6 +439,91 @@ class _FileBrowserViewState extends State<FileBrowserView> {
               entity is Directory ? () => _load(entity) : () => _toggle(entity),
         );
       },
+    );
+  }
+
+  Widget _gridThumb(FileSystemEntity entity, String name) {
+    final scheme = Theme.of(context).colorScheme;
+    if (entity is Directory) {
+      return Center(
+        child: Icon(AppIcons.folder, size: 44, color: AppColors.accent),
+      );
+    }
+    if (imageFileExtensions.contains(_extensionOf(name))) {
+      return Image.file(
+        File(entity.path),
+        fit: BoxFit.cover,
+        cacheWidth: 240,
+        errorBuilder: (context, error, stackTrace) => Center(
+          child: Icon(_iconFor(name), size: 44, color: scheme.onSurfaceVariant),
+        ),
+      );
+    }
+    return Center(
+      child: Icon(_iconFor(name), size: 44, color: scheme.onSurfaceVariant),
+    );
+  }
+
+  Widget _gridTile(FileSystemEntity entity) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = _isSelected(entity);
+    final name = _nameOf(entity);
+    return Material(
+      color: selected ? AppColors.accentWash : scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap:
+            entity is Directory ? () => _load(entity) : () => _toggle(entity),
+        child: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _gridThumb(entity, name)),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      if (entity is File)
+                        Text(
+                          formatBytes(entity.lengthSync()),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (selected)
+              Positioned(
+                top: 6,
+                right: 6,
+                child: Icon(
+                  AppIcons.checkCircle,
+                  color: AppColors.accent,
+                  size: 22,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
