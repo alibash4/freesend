@@ -201,7 +201,7 @@ class _SendSelectViewState extends State<SendSelectView> {
               IconButton(
                 tooltip: _grid ? l10n.listView : l10n.gridView,
                 onPressed: () => setState(() => _grid = !_grid),
-                icon: Icon(_grid ? AppIcons.list : AppIcons.grid),
+                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 20),
               ),
           ],
         ),
