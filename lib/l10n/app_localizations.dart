@@ -596,6 +596,24 @@ abstract class AppLocalizations {
   /// **'Add folder'**
   String get addFolder;
 
+  /// No description provided for @up.
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get up;
+
+  /// No description provided for @folderEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty'**
+  String get folderEmpty;
+
+  /// No description provided for @folderReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read this folder: {error}'**
+  String folderReadFailed(Object error);
+
   /// No description provided for @dropFilesToSend.
   ///
   /// In en, this message translates to:

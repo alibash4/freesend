@@ -295,6 +295,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addFolder => 'إضافة مجلد';
 
   @override
+  String get up => 'أعلى';
+
+  @override
+  String get folderEmpty => 'هذا المجلد فارغ';
+
+  @override
+  String folderReadFailed(Object error) {
+    return 'تعذّرت قراءة هذا المجلد: $error';
+  }
+
+  @override
   String get dropFilesToSend => 'أفلت الملفات لإضافتها';
 
   @override

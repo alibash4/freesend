@@ -9,6 +9,7 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/app_packages.dart';
+import 'package:free_send/ui/screens/file_browser_screen.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -53,7 +54,31 @@ class _SendSelectViewState extends State<SendSelectView> {
     });
   }
 
+  /// Opens the in-app filesystem browser on desktop; other platforms keep
+  /// the native picker until the SAF browser lands.
+  Future<void> _browseFiles({bool foldersOnly = false}) async {
+    final result = await Navigator.of(context).push<FileBrowserResult>(
+      MaterialPageRoute(
+        builder: (_) => FileBrowserScreen(
+          mode: foldersOnly
+              ? FileBrowserMode.foldersOnly
+              : FileBrowserMode.filesAndFolders,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (result.files.isNotEmpty) {
+      widget.controller.addFiles(result.files);
+    }
+    for (final directory in result.directories) {
+      await widget.controller.addDirectory(directory);
+    }
+  }
+
   Future<void> _addFiles(FileType type, {List<String>? extensions}) async {
+    if (type == FileType.any && PlatformEnv.isDesktop) {
+      return _browseFiles();
+    }
     final effectiveExtensions = extensions ??
         (type == FileType.custom
             ? const [
@@ -84,6 +109,9 @@ class _SendSelectViewState extends State<SendSelectView> {
   }
 
   Future<void> _addFolder() async {
+    if (PlatformEnv.isDesktop) {
+      return _browseFiles(foldersOnly: true);
+    }
     final path = await FilePicker.getDirectoryPath();
     if (path == null || path.isEmpty || !mounted) return;
     await widget.controller.addDirectory(Directory(path));

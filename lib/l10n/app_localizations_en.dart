@@ -292,6 +292,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addFolder => 'Add folder';
 
   @override
+  String get up => 'Up';
+
+  @override
+  String get folderEmpty => 'This folder is empty';
+
+  @override
+  String folderReadFailed(Object error) {
+    return 'Couldn\'t read this folder: $error';
+  }
+
+  @override
   String get dropFilesToSend => 'Drop files to add them';
 
   @override
