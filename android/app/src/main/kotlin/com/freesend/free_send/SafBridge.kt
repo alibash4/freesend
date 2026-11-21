@@ -1,7 +1,9 @@
 package com.freesend.free_send
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -37,7 +39,121 @@ class SafBridge(
                 }
                 copyTree(Uri.parse(uri), result)
             }
+            "persist" -> {
+                val uri = call.argument<String>("uri")
+                if (uri.isNullOrEmpty()) {
+                    result.error("argument", "A folder URI is required.", null)
+                    return
+                }
+                persist(Uri.parse(uri), result)
+            }
+            "list" -> {
+                val uri = call.argument<String>("uri")
+                val path = call.argument<String>("path") ?: ""
+                if (uri.isNullOrEmpty()) {
+                    result.error("argument", "A folder URI is required.", null)
+                    return
+                }
+                list(Uri.parse(uri), path, result)
+            }
+            "copyFile" -> {
+                val uri = call.argument<String>("uri")
+                if (uri.isNullOrEmpty()) {
+                    result.error("argument", "A file URI is required.", null)
+                    return
+                }
+                copyFile(Uri.parse(uri), result)
+            }
             else -> result.notImplemented()
+        }
+    }
+
+    /// Keeps the tree grant alive across reboots so the browser can reopen
+    /// the same root without asking again.
+    private fun persist(uri: Uri, result: MethodChannel.Result) {
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+            result.success(true)
+        } catch (error: SecurityException) {
+            // The picker already took the permission, or the grant cannot be
+            // persisted; browsing still works for this session.
+            result.success(false)
+        }
+    }
+
+    /// Lists the children of [path] inside the tree rooted at [treeUri].
+    /// [path] is a '/'-joined chain of child names relative to the root.
+    private fun list(treeUri: Uri, path: String, result: MethodChannel.Result) {
+        val root = DocumentFile.fromTreeUri(context, treeUri)
+        if (root == null || !root.canRead()) {
+            result.error(
+                "unreadable",
+                "That Android folder is no longer readable. Choose it again.",
+                null,
+            )
+            return
+        }
+        var dir: DocumentFile = root
+        if (path.isNotEmpty()) {
+            for (segment in path.split('/')) {
+                val next = dir.findFile(segment)
+                if (next == null || !next.isDirectory) {
+                    result.error("missing", "Folder not found: $segment", null)
+                    return
+                }
+                dir = next
+            }
+        }
+        val entries = dir.listFiles().mapNotNull { child ->
+            if (!child.canRead()) return@mapNotNull null
+            mapOf(
+                "name" to (child.name ?: "file"),
+                "isDir" to child.isDirectory,
+                "size" to child.length(),
+                "uri" to child.uri.toString(),
+                "documentId" to (runCatching {
+                    DocumentsContract.getDocumentId(child.uri)
+                }.getOrNull() ?: ""),
+                "mimeType" to (child.type ?: ""),
+            )
+        }
+        result.success(entries)
+    }
+
+    /// Copies a single document into the app cache and returns its path.
+    private fun copyFile(uri: Uri, result: MethodChannel.Result) {
+        val name = runCatching {
+            context.contentResolver.query(
+                uri,
+                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null, null, null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull() ?: "file"
+        val baseDir = File(context.cacheDir, "freesend-saf")
+        if (!baseDir.isDirectory && !baseDir.mkdirs()) {
+            result.error("failed", "Could not create a cache folder.", null)
+            return
+        }
+        val target = uniqueFile(baseDir, safeName(name))
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(target).use { output -> input.copyTo(output) }
+            } ?: run {
+                result.error("unreadable", "Could not read that file.", null)
+                return
+            }
+            result.success(mapOf("path" to target.absolutePath))
+        } catch (error: Exception) {
+            result.error(
+                "failed",
+                error.message ?: "Could not read that file.",
+                null,
+            )
         }
     }
 

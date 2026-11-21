@@ -86,6 +86,8 @@
   "up": "Up",
   "folderEmpty": "This folder is empty",
   "folderReadFailed": "Couldn't read this folder: {error}",
+  "thisDevice": "This device",
+  "chooseFolderToBrowse": "Choose a folder to browse",
   "dropFilesToSend": "Drop files to add them",
   "emptyCategory": "Nothing here yet",
   "selectedCount": "{count} selected",

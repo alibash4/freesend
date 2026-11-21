@@ -10,6 +10,7 @@ import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/ui/screens/file_browser_screen.dart';
+import 'package:free_send/ui/widgets/saf_browser_view.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -149,9 +150,13 @@ class _SendSelectViewState extends State<SendSelectView> {
     final l10n = AppLocalizations.of(context);
     final controller = widget.controller;
     final wide = MediaQuery.sizeOf(context).width >= 840;
+    // Every browsing category embeds a file browser: the raw filesystem
+    // on desktop, the SAF tree on Android. iOS keeps the old content
+    // views, and the APK list is Android-only anyway.
+    final browserMode = _category != _SendCategory.apk &&
+        (PlatformEnv.isDesktop || Platform.isAndroid);
     // Recents stat every file synchronously, so only resolve them for the
     // categories that actually render them.
-    final browserMode = PlatformEnv.isDesktop && _category != _SendCategory.apk;
     final needsRecents = !browserMode &&
         _category != _SendCategory.files &&
         _category != _SendCategory.folders &&
@@ -270,12 +275,19 @@ class _SendSelectViewState extends State<SendSelectView> {
         (MediaQuery.sizeOf(context).height * 0.5).clamp(320.0, 560.0);
     return SizedBox(
       height: height,
-      child: FileBrowserView(
-        key: ValueKey(_category),
-        mode: mode,
-        allowedExtensions: allowed,
-        onConfirm: _addBrowserItems,
-      ),
+      child: PlatformEnv.isDesktop
+          ? FileBrowserView(
+              key: ValueKey(_category),
+              mode: mode,
+              allowedExtensions: allowed,
+              onConfirm: _addBrowserItems,
+            )
+          : SafBrowserView(
+              key: ValueKey(_category),
+              mode: mode,
+              allowedExtensions: allowed,
+              onConfirm: _addBrowserItems,
+            ),
     );
   }
 

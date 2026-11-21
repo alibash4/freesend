@@ -67,6 +67,37 @@ Directory _homeDirectory() {
   return Directory(home != null && home.isNotEmpty ? home : '.');
 }
 
+/// File-type icon for a name, shared by the filesystem and SAF browsers.
+IconData iconForFileName(String name) {
+  final dot = name.lastIndexOf('.');
+  final ext = dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+  return switch (ext) {
+    'jpg' ||
+    'jpeg' ||
+    'png' ||
+    'gif' ||
+    'webp' ||
+    'bmp' ||
+    'svg' ||
+    'heic' ||
+    'avif' =>
+      AppIcons.image,
+    'mp4' || 'mkv' || 'avi' || 'mov' || 'webm' || 'm4v' => AppIcons.video,
+    'mp3' ||
+    'wav' ||
+    'flac' ||
+    'aac' ||
+    'ogg' ||
+    'm4a' ||
+    'opus' =>
+      AppIcons.music,
+    'pdf' => AppIcons.pdf,
+    'doc' || 'docx' || 'txt' || 'md' || 'rtf' || 'odt' => AppIcons.fileText,
+    'zip' || 'rar' || '7z' || 'tar' || 'gz' || 'bz2' || 'xz' => AppIcons.file,
+    _ => AppIcons.file,
+  };
+}
+
 /// What the user picked in [FileBrowserScreen].
 class FileBrowserResult {
   const FileBrowserResult({this.files = const [], this.directories = const []});
@@ -262,33 +293,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     await widget.onConfirm(files, directories);
   }
 
-  IconData _iconFor(String name) {
-    return switch (_extensionOf(name)) {
-      'jpg' ||
-      'jpeg' ||
-      'png' ||
-      'gif' ||
-      'webp' ||
-      'bmp' ||
-      'svg' ||
-      'heic' ||
-      'avif' =>
-        AppIcons.image,
-      'mp4' || 'mkv' || 'avi' || 'mov' || 'webm' || 'm4v' => AppIcons.video,
-      'mp3' ||
-      'wav' ||
-      'flac' ||
-      'aac' ||
-      'ogg' ||
-      'm4a' ||
-      'opus' =>
-        AppIcons.music,
-      'pdf' => AppIcons.pdf,
-      'doc' || 'docx' || 'txt' || 'md' || 'rtf' || 'odt' => AppIcons.fileText,
-      'zip' || 'rar' || '7z' || 'tar' || 'gz' || 'bz2' || 'xz' => AppIcons.file,
-      _ => AppIcons.file,
-    };
-  }
+  IconData _iconFor(String name) => iconForFileName(name);
 
   Widget _leading(FileSystemEntity entity) {
     if (entity is Directory) {

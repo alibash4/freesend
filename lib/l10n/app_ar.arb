@@ -86,6 +86,8 @@
   "up": "أعلى",
   "folderEmpty": "هذا المجلد فارغ",
   "folderReadFailed": "تعذّرت قراءة هذا المجلد: {error}",
+  "thisDevice": "هذا الجهاز",
+  "chooseFolderToBrowse": "اختر مجلدًا للتصفح",
   "dropFilesToSend": "أفلت الملفات لإضافتها",
   "emptyCategory": "لا يوجد شيء هنا بعد",
   "selectedCount": "{count} محدد",

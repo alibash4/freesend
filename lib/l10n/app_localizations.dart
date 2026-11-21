@@ -614,6 +614,18 @@ abstract class AppLocalizations {
   /// **'Couldn\'t read this folder: {error}'**
   String folderReadFailed(Object error);
 
+  /// No description provided for @thisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get thisDevice;
+
+  /// No description provided for @chooseFolderToBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder to browse'**
+  String get chooseFolderToBrowse;
+
   /// No description provided for @dropFilesToSend.
   ///
   /// In en, this message translates to:
@@ -763,12 +775,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{sent} of {total}'**
   String ofTotal(Object sent, Object total);
-
-  /// No description provided for @thisDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'This device'**
-  String get thisDevice;
 
   /// No description provided for @general.
   ///

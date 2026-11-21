@@ -303,6 +303,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get thisDevice => 'This device';
+
+  @override
+  String get chooseFolderToBrowse => 'Choose a folder to browse';
+
+  @override
   String get dropFilesToSend => 'Drop files to add them';
 
   @override
@@ -413,9 +419,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String ofTotal(Object sent, Object total) {
     return '$sent of $total';
   }
-
-  @override
-  String get thisDevice => 'This device';
 
   @override
   String get general => 'General';

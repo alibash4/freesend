@@ -306,6 +306,12 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get thisDevice => 'هذا الجهاز';
+
+  @override
+  String get chooseFolderToBrowse => 'اختر مجلدًا للتصفح';
+
+  @override
   String get dropFilesToSend => 'أفلت الملفات لإضافتها';
 
   @override
@@ -425,9 +431,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String ofTotal(Object sent, Object total) {
     return '$sent من $total';
   }
-
-  @override
-  String get thisDevice => 'هذا الجهاز';
 
   @override
   String get general => 'عام';
