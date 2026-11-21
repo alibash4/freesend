@@ -362,7 +362,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
                 ),
               ),
               IconButton(
-                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 20),
+                icon: Icon(_grid ? AppIcons.list : AppIcons.grid, size: 16),
                 tooltip: _grid ? l10n.listView : l10n.gridView,
                 onPressed: () => setState(() => _grid = !_grid),
               ),
