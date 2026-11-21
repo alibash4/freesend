@@ -83,6 +83,7 @@
   "select": "Select",
   "addFiles": "Add files",
   "addFolder": "Add folder",
+  "dropFilesToSend": "Drop files to add them",
   "emptyCategory": "Nothing here yet",
   "selectedCount": "{count} selected",
   "done": "Done",

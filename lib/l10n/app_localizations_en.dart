@@ -292,6 +292,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addFolder => 'Add folder';
 
   @override
+  String get dropFilesToSend => 'Drop files to add them';
+
+  @override
   String get emptyCategory => 'Nothing here yet';
 
   @override

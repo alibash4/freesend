@@ -596,6 +596,12 @@ abstract class AppLocalizations {
   /// **'Add folder'**
   String get addFolder;
 
+  /// No description provided for @dropFilesToSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop files to add them'**
+  String get dropFilesToSend;
+
   /// No description provided for @emptyCategory.
   ///
   /// In en, this message translates to:

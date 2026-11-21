@@ -295,6 +295,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addFolder => 'إضافة مجلد';
 
   @override
+  String get dropFilesToSend => 'أفلت الملفات لإضافتها';
+
+  @override
   String get emptyCategory => 'لا يوجد شيء هنا بعد';
 
   @override

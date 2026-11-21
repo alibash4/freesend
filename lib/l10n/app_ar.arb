@@ -83,6 +83,7 @@
   "select": "تحديد",
   "addFiles": "إضافة ملفات",
   "addFolder": "إضافة مجلد",
+  "dropFilesToSend": "أفلت الملفات لإضافتها",
   "emptyCategory": "لا يوجد شيء هنا بعد",
   "selectedCount": "{count} محدد",
   "done": "تم",

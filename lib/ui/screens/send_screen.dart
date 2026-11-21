@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +66,7 @@ class _SendScreenState extends State<SendScreen> {
   bool _picking = false;
   String _query = '';
   bool _chooserShown = false;
+  bool _draggingFiles = false;
 
   @override
   void initState() {
@@ -269,6 +271,31 @@ class _SendScreenState extends State<SendScreen> {
     }
   }
 
+  /// Desktop drag-and-drop: files join the queue directly, directories go
+  /// through the same recursive add as the folder picker.
+  Future<void> _onDropDone(DropDoneDetails details) async {
+    if (!mounted) return;
+    setState(() => _draggingFiles = false);
+    final controller = context.read<SendController>();
+    if (controller.isBusy) return;
+    final files = <File>[];
+    final directories = <Directory>[];
+    for (final item in details.files) {
+      final path = item.path;
+      if (path.isEmpty) continue;
+      if (item is DropItemDirectory ||
+          FileSystemEntity.typeSync(path) == FileSystemEntityType.directory) {
+        directories.add(Directory(path));
+      } else {
+        files.add(File(path));
+      }
+    }
+    if (files.isNotEmpty) controller.addFiles(files);
+    for (final directory in directories) {
+      await controller.addDirectory(directory);
+    }
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -324,7 +351,7 @@ class _SendScreenState extends State<SendScreen> {
     final floatingNav = context.select<AppState, bool>(
       (state) => state.floatingNav,
     );
-    return PopScope(
+    final screen = PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
@@ -404,6 +431,60 @@ class _SendScreenState extends State<SendScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+    if (!PlatformEnv.isDesktop) return screen;
+    return DropTarget(
+      onDragEntered: (_) {
+        if (!controller.isBusy) setState(() => _draggingFiles = true);
+      },
+      onDragExited: (_) => setState(() => _draggingFiles = false),
+      onDragDone: _onDropDone,
+      child: Stack(
+        children: [
+          screen,
+          if (_draggingFiles && !controller.isBusy)
+            const Positioned.fill(child: _DropFilesOverlay()),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-screen affordance shown while files are dragged over the send view.
+class _DropFilesOverlay extends StatelessWidget {
+  const _DropFilesOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IgnorePointer(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.45),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.lg,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: AppColors.accent, width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(AppIcons.inbox, color: AppColors.accent, size: 22),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  AppLocalizations.of(context).dropFilesToSend,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
           ),
         ),
       ),
