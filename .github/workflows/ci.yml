@@ -1,0 +1,35 @@
+# Analyze and test on every push and pull request.
+name: ci
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.50.0"
+          cache: true
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libayatana-appindicator3-dev libblkid-dev liblzma-dev
+
+      - name: Analyze and test
+        run: |
+          flutter pub get
+          # Flutter 3.50 deprecates the material.dart umbrella; the
+          # replacement package is not adopted yet, so info-level
+          # deprecations must not fail CI.
+          flutter analyze --no-fatal-infos
+          flutter test

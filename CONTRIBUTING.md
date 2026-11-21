@@ -30,6 +30,7 @@ and the app downloads the package that matches how it was installed:
 | `FreeSend for Linux aarch64 (rpm)` | `.rpm` for aarch64 | Fedora/RHEL package on arm64 |
 | `FreeSend for Linux aarch64 (bundle)` | `.tar.gz` of the raw aarch64 build | an unpacked `free_send` bundle on arm64 |
 | `FreeSend for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
+| `FreeSend for macOS (dmg)` | `.dmg` disk image | macOS |
 
 The Android ABI is read from the device, so a 64-bit phone downloads the
 smaller split instead of the universal APK. On Linux the architecture is
@@ -47,18 +48,20 @@ copy, or the installer refuses the update.
 
 ## Releasing
 
-Create the release first, then let the pipeline attach the binary to it.
+Create the tag first, then the release. In GitLab: **Repository → Tags →
+New tag** (or `git tag v1.2.3 && git push origin v1.2.3`), which triggers
+the pipelines; then **Deploy → Releases → New release → Create from
+existing tag** and write the notes. The builds take far longer than it
+takes to create the release, so every asset finds its release when it
+finishes — but if a tag ever goes out with no release, the attach steps
+fail and you create the release afterwards and re-run them.
 
-1. **Make the release** in GitLab: Deploy → Releases → New release, pick a
-   tag (or type `v1.2.3` to create it), write the release notes, and save.
-   Creating the tag is what triggers the pipeline.
-2. The `release:publish` job uploads every package the build jobs produced
-   and **attaches them to that release** under the names in the table
-   above. Your release notes are left alone. A missing file (for example
-   the Windows zip, when no Windows runner is available) is skipped; the
-   rest are still attached.
-3. If a tag has no release at all, the job creates one for you, using the
-   commit log since the previous tag as the notes.
+Both pipelines attach assets under the names in the table above and leave
+your release notes alone; a missing package (for example the Windows zip,
+when no Windows runner is available) is skipped while the rest still
+attach. The GitLab `release:publish` job additionally creates a release
+for a bare tag using the commit log since the previous tag; the GitHub
+Actions attach step does not — it expects the release to exist.
 
 Pushing to `main` runs the `test` job only — analyze plus the test suite,
 no packages. A full build matrix costs roughly 45 runner-minutes against a
@@ -68,6 +71,15 @@ finite monthly compute quota, so packages are built on tags: `build:apk`
 for aarch64 on a hosted Arm runner) and `build:windows` (a zip of
 `free_send.exe` and its DLLs, allowed to fail when no Windows runner is
 available).
+
+The `release` GitHub Actions workflow builds every package on `v*` tags —
+Android splits, Linux x86_64 and aarch64, Windows and macOS — and attaches
+them to the same GitLab release through `scripts/attach_release_asset.sh`.
+It needs the `RELEASE_TOKEN` repository secret on GitHub, plus the four
+`SIGNING_*` secrets for the Android keystore. GitLab CI remains as the
+release host (the updater reads GitLab Releases) and its own tag pipeline
+still builds the same packages, so disable it if the Actions builds should
+be the only source.
 
 Two things must be configured once:
 
