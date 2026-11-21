@@ -1,14 +1,15 @@
 # FreeSend
 
-A free, open implementation of the SHAREit idea: move files between two devices
-over a **direct Wi-Fi hotspot**, with no cloud, no account, no upload limit and
-no per-file size ceiling. Built in Flutter for **Android, Windows, Linux and
-macOS**.
+<p align="center">
+  <img src="docs/alpha-banner.svg" alt="Alpha" width="100%">
+</p>
 
-Transfer speed is the whole point, so the transport is a raw TCP socket with
-framed 512 KiB chunks instead of an HTTP file upload. Nothing is re-encoded,
-compressed or staged — bytes are read from the source file and written to the
-destination file as they arrive.
+Free, open-source file transfer between two devices: no cloud, no account,
+no upload limits, no per-file size ceiling. Built in Flutter for Android,
+Windows, Linux and macOS.
+
+The transport is a raw TCP socket with framed 512 KiB chunks — files stream
+to disk as they arrive, never re-encoded, compressed or staged.
 
 ```
 sender                                            receiver
@@ -21,78 +22,54 @@ streams frames of file bytes  ──── Wi-Fi ────▶    writes strai
 
 ## Platform support
 
-| Capability                              | Android | Linux | Windows | macOS |
-| --------------------------------------- | ------- | ----- | ------- | ----- |
-| Host a session and send files           | ✅      | ✅    | ✅      | ✅    |
-| Create the hotspot from inside the app  | ✅      | ✅ (NetworkManager) | manual (OS Mobile hotspot) | manual (OS Internet Sharing) |
-| Join a hotspot from inside the app      | ✅      | ✅    | manual (Wi-Fi settings) | ✅ (`networksetup`) |
-| Receive files                           | ✅      | ✅    | ✅      | ✅    |
-| Scan a pairing QR code with the camera  | ✅      | —     | —       | ✅    |
-| System tray icon with Open / Quit menu  | —       | ✅    | ✅      | —     |
+| Capability                             | Android | Linux | Windows | macOS |
+| -------------------------------------- | ------- | ----- | ------- | ----- |
+| Host a session and send files          | ✅      | ✅    | ✅      | ✅    |
+| Create the hotspot from inside the app | ✅      | ✅ (NetworkManager) | manual (OS hotspot) | manual (OS Internet Sharing) |
+| Join a hotspot from inside the app     | ✅      | ✅    | manual (Wi-Fi settings) | ✅ (`networksetup`) |
+| Receive files                          | ✅      | ✅    | ✅      | ✅    |
+| Scan a pairing QR code with the camera | ✅      | —     | —       | ✅    |
+| System tray icon                       | —       | ✅    | ✅      | —     |
 
-Minimum Android is 8.0 (API 26) because `WifiManager.startLocalOnlyHotspot` is
-needed to create a hotspot without user interaction. On Windows and macOS the
-OS does not expose hotspot creation to applications, so the app shares over the
-network the device is already on and tells you where to enable a system hotspot
-if you want the fastest link.
-
-The tray icon appears while FreeSend is running on Windows and Linux. Right-click
-it for the native menu (**Open FreeSend**, **Quit FreeSend**); a left click
-restores the window. Windows and Linux have a **Minimize to tray on close**
-toggle in Settings. GNOME needs the AppIndicator extension installed to show the
-icon. macOS uses the Dock: closing the window follows the normal macOS app
-lifecycle and there is no close-to-tray toggle.
-
-Linux builds need the tray library at build time and run time:
-
-```bash
-sudo apt install libayatana-appindicator3-dev        # Debian/Ubuntu build
-sudo dnf install libayatana-appindicator-gtk3-devel  # Fedora build
-sudo dnf install libayatana-appindicator-gtk3        # Fedora runtime
-```
-
-iOS is not supported: Apple does not allow an app to create a hotspot.
+- Minimum Android is 8.0 (API 26).
+- Windows and macOS cannot create hotspots programmatically, so the app
+  shares over the current network and points you at the system hotspot
+  settings for the fastest link.
+- Windows and Linux show a tray icon while running (GNOME needs the
+  AppIndicator extension); Linux needs `libayatana-appindicator3` at build
+  and run time. macOS uses the Dock normally.
+- iOS is not supported: Apple does not allow apps to create hotspots.
 
 ## How it works
 
 - `lib/services/hotspot/` — platform hotspot control. Android goes through a
   `MethodChannel` to `HotspotBridge.kt` (`LocalOnlyHotspot` to host,
-  `WifiNetworkSpecifier` to join, plus `bindProcessToNetwork` so sockets route
-  over the hotspot instead of mobile data). Linux shells out to `nmcli`; macOS
-  joins with `networksetup`; Windows falls back to guided steps.
-- `lib/services/transfer/` — the wire protocol and both endpoints.
-  - `protocol.dart`: `[type:u8][length:u32][payload]` frames, JSON for control
-    and raw bytes for file data.
-  - `frame_channel.dart`: socket ⇄ frame pump with a 4 MiB write buffer, so the
-    sender never awaits a syscall per chunk.
-  - `transfer_host.dart` / `transfer_client.dart`: handshake, manifest, file
-    selection, then a single ordered stream of file bytes.
-- `lib/services/discovery_service.dart` — the host broadcasts a session beacon
-  on UDP `:47810`; the receiver lists whatever answers. Beacons leave through
-  the hotspot interface (bound to the AP address) and are refreshed every 2s.
-- `lib/state/` — `SendController` / `ReceiveController` own the hotspot, the
-  socket server/client, aggregate progress, smoothed speed and history records.
-- `lib/ui/` — Material 3 UI: content sits on the bare page (pure white, or
-  `#1C1C1C` in dark), neutral greys, one `#1E90FF` accent. Grouped sections get
-  a soft neutral fill rather than a bordered card, and icons come from UIcons
-  via `lib/theme/app_icons.dart`.
-- `lib/theme/` — colours, type scale and the icon map, so the palette and the
-  icon set are each defined in one place.
+  `WifiNetworkSpecifier` to join); Linux shells out to `nmcli`; macOS joins
+  with `networksetup`; Windows falls back to guided steps.
+- `lib/services/transfer/` — the wire protocol and both endpoints:
+  `[type:u8][length:u32][payload]` frames, JSON for control and raw bytes for
+  file data, a 4 MiB write buffer so the sender never awaits per chunk.
+- `lib/services/discovery_service.dart` — the host broadcasts a session
+  beacon on UDP `:47810`; receivers list whatever answers.
+- `lib/state/` — `SendController` / `ReceiveController` own the hotspot,
+  sockets, aggregate progress, speed and history.
+- `lib/ui/` and `lib/theme/` — Material 3 UI; colours, type scale and the
+  UIcons map are each defined in one place.
 
 ### Protocol
 
-Frames are `[type:u8][length:u32][payload]`; control frames carry JSON and data
-frames carry raw bytes.
+Frames are `[type:u8][length:u32][payload]`; control frames carry JSON and
+data frames carry raw bytes.
 
 1. Client → host `hello` — protocol version, device name, platform, an
    ephemeral X25519 public key and a salt.
-2. Host → client `helloAck` — its ephemeral key plus an Ed25519 signature over
-   that key, the salt and the host's instance id. The receiver pins the sender
-   on first contact and refuses a later change.
+2. Host → client `helloAck` — its ephemeral key plus an Ed25519 signature
+   over that key, the salt and the host's instance id. The receiver pins the
+   sender on first contact and refuses a later change.
 3. Both sides derive the same key (X25519, then HKDF-SHA256) and switch to
    AES-256-GCM. Every frame after this travels in a `secure` envelope.
-4. Host → client `session` — the manifest: file ids, names, sizes and folder
-   layout.
+4. Host → client `session` — the manifest: file ids, names, sizes and
+   folder layout.
 5. Client → host `accept` — the selected ids, plus resume offsets from an
    earlier partial attempt.
 6. Per file: `fileHeader`, `data` frames of 512 KiB, then `fileEnd` carrying
@@ -100,10 +77,10 @@ frames carry raw bytes.
 7. Host → client `transferEnd`; the receiver answers `ackAll` and the host
    closes.
 
-TCP already guarantees ordering and delivery, so the protocol deliberately has
-no per-chunk acknowledgement — that is what keeps the link saturated. Either
-side can pause: the sender stops reading, and the receiver stops draining the
-socket so TCP backpressure does the work.
+TCP already guarantees ordering and delivery, so the protocol deliberately
+has no per-chunk acknowledgement — that is what keeps the link saturated.
+Either side can pause: the sender stops reading, and the receiver stops
+draining the socket so TCP backpressure does the work.
 
 ## Running
 
@@ -113,129 +90,23 @@ flutter run -d <device>          # android / linux / windows / macos
 flutter build apk --release      # or build linux / windows / macos
 ```
 
-Two devices: on one press **Send**, pick files, and scan the QR code it shows
-with the other device (**Receive** → *Scan pairing code*). The code carries the
-hotspot name, password and the sender's address, so the receiver joins and
-connects in one step.
+Two devices: on one press **Send**, pick files, and scan the QR code it
+shows with the other device (**Receive** → *Scan pairing code*). The code
+carries the hotspot name, password and the sender's address, so the
+receiver joins and connects in one step.
 
-No camera (Windows or Linux receivers, or a code sent through a chat app)? Tap
-*Copy code* on the sender and *Enter code* on the receiver, join the hotspot from
-the system Wi-Fi menu, or use *Connect by address*.
+No camera (Windows or Linux receivers, or a code sent through a chat app)?
+Tap *Copy code* on the sender and *Enter code* on the receiver, join the
+hotspot from the system Wi-Fi menu, or use *Connect by address*.
 
-Received files go to `Downloads/FreeSend` on desktop and to the app's external
-files directory on Android (changeable in Settings).
+Received files go to `Downloads/FreeSend` on desktop and to the app's
+external files directory on Android (changeable in Settings).
 
 ## Updating
 
-The app can check GitLab Releases for a newer build and install it.
-
-- **Settings → Updates → Check automatically** turns on a silent check each
-  launch. A failure or an up-to-date app stays quiet.
-- **Check for updates** always reports the outcome.
-- When a release is found, a sheet shows the release notes and the download
-  size. **Download update** pulls the asset, then **Install and restart** hands
-  it to the OS installer and exits the app.
-
-Releases are matched to the platform by a word in the asset name
-(`android`, `linux`, `windows`, `macos`). Linux and Windows also carry a
-format marker, Linux carries the architecture word (`x86_64`, `aarch64`), and
-the app downloads the package that matches how it was installed:
-
-| Asset name | File | Who gets it |
-| --- | --- | --- |
-| `FreeSend for Android (32-bit)` | armeabi-v7a APK | 32-bit phones |
-| `FreeSend for Android (64-bit)` | arm64-v8a APK | 64-bit phones |
-| `FreeSend for Android (universal)` | all ABIs, including emulators | x86_64, or when no split matches |
-| `FreeSend for Linux x86_64 (AppImage)` | `.AppImage` for x86_64 | x86_64 AppImage (`APPIMAGE` is set) |
-| `FreeSend for Linux x86_64 (deb)` | `.deb` for amd64 | Debian/Ubuntu package (`package-kind` is `deb`) |
-| `FreeSend for Linux x86_64 (rpm)` | `.rpm` for x86_64 | Fedora/RHEL package (`package-kind` is `rpm`) |
-| `FreeSend for Linux x86_64 (bundle)` | `.tar.gz` of the raw x86_64 build | an unpacked `free_send` bundle |
-| `FreeSend for Linux aarch64 (AppImage)` | `.AppImage` for aarch64 | arm64 AppImage (`APPIMAGE` is set) |
-| `FreeSend for Linux aarch64 (deb)` | `.deb` for arm64 | Debian/Ubuntu package on arm64 |
-| `FreeSend for Linux aarch64 (rpm)` | `.rpm` for aarch64 | Fedora/RHEL package on arm64 |
-| `FreeSend for Linux aarch64 (bundle)` | `.tar.gz` of the raw aarch64 build | an unpacked `free_send` bundle on arm64 |
-| `FreeSend for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
-
-The Android ABI is read from the device, so a 64-bit phone downloads the
-smaller split instead of the universal APK. On Linux the architecture is read
-from the running process, so an arm64 machine downloads the aarch64 build and
-never the x86_64 one. A Linux install that cannot find its own format falls
-back to the raw bundle, then the AppImage. Installing a deb or rpm asks the
-system for permission (`pkexec`). An AppImage, the raw bundle, and the Windows
-zip replace themselves after the app exits and then relaunch.
-
-Android requires the user to grant *install unknown apps* to FreeSend; the
-install bridge checks for it and points at the system page when it is missing.
-Android must also be signed with the same key as the installed copy, or the
-installer refuses the update.
-
-## Releasing
-
-Create the release first, then let the pipeline attach the binary to it.
-
-1. **Make the release** in GitLab: Deploy → Releases → New release, pick a tag
-   (or type `v1.2.3` to create it), write the release notes, and save. Creating
-   the tag is what triggers the pipeline.
-2. The `release:publish` job uploads every package the build jobs produced
-   and **attaches them to that release** under the names in the table above.
-   Your release notes are left alone. A missing file (for example the Windows
-   zip, when no Windows runner is available) is skipped; the rest are still
-   attached.
-3. If a tag has no release at all, the job creates one for you, using the commit
-   log since the previous tag as the notes.
-
-Pushing to `main` runs the `test` job only — analyze plus the test suite, no
-packages. A full build matrix costs roughly 45 runner-minutes against a finite
-monthly compute quota, so packages are built on tags: `build:apk` (analyze,
-test, the two ABI splits and the universal APK), `build:linux` (AppImage, deb,
-rpm and the raw tar.gz), `build:linux:arm64` (the same four for aarch64 on a
-hosted Arm runner) and `build:windows` (a zip of `free_send.exe` and its DLLs,
-allowed to fail when no Windows runner is available).
-
-Two things must be configured once:
-
-1. **`RELEASE_TOKEN`** — a project access token with the `api` scope, set as a
-   CI/CD variable (Settings → CI/CD → Variables). Creating a release in the UI
-   does not remove the need for this: the job still has to upload the APK and
-   attach it, and `CI_JOB_TOKEN` cannot do that. Mark the variable **masked**.
-
-   Also check **Protect variable**. A protected variable only reaches pipelines
-   on protected branches or tags. If you leave it off, every pipeline can see
-   it. If you turn it on, you must also protect your release tags
-   (Settings → Repository → Protected tags, rule `v*`) or the tag pipeline
-   will not receive the token and the job will fail with a 401.
-
-2. **A signing keystore** — one stable key, or Android refuses to install an
-   update over an existing copy. Locally, create `android/key.properties`
-   (gitignored):
-
-   ```
-   STORE_FILE=/absolute/path/to/freesend.keystore
-   STORE_PASSWORD=...
-   KEY_ALIAS=freesend
-   KEY_PASSWORD=...
-   ```
-
-   Generate the keystore once and keep it somewhere safe; losing it means no
-   further updates to installed copies:
-
-   ```bash
-   keytool -genkeypair -v -keystore ~/freesend.keystore \
-     -alias freesend -keyalg RSA -keysize 4096 -validity 10000
-   ```
-
-   For CI, add the same key as four CI/CD variables and the pipeline writes
-   `key.properties` itself:
-
-   | Variable | Value |
-   | --- | --- |
-   | `SIGNING_KEYSTORE_BASE64` | `base64 -w0 ~/freesend.keystore` |
-   | `SIGNING_STORE_PASSWORD` | keystore password |
-   | `SIGNING_KEY_ALIAS` | `freesend` |
-   | `SIGNING_KEY_PASSWORD` | key password |
-
-   Without these the build falls back to debug signing, which is fine for
-   testing but will not update a properly signed release.
+The app checks GitLab Releases for a newer build and can download and
+install it — see **Settings → Updates**. Release and CI setup for
+maintainers is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Tests
 
@@ -244,48 +115,19 @@ flutter test
 ```
 
 - `test/transfer_test.dart` drives the real socket protocol on localhost:
-  multi-file transfer with byte-for-byte verification, subset selection, frame
-  reassembly across arbitrary TCP boundaries, and a peer that disconnects
-  mid-transfer (must surface an error, not hang).
-- `test/pairing_test.dart` round-trips the pairing payload (including awkward
-  SSIDs and passwords), and checks that foreign QRs, unknown versions, out-of-
-  range ports and hostnames are refused.
-- `test/ui_render_test.dart` renders the actual screens at phone size and fails
-  on layout overflow or missing widgets; it also writes PNGs to `artifacts/`
-  for visual review. It covers the update sheet end to end against a stubbed
-  release API.
+  multi-file transfer with byte-for-byte verification, subset selection,
+  frame reassembly across arbitrary TCP boundaries, and a peer that
+  disconnects mid-transfer.
+- `test/pairing_test.dart` round-trips the pairing payload and checks that
+  foreign QRs, unknown versions, out-of-range ports and hostnames are
+  refused.
+- `test/ui_render_test.dart` renders the actual screens at phone size and
+  fails on layout overflow; it also writes PNGs to `artifacts/` for visual
+  review.
 - `test/update_test.dart` checks release parsing, platform asset selection,
   version comparison, download progress and partial-file cleanup.
 
-## Known limitations
-
-- Hotspots created by `LocalOnlyHotspot` have no internet, by design. Expect the
-  OS to label the connection "no internet".
-- Android randomises hotspot names on some versions; always read the name from
-  the sending device's screen.
-- Camera scanning needs the `mobile_scanner` plugin, which has no Windows or
-  Linux implementation; those receivers type or paste the code instead.
-- The pairing code is not authenticated: someone on the same hotspot could read
-  it off the sender's screen. It only grants access to the files being shared in
-  that session; the sender's identity is pinned after the first connection, so a
-  later change is refused.
-- An interrupted transfer keeps its partial file and resumes from the last
-  written offset, but the recovery record lives in the download folder — clear
-  it and the next attempt starts over.
-- Android's hotspot password is generated by the OS and cannot be chosen.
-
 ## License
 
-FreeSend is free software: you can redistribute it and/or modify it under the
-terms of the GNU Affero General Public License as published by the Free
-Software Foundation, version 3.
-
-Copyright (C) 2026 Ali Basheer.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
-PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
-
-The full text is in [LICENSE](LICENSE). Section 13 applies: anyone offering
-FreeSend as a network service must also make the corresponding source available
-to its users.
+FreeSend is free software under the GNU Affero General Public License v3 —
+see [LICENSE](LICENSE).
