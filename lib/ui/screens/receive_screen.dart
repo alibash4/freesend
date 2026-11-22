@@ -616,8 +616,16 @@ class _NoCameraPanel extends StatelessWidget {
 }
 
 /// Asks for the hotspot password the phone shows, then joins it.
+///
+/// Android's LocalOnlyHotspot (`AndroidShare_*`) is an open network - there
+/// is no password to ask for, so those join straight away. Everything else
+/// still prompts, since desktop-hosted networks are WPA2.
 Future<void> _askHotspotPassword(BuildContext context, String ssid) async {
   final controller = context.read<ReceiveController>();
+  if (ssid.startsWith('AndroidShare')) {
+    await controller.joinSurveyed(ssid, '');
+    return;
+  }
   final password = await showDialog<String>(
     context: context,
     builder: (context) {
