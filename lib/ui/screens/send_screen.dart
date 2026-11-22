@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -10,15 +9,12 @@ import 'package:scroll_animator/scroll_animator.dart';
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
 import 'package:free_send/l10n/app_localizations.dart';
-import 'package:free_send/services/app_packages.dart';
-import 'package:free_send/services/saf_folders.dart';
 import 'package:free_send/state/app_state.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/vpn_warning.dart';
 import 'package:free_send/ui/screens/file_browser_screen.dart';
-import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
 import 'package:free_send/ui/screens/setup_screen.dart';
@@ -61,11 +57,7 @@ class SendScreen extends StatefulWidget {
   State<SendScreen> createState() => _SendScreenState();
 }
 
-enum _SourceKind { any, media, photos, videos, audio, docs, apps, folder }
-
 class _SendScreenState extends State<SendScreen> {
-  bool _picking = false;
-  String _query = '';
   bool _chooserShown = false;
   bool _draggingFiles = false;
 
@@ -143,185 +135,6 @@ class _SendScreenState extends State<SendScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _openSourcePicker(SendController controller) async {
-    final kind = await showModalBottomSheet<_SourceKind>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => const _SourceSheet(),
-    );
-    if (kind == null || !mounted) return;
-    if (kind == _SourceKind.folder) {
-      setState(() => _picking = true);
-      try {
-        await _pickFolder(controller);
-      } finally {
-        if (mounted) setState(() => _picking = false);
-      }
-      return;
-    }
-    if (kind == _SourceKind.media) {
-      await _pickMedia(controller);
-      return;
-    }
-    if (kind == _SourceKind.apps) {
-      await _pickApps(controller);
-      return;
-    }
-    await _pick(controller, kind);
-  }
-
-  /// Desktop picks go through the in-app filesystem browser; mobile keeps
-  /// the native picker (and SAF for folders) until the SAF browser lands.
-  Future<void> _pickViaBrowser(
-    SendController controller,
-    _SourceKind kind,
-  ) async {
-    final allowed = switch (kind) {
-      _SourceKind.photos => imageFileExtensions,
-      _SourceKind.videos => videoFileExtensions,
-      _SourceKind.audio => audioFileExtensions,
-      _SourceKind.docs => documentFileExtensions,
-      _ => null,
-    };
-    final result = await Navigator.of(context).push<FileBrowserResult>(
-      MaterialPageRoute(
-        builder: (_) => FileBrowserScreen(allowedExtensions: allowed),
-      ),
-    );
-    if (result == null || !mounted) return;
-    if (result.files.isNotEmpty) controller.addFiles(result.files);
-    for (final directory in result.directories) {
-      await controller.addDirectory(directory);
-    }
-  }
-
-  Future<void> _pick(SendController controller, _SourceKind kind) async {
-    if (_picking) return;
-    setState(() => _picking = true);
-    try {
-      if (PlatformEnv.isDesktop) {
-        await _pickViaBrowser(controller, kind);
-        return;
-      }
-      final picked = await FilePicker.pickFiles(
-        type: switch (kind) {
-          _SourceKind.any => FileType.any,
-          _SourceKind.photos => FileType.image,
-          _SourceKind.videos => FileType.video,
-          _SourceKind.audio => FileType.audio,
-          _SourceKind.docs ||
-          _SourceKind.folder ||
-          _SourceKind.media ||
-          _SourceKind.apps =>
-            FileType.custom,
-        },
-        allowedExtensions: kind == _SourceKind.docs
-            ? const [
-                'pdf',
-                'doc',
-                'docx',
-                'txt',
-                'md',
-                'rtf',
-                'xls',
-                'xlsx',
-                'csv',
-                'ppt',
-                'pptx',
-              ]
-            : null,
-      );
-      final files = <File>[];
-      for (final picked in picked) {
-        final path = picked.path;
-        if (path != null && path.isNotEmpty) files.add(File(path));
-      }
-      controller.addFiles(files);
-    } on Object catch (error) {
-      if (!mounted) return;
-      _toast(AppLocalizations.of(context).filePickerFailed('$error'));
-    } finally {
-      if (mounted) setState(() => _picking = false);
-    }
-  }
-
-  Future<void> _pickMedia(SendController controller) async {
-    // photo_manager has no Linux backend, so the media library falls back
-    // to the filesystem browser there.
-    if (PlatformEnv.kind == PlatformKind.linux) {
-      return _pickViaBrowser(controller, _SourceKind.any);
-    }
-    final files = await Navigator.of(context).push<List<File>>(
-      MaterialPageRoute(builder: (_) => const MediaBrowserScreen()),
-    );
-    if (files == null || files.isEmpty || !mounted) return;
-    controller.addFiles(files);
-  }
-
-  Future<void> _pickApps(SendController controller) async {
-    final apps = await InstalledApps.list();
-    if (!mounted) return;
-    final l10n = AppLocalizations.of(context);
-    if (apps.isEmpty) {
-      _toast(l10n.noAppBundles);
-      return;
-    }
-    final selected = await showModalBottomSheet<InstalledApp>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => _AppsSheet(apps: apps),
-    );
-    if (selected == null || !mounted) return;
-    final file = File(selected.path);
-    if (!await file.exists()) {
-      _toast(l10n.appBundleUnreadable);
-      return;
-    }
-    controller.addFiles([file]);
-  }
-
-  Future<void> _pickFolder(SendController controller) async {
-    final l10n = AppLocalizations.of(context);
-    if (PlatformEnv.isDesktop) {
-      final result = await Navigator.of(context).push<FileBrowserResult>(
-        MaterialPageRoute(
-          builder: (_) => const FileBrowserScreen(
-            mode: FileBrowserMode.foldersOnly,
-          ),
-        ),
-      );
-      if (result == null || !mounted) return;
-      for (final directory in result.directories) {
-        await controller.addDirectory(directory);
-      }
-      return;
-    }
-    var path = await FilePicker.getDirectoryPath(
-      dialogTitle: AppLocalizations.of(context).chooseFolderToSend,
-    );
-    if (path == null || path.isEmpty || !mounted) return;
-    if (path.startsWith('content://')) {
-      final cached = await SafFolders.copyTreeToCache(path);
-      if (!mounted) return;
-      if (cached == null || cached.isEmpty) {
-        _toast(l10n.androidFolderUnreadable);
-        return;
-      }
-      path = cached;
-    }
-    final folder = Directory(path);
-    if (!await folder.exists()) {
-      if (mounted) _toast(l10n.folderNotReadable);
-      return;
-    }
-    await controller.addDirectory(folder);
-    if (mounted && controller.items.isEmpty) {
-      _toast(l10n.folderNoReadableFiles);
-    }
   }
 
   /// Desktop drag-and-drop: files join the queue directly, directories go
@@ -507,8 +320,9 @@ class _SendScreenState extends State<SendScreen> {
                                   controller: controller,
                                   onDone: () async {
                                     await controller.reset();
-                                    if (context.mounted)
+                                    if (context.mounted) {
                                       Navigator.of(context).pop();
+                                    }
                                   },
                                   onAgain: () async {
                                     await controller.reset();
@@ -528,8 +342,9 @@ class _SendScreenState extends State<SendScreen> {
                                   },
                                   onBack: () async {
                                     await controller.reset();
-                                    if (context.mounted)
+                                    if (context.mounted) {
                                       Navigator.of(context).pop();
+                                    }
                                   },
                                 ),
                             },
@@ -600,187 +415,6 @@ class _DropFilesOverlay extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PickView extends StatelessWidget {
-  const _PickView({
-    super.key,
-    required this.controller,
-    required this.picking,
-    required this.query,
-    required this.onQueryChanged,
-    required this.onPick,
-    required this.onStart,
-  });
-
-  final SendController controller;
-  final bool picking;
-  final String query;
-  final ValueChanged<String> onQueryChanged;
-  final VoidCallback onPick;
-  final Future<void> Function() onStart;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    final needle = query.trim().toLowerCase();
-    final visible = controller.items
-        .where((item) =>
-            needle.isEmpty || item.name.toLowerCase().contains(needle))
-        .toList(growable: false);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.pickWhatToSend,
-          style: theme.textTheme.headlineSmall,
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          l10n.everythingStreamed,
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        if (controller.items.isNotEmpty) ...[
-          TextField(
-            onChanged: onQueryChanged,
-            decoration: InputDecoration(
-              hintText: l10n.searchSelectedFiles,
-              prefixIcon: Icon(AppIcons.search, size: 18),
-              isDense: true,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-        ],
-        if (controller.items.isEmpty)
-          EmptyState(
-            icon: AppIcons.addCircle,
-            title: l10n.nothingSelected,
-            message: l10n.chooseFilesMessage,
-            action: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: picking ? null : onPick,
-                    icon: picking
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(AppIcons.folderOpen, size: 17),
-                    label:
-                        Text(picking ? l10n.opening : l10n.chooseFilesOrFolder),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          Column(
-            children: [
-              if (visible.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                  child: Text(
-                    l10n.noSelectedFileMatches(query),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              for (var i = 0; i < visible.length; i++) ...[
-                if (i > 0)
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.hairline,
-                  ),
-                FileTile(
-                  name: visible[i].name,
-                  size: visible[i].size,
-                  subtitle: visible[i].relativePath,
-                  trailing: IconButton(
-                    tooltip: l10n.remove,
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => controller.removeItem(visible[i]),
-                    icon: Icon(
-                      AppIcons.close,
-                      size: 17,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        if (controller.items.isEmpty && controller.recents.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.lg),
-          Text(l10n.recentFiles, style: theme.textTheme.titleSmall),
-          const SizedBox(height: AppSpacing.xs),
-          for (final recent in controller.recents.take(6))
-            if (File(recent.path).existsSync())
-              InkWell(
-                onTap: picking
-                    ? null
-                    : () => controller.addFiles([File(recent.path)]),
-                child: FileTile(
-                  name: recent.name,
-                  size: recent.size,
-                  subtitle: l10n.tapToAddAgain,
-                ),
-              ),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        if (controller.items.isNotEmpty)
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: picking ? null : onPick,
-                  icon: Icon(AppIcons.add, size: 17),
-                  label: Text(l10n.addMore),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => onStart(),
-                  icon: Icon(AppIcons.hotspot, size: 17),
-                  label: Text(l10n.startSharing),
-                ),
-              ),
-            ],
-          ),
-        if (controller.items.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Icon(
-                AppIcons.info,
-                size: 14,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  l10n.filesTotal(
-                    controller.items.length,
-                    formatBytes(controller.totalBytes),
-                  ),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-              TextButton(
-                onPressed: controller.clearFiles,
-                child: Text(l10n.clear),
-              ),
-            ],
-          ),
-        ],
-      ],
     );
   }
 }
@@ -1271,130 +905,6 @@ class _FailedView extends StatelessWidget {
           child: Text(l10n.backToFiles),
         ),
       ],
-    );
-  }
-}
-
-class _AppsSheet extends StatelessWidget {
-  const _AppsSheet({required this.apps});
-
-  final List<InstalledApp> apps;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.65,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                0,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              child: Text(l10n.sendAnApp, style: theme.textTheme.titleLarge),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: apps.length,
-                itemBuilder: (context, index) {
-                  final app = apps[index];
-                  return ListTile(
-                    leading: Icon(AppIcons.package),
-                    title: Text(app.name),
-                    subtitle: Text(
-                      app.version.isEmpty
-                          ? l10n.installedApp
-                          : l10n.appVersion(app.version),
-                    ),
-                    onTap: () => Navigator.of(context).pop(app),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SourceSheet extends StatelessWidget {
-  const _SourceSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                0,
-                AppSpacing.lg,
-                AppSpacing.sm,
-              ),
-              child: Text(
-                l10n.addToTransfer,
-                style: theme.textTheme.titleLarge,
-              ),
-            ),
-            ListTile(
-              leading: Icon(AppIcons.folderOpen),
-              title: Text(l10n.files),
-              subtitle: Text(l10n.anyFileType),
-              onTap: () => Navigator.of(context).pop(_SourceKind.any),
-            ),
-            if (Platform.isAndroid || Platform.isMacOS)
-              ListTile(
-                leading: Icon(AppIcons.image),
-                title: Text(l10n.mediaLibrary),
-                subtitle: Text(l10n.mediaLibraryHint),
-                onTap: () => Navigator.of(context).pop(_SourceKind.media),
-              ),
-            ListTile(
-              leading: Icon(AppIcons.video),
-              title: Text(l10n.videos),
-              onTap: () => Navigator.of(context).pop(_SourceKind.videos),
-            ),
-            ListTile(
-              leading: Icon(AppIcons.music),
-              title: Text(l10n.audioLabel),
-              onTap: () => Navigator.of(context).pop(_SourceKind.audio),
-            ),
-            ListTile(
-              leading: Icon(AppIcons.fileText),
-              title: Text(l10n.documents),
-              subtitle: Text(l10n.docsHint),
-              onTap: () => Navigator.of(context).pop(_SourceKind.docs),
-            ),
-            ListTile(
-              leading: Icon(AppIcons.package),
-              title: Text(l10n.appsLabel),
-              subtitle: Text(l10n.appsHint),
-              onTap: () => Navigator.of(context).pop(_SourceKind.apps),
-            ),
-            ListTile(
-              leading: Icon(AppIcons.folder),
-              title: Text(l10n.folderLabel),
-              subtitle: Text(l10n.folderHint),
-              onTap: () => Navigator.of(context).pop(_SourceKind.folder),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-        ),
-      ),
     );
   }
 }
