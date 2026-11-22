@@ -578,7 +578,10 @@ class _FileBrowserViewState extends State<FileBrowserView> {
         final name = _nameOf(entity);
         return ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: _leading(entity),
+          leading: Padding(
+            padding: const EdgeInsets.only(left: AppSpacing.sm),
+            child: _leading(entity),
+          ),
           title: Text(
             name,
             overflow: TextOverflow.ellipsis,

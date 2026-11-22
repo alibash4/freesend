@@ -373,12 +373,8 @@ class _SendScreenState extends State<SendScreen> {
     final theme = Theme.of(context);
     final selected = controller.items;
     return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
+      color: theme.scaffoldBackgroundColor,
       padding: kPagePadding.copyWith(
-        top: AppSpacing.sm,
         bottom: floatingNav ? floatingNavClearance(context) : AppSpacing.md,
       ),
       child: Row(
@@ -465,79 +461,89 @@ class _SendScreenState extends State<SendScreen> {
             },
           ),
         ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  controller: _scrollController,
-                  padding: EdgeInsets.only(
-                    bottom: AppSpacing.xl +
-                        (floatingNav ? floatingNavClearance(context) : 0),
-                  ),
-                  children: [
-                    Padding(
-                      padding: kPagePadding,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 220),
-                        child: switch (controller.phase) {
-                          SendPhase.idle => SendSelectView(
-                              key: const ValueKey('select'),
-                              controller: controller,
-                              browserBack: _browserBack,
-                            ),
-                          SendPhase.preparing => _BusyView(
-                              key: const ValueKey('preparing'),
-                              label: l10n.openingHotspot,
-                            ),
-                          SendPhase.waitingForPeer ||
-                          SendPhase.transferring =>
-                            _SessionView(
-                              key: const ValueKey('session'),
-                              controller: controller,
-                              onCopy: _copy,
-                              onScanReceiver: () => _scanReceiver(controller),
-                            ),
-                          SendPhase.completed => _CompletedView(
-                              key: const ValueKey('done'),
-                              controller: controller,
-                              onDone: () async {
-                                await controller.reset();
-                                if (context.mounted)
-                                  Navigator.of(context).pop();
-                              },
-                              onAgain: () async {
-                                await controller.reset();
-                                if (!context.mounted) return;
-                                await _start(controller);
-                              },
-                            ),
-                          SendPhase.failed ||
-                          SendPhase.cancelled =>
-                            _FailedView(
-                              key: const ValueKey('failed'),
-                              controller: controller,
-                              onRetry: () async {
-                                await controller.reset();
-                                if (!context.mounted) return;
-                                await _start(controller);
-                              },
-                              onBack: () async {
-                                await controller.reset();
-                                if (context.mounted)
-                                  Navigator.of(context).pop();
-                              },
-                            ),
-                        },
-                      ),
-                    ),
-                  ],
+        body: Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                bottom: false,
+                child: LayoutBuilder(
+                  builder: (context, viewport) {
+                    // Height available to the scroll content after the
+                    // ListView's own bottom padding is accounted for; the
+                    // embedded browser uses it to fill the leftover space.
+                    final listBottomPad = AppSpacing.xl +
+                        (floatingNav ? floatingNavClearance(context) : 0);
+                    return ListView(
+                      controller: _scrollController,
+                      padding: EdgeInsets.only(bottom: listBottomPad),
+                      children: [
+                        Padding(
+                          padding: kPagePadding,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: switch (controller.phase) {
+                              SendPhase.idle => SendSelectView(
+                                  key: const ValueKey('select'),
+                                  controller: controller,
+                                  browserBack: _browserBack,
+                                  contentHeight:
+                                      viewport.maxHeight - listBottomPad,
+                                ),
+                              SendPhase.preparing => _BusyView(
+                                  key: const ValueKey('preparing'),
+                                  label: l10n.openingHotspot,
+                                ),
+                              SendPhase.waitingForPeer ||
+                              SendPhase.transferring =>
+                                _SessionView(
+                                  key: const ValueKey('session'),
+                                  controller: controller,
+                                  onCopy: _copy,
+                                  onScanReceiver: () =>
+                                      _scanReceiver(controller),
+                                ),
+                              SendPhase.completed => _CompletedView(
+                                  key: const ValueKey('done'),
+                                  controller: controller,
+                                  onDone: () async {
+                                    await controller.reset();
+                                    if (context.mounted)
+                                      Navigator.of(context).pop();
+                                  },
+                                  onAgain: () async {
+                                    await controller.reset();
+                                    if (!context.mounted) return;
+                                    await _start(controller);
+                                  },
+                                ),
+                              SendPhase.failed ||
+                              SendPhase.cancelled =>
+                                _FailedView(
+                                  key: const ValueKey('failed'),
+                                  controller: controller,
+                                  onRetry: () async {
+                                    await controller.reset();
+                                    if (!context.mounted) return;
+                                    await _start(controller);
+                                  },
+                                  onBack: () async {
+                                    await controller.reset();
+                                    if (context.mounted)
+                                      Navigator.of(context).pop();
+                                  },
+                                ),
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
-              if (controller.phase == SendPhase.idle)
-                _startBar(context, controller, l10n, floatingNav),
-            ],
-          ),
+            ),
+            if (controller.phase == SendPhase.idle)
+              _startBar(context, controller, l10n, floatingNav),
+          ],
         ),
       ),
     );

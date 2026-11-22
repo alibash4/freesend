@@ -7,6 +7,7 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
+import 'package:free_send/ui/kit/tokens.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
 /// In-app media browser: albums, photos, videos, and audio with thumbnails.
@@ -372,7 +373,7 @@ class _AssetTile extends StatelessWidget {
     return Material(
       color: theme.colorScheme.surfaceContainer,
       clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(AppRadii.card),
       child: InkWell(
         onTap: onTap,
         child: Stack(

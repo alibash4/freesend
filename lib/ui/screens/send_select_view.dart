@@ -25,10 +25,16 @@ class SendSelectView extends StatefulWidget {
   const SendSelectView({
     super.key,
     required this.controller,
+    required this.contentHeight,
     this.browserBack,
   });
 
   final SendController controller;
+
+  /// Height the page's scroll viewport can show at once. The embedded
+  /// browser uses it to claim whatever space the rest of the column
+  /// doesn't need, instead of a fixed fraction of the screen.
+  final double contentHeight;
 
   /// Shared with the send screen so system back can walk up directories
   /// inside the embedded browser before leaving the screen.
@@ -276,9 +282,17 @@ class _SendSelectViewState extends State<SendSelectView> {
       _ => null,
     };
     // The send screen scrolls as a whole, so the browser gets a bounded
-    // height: about half the viewport, with sane clamps.
-    final height =
-        (MediaQuery.sizeOf(context).height * 0.5).clamp(320.0, 560.0);
+    // height: everything the scroll viewport has left after the fixed
+    // chrome around it (tabs, queue strip, link picker, trailing space).
+    // Chrome heights: top spacer + tabs + gap = 16+40+24, queue strip
+    // = 44+8 when items are queued, desktop link picker block = 16+~40,
+    // trailing spacer = 24.
+    const chrome = AppSpacing.md + 40 + AppSpacing.lg + AppSpacing.lg;
+    final queueChrome =
+        widget.controller.items.isEmpty ? 0.0 : 44 + AppSpacing.sm;
+    final linkChrome = PlatformEnv.isDesktop ? AppSpacing.md + 40 : 0.0;
+    final raw = widget.contentHeight - chrome - queueChrome - linkChrome;
+    final height = raw < 320 ? 320.0 : raw;
     return SizedBox(
       height: height,
       child: PlatformEnv.isDesktop

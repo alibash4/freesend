@@ -407,13 +407,16 @@ class _SafBrowserViewState extends State<SafBrowserView> {
         final selected = _isSelected(entry);
         return ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: entry.isDir
-              ? Icon(AppIcons.folderFilled, color: AppColors.accent, size: 36)
-              : Icon(
-                  iconForFileName(entry.name),
-                  size: 36,
-                  color: AppColors.accent,
-                ),
+          leading: Padding(
+            padding: const EdgeInsets.only(left: AppSpacing.sm),
+            child: entry.isDir
+                ? Icon(AppIcons.folderFilled, color: AppColors.accent, size: 36)
+                : Icon(
+                    iconForFileName(entry.name),
+                    size: 36,
+                    color: AppColors.accent,
+                  ),
+          ),
           title: Text(
             entry.name,
             overflow: TextOverflow.ellipsis,
