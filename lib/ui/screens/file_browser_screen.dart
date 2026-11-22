@@ -83,8 +83,8 @@ IconData iconForFileName(String name) {
     'svg' ||
     'heic' ||
     'avif' =>
-      AppIcons.image,
-    'mp4' || 'mkv' || 'avi' || 'mov' || 'webm' || 'm4v' => AppIcons.video,
+      AppIcons.imageFilled,
+    'mp4' || 'mkv' || 'avi' || 'mov' || 'webm' || 'm4v' => AppIcons.videoFilled,
     'mp3' ||
     'wav' ||
     'flac' ||
@@ -92,12 +92,61 @@ IconData iconForFileName(String name) {
     'ogg' ||
     'm4a' ||
     'opus' =>
-      AppIcons.music,
-    'pdf' => AppIcons.pdf,
-    'doc' || 'docx' || 'txt' || 'md' || 'rtf' || 'odt' => AppIcons.fileText,
-    'zip' || 'rar' || '7z' || 'tar' || 'gz' || 'bz2' || 'xz' => AppIcons.file,
-    _ => AppIcons.file,
+      AppIcons.musicFilled,
+    'pdf' => AppIcons.pdfFilled,
+    'doc' ||
+    'docx' ||
+    'txt' ||
+    'md' ||
+    'rtf' ||
+    'odt' =>
+      AppIcons.fileTextFilled,
+    'zip' ||
+    'rar' ||
+    '7z' ||
+    'tar' ||
+    'gz' ||
+    'bz2' ||
+    'xz' =>
+      AppIcons.fileFilled,
+    _ => AppIcons.fileFilled,
   };
+}
+
+/// Animated radio-style selection indicator shared by the file browsers:
+/// an outline ring that fills with the accent colour and reveals a check.
+class FileSelectRadio extends StatelessWidget {
+  const FileSelectRadio({super.key, required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? AppColors.accent : Colors.transparent,
+        border: Border.all(
+          color: selected ? AppColors.accent : AppColors.neutral400,
+          width: 2,
+        ),
+      ),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutBack,
+        scale: selected ? 1 : 0,
+        child: Icon(
+          AppIcons.check,
+          size: 14,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
 }
 
 /// What the user picked in [FileBrowserScreen].
@@ -174,6 +223,8 @@ class FileBrowserView extends StatefulWidget {
     this.allowedExtensions,
     this.showHeader = true,
     this.backHandler,
+    this.isItemSelected,
+    this.onItemToggle,
     required this.onConfirm,
   });
 
@@ -187,8 +238,15 @@ class FileBrowserView extends StatefulWidget {
   /// Receives the system-back handler while this view is mounted.
   final BrowserBackHandler? backHandler;
 
+  /// Live-selection hooks: when [onItemToggle] is provided the parent owns
+  /// selection state - [isItemSelected] reports it and every tap is
+  /// forwarded instead of using the built-in marks and confirm bar.
+  final bool Function(FileSystemEntity entity)? isItemSelected;
+  final void Function(FileSystemEntity entity, bool selected)? onItemToggle;
+
   /// Called with the marked files and directories when the user taps the
-  /// confirm action. The view clears its marks afterwards.
+  /// confirm action. The view clears its marks afterwards. Only used when
+  /// [onItemToggle] is null (standalone picker mode).
   final FutureOr<void> Function(
     List<File> files,
     List<Directory> directories,
@@ -342,6 +400,11 @@ class _FileBrowserViewState extends State<FileBrowserView> {
   }
 
   void _toggle(FileSystemEntity entity) {
+    final onItemToggle = widget.onItemToggle;
+    if (onItemToggle != null) {
+      onItemToggle(entity, !_isSelected(entity));
+      return;
+    }
     setState(() {
       if (entity is Directory) {
         if (!_selectedDirs.remove(entity.path)) _selectedDirs.add(entity.path);
@@ -353,9 +416,11 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     });
   }
 
-  bool _isSelected(FileSystemEntity entity) => entity is Directory
-      ? _selectedDirs.contains(entity.path)
-      : _selectedFiles.contains(entity.path);
+  bool _isSelected(FileSystemEntity entity) =>
+      widget.isItemSelected?.call(entity) ??
+      (entity is Directory
+          ? _selectedDirs.contains(entity.path)
+          : _selectedFiles.contains(entity.path));
 
   Future<void> _confirm() async {
     final files = _selectedFiles.map(File.new).toList(growable: false);
@@ -372,7 +437,11 @@ class _FileBrowserViewState extends State<FileBrowserView> {
 
   Widget _leading(FileSystemEntity entity) {
     if (entity is Directory) {
-      return Icon(AppIcons.folder, color: AppColors.accent);
+      return Icon(
+        AppIcons.folderFilled,
+        color: AppColors.accent,
+        size: 36,
+      );
     }
     final name = _nameOf(entity);
     if (imageFileExtensions.contains(_extensionOf(name))) {
@@ -384,12 +453,15 @@ class _FileBrowserViewState extends State<FileBrowserView> {
           height: 40,
           fit: BoxFit.cover,
           cacheWidth: 96,
-          errorBuilder: (context, error, stackTrace) =>
-              Icon(_iconFor(name), size: 28),
+          errorBuilder: (context, error, stackTrace) => Icon(
+            _iconFor(name),
+            size: 36,
+            color: AppColors.accent,
+          ),
         ),
       );
     }
-    return Icon(_iconFor(name), size: 28);
+    return Icon(_iconFor(name), size: 36, color: AppColors.accent);
   }
 
   @override
@@ -430,7 +502,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
           const Divider(height: 1),
         ],
         Expanded(child: _body(l10n)),
-        if (selectedCount > 0)
+        if (selectedCount > 0 && widget.onItemToggle == null)
           SafeArea(
             top: false,
             child: Padding(
@@ -456,6 +528,8 @@ class _FileBrowserViewState extends State<FileBrowserView> {
   }
 
   Widget _body(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -485,7 +559,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     }
     if (_grid) {
       return GridView.builder(
-        padding: const EdgeInsets.all(AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 150,
           childAspectRatio: 0.92,
@@ -503,15 +577,24 @@ class _FileBrowserViewState extends State<FileBrowserView> {
         final selected = _isSelected(entity);
         final name = _nameOf(entity);
         return ListTile(
+          contentPadding: EdgeInsets.zero,
           leading: _leading(entity),
-          title: Text(name, overflow: TextOverflow.ellipsis),
-          subtitle:
-              entity is File ? Text(formatBytes(entity.lengthSync())) : null,
-          trailing: IconButton(
-            icon: Icon(
-              selected ? AppIcons.checkCircle : AppIcons.circle,
-              color: selected ? AppColors.accent : AppColors.neutral400,
+          title: Text(
+            name,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 17,
+              color: scheme.onSurface,
             ),
+          ),
+          subtitle: entity is File
+              ? Text(
+                  formatBytes(entity.lengthSync()),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                )
+              : null,
+          trailing: IconButton(
+            icon: FileSelectRadio(selected: selected),
             onPressed: () => _toggle(entity),
           ),
           onTap:
@@ -522,10 +605,9 @@ class _FileBrowserViewState extends State<FileBrowserView> {
   }
 
   Widget _gridThumb(FileSystemEntity entity, String name) {
-    final scheme = Theme.of(context).colorScheme;
     if (entity is Directory) {
       return Center(
-        child: Icon(AppIcons.folder, size: 44, color: AppColors.accent),
+        child: Icon(AppIcons.folderFilled, size: 48, color: AppColors.accent),
       );
     }
     if (imageFileExtensions.contains(_extensionOf(name))) {
@@ -534,12 +616,12 @@ class _FileBrowserViewState extends State<FileBrowserView> {
         fit: BoxFit.cover,
         cacheWidth: 240,
         errorBuilder: (context, error, stackTrace) => Center(
-          child: Icon(_iconFor(name), size: 44, color: scheme.onSurfaceVariant),
+          child: Icon(_iconFor(name), size: 48, color: AppColors.accent),
         ),
       );
     }
     return Center(
-      child: Icon(_iconFor(name), size: 44, color: scheme.onSurfaceVariant),
+      child: Icon(_iconFor(name), size: 48, color: AppColors.accent),
     );
   }
 
@@ -591,14 +673,10 @@ class _FileBrowserViewState extends State<FileBrowserView> {
               ],
             ),
             if (selected)
-              Positioned(
+              const Positioned(
                 top: 6,
                 right: 6,
-                child: Icon(
-                  AppIcons.checkCircle,
-                  color: AppColors.accent,
-                  size: 22,
-                ),
+                child: FileSelectRadio(selected: true),
               ),
           ],
         ),

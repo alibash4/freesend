@@ -361,6 +361,45 @@ class _SendScreenState extends State<SendScreen> {
     _toast(AppLocalizations.of(context).labelCopied(label));
   }
 
+  /// Docked action bar under the scrollable send content: queue summary on
+  /// the start edge, Start sharing on the end edge. Sits above the floating
+  /// bottom nav on mobile and flush with the bottom edge on desktop.
+  Widget _startBar(
+    BuildContext context,
+    SendController controller,
+    AppLocalizations l10n,
+    bool floatingNav,
+  ) {
+    final theme = Theme.of(context);
+    final selected = controller.items;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
+      ),
+      padding: kPagePadding.copyWith(
+        top: AppSpacing.sm,
+        bottom: floatingNav ? floatingNavClearance(context) : AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${l10n.fileCount(selected.length)} · '
+              '${formatBytes(controller.totalBytes)}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: selected.isEmpty ? null : () => _start(controller),
+            icon: Icon(AppIcons.send, size: 17),
+            label: Text(l10n.startSharing),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _start(SendController controller) async {
     final ready = await SetupScreen.ensure(
       context,
@@ -427,65 +466,76 @@ class _SendScreenState extends State<SendScreen> {
           ),
         ),
         body: SafeArea(
-          child: ListView(
-            controller: _scrollController,
-            padding: EdgeInsets.only(
-              bottom: AppSpacing.xl +
-                  (floatingNav ? floatingNavClearance(context) : 0),
-            ),
+          child: Column(
             children: [
-              Padding(
-                padding: kPagePadding,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: switch (controller.phase) {
-                    SendPhase.idle => SendSelectView(
-                        key: const ValueKey('select'),
-                        controller: controller,
-                        onStart: () => _start(controller),
-                        browserBack: _browserBack,
-                      ),
-                    SendPhase.preparing => _BusyView(
-                        key: const ValueKey('preparing'),
-                        label: l10n.openingHotspot,
-                      ),
-                    SendPhase.waitingForPeer ||
-                    SendPhase.transferring =>
-                      _SessionView(
-                        key: const ValueKey('session'),
-                        controller: controller,
-                        onCopy: _copy,
-                        onScanReceiver: () => _scanReceiver(controller),
-                      ),
-                    SendPhase.completed => _CompletedView(
-                        key: const ValueKey('done'),
-                        controller: controller,
-                        onDone: () async {
-                          await controller.reset();
-                          if (context.mounted) Navigator.of(context).pop();
+              Expanded(
+                child: ListView(
+                  controller: _scrollController,
+                  padding: EdgeInsets.only(
+                    bottom: AppSpacing.xl +
+                        (floatingNav ? floatingNavClearance(context) : 0),
+                  ),
+                  children: [
+                    Padding(
+                      padding: kPagePadding,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: switch (controller.phase) {
+                          SendPhase.idle => SendSelectView(
+                              key: const ValueKey('select'),
+                              controller: controller,
+                              browserBack: _browserBack,
+                            ),
+                          SendPhase.preparing => _BusyView(
+                              key: const ValueKey('preparing'),
+                              label: l10n.openingHotspot,
+                            ),
+                          SendPhase.waitingForPeer ||
+                          SendPhase.transferring =>
+                            _SessionView(
+                              key: const ValueKey('session'),
+                              controller: controller,
+                              onCopy: _copy,
+                              onScanReceiver: () => _scanReceiver(controller),
+                            ),
+                          SendPhase.completed => _CompletedView(
+                              key: const ValueKey('done'),
+                              controller: controller,
+                              onDone: () async {
+                                await controller.reset();
+                                if (context.mounted)
+                                  Navigator.of(context).pop();
+                              },
+                              onAgain: () async {
+                                await controller.reset();
+                                if (!context.mounted) return;
+                                await _start(controller);
+                              },
+                            ),
+                          SendPhase.failed ||
+                          SendPhase.cancelled =>
+                            _FailedView(
+                              key: const ValueKey('failed'),
+                              controller: controller,
+                              onRetry: () async {
+                                await controller.reset();
+                                if (!context.mounted) return;
+                                await _start(controller);
+                              },
+                              onBack: () async {
+                                await controller.reset();
+                                if (context.mounted)
+                                  Navigator.of(context).pop();
+                              },
+                            ),
                         },
-                        onAgain: () async {
-                          await controller.reset();
-                          if (!context.mounted) return;
-                          await _start(controller);
-                        },
                       ),
-                    SendPhase.failed || SendPhase.cancelled => _FailedView(
-                        key: const ValueKey('failed'),
-                        controller: controller,
-                        onRetry: () async {
-                          await controller.reset();
-                          if (!context.mounted) return;
-                          await _start(controller);
-                        },
-                        onBack: () async {
-                          await controller.reset();
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                      ),
-                  },
+                    ),
+                  ],
                 ),
               ),
+              if (controller.phase == SendPhase.idle)
+                _startBar(context, controller, l10n, floatingNav),
             ],
           ),
         ),

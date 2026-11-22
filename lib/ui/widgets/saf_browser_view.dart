@@ -332,6 +332,8 @@ class _SafBrowserViewState extends State<SafBrowserView> {
   }
 
   Widget _body(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     if (_rootUri == null) {
       return Center(
         child: Padding(
@@ -387,7 +389,7 @@ class _SafBrowserViewState extends State<SafBrowserView> {
     }
     if (_grid) {
       return GridView.builder(
-        padding: const EdgeInsets.all(AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: 150,
           childAspectRatio: 0.92,
@@ -404,16 +406,30 @@ class _SafBrowserViewState extends State<SafBrowserView> {
         final entry = entries[index];
         final selected = _isSelected(entry);
         return ListTile(
+          contentPadding: EdgeInsets.zero,
           leading: entry.isDir
-              ? Icon(AppIcons.folder, color: AppColors.accent)
-              : Icon(iconForFileName(entry.name), size: 28),
-          title: Text(entry.name, overflow: TextOverflow.ellipsis),
-          subtitle: entry.isDir ? null : Text(formatBytes(entry.size)),
-          trailing: IconButton(
-            icon: Icon(
-              selected ? AppIcons.checkCircle : AppIcons.circle,
-              color: selected ? AppColors.accent : AppColors.neutral400,
+              ? Icon(AppIcons.folderFilled, color: AppColors.accent, size: 36)
+              : Icon(
+                  iconForFileName(entry.name),
+                  size: 36,
+                  color: AppColors.accent,
+                ),
+          title: Text(
+            entry.name,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 17,
+              color: scheme.onSurface,
             ),
+          ),
+          subtitle: entry.isDir
+              ? null
+              : Text(
+                  formatBytes(entry.size),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                ),
+          trailing: IconButton(
+            icon: FileSelectRadio(selected: selected),
             onPressed: () => _toggle(entry),
           ),
           onTap: entry.isDir
@@ -425,17 +441,16 @@ class _SafBrowserViewState extends State<SafBrowserView> {
   }
 
   Widget _gridThumb(SafEntry entry) {
-    final scheme = Theme.of(context).colorScheme;
     if (entry.isDir) {
       return Center(
-        child: Icon(AppIcons.folder, size: 44, color: AppColors.accent),
+        child: Icon(AppIcons.folderFilled, size: 48, color: AppColors.accent),
       );
     }
     return Center(
       child: Icon(
         iconForFileName(entry.name),
-        size: 44,
-        color: scheme.onSurfaceVariant,
+        size: 48,
+        color: AppColors.accent,
       ),
     );
   }
@@ -488,14 +503,10 @@ class _SafBrowserViewState extends State<SafBrowserView> {
               ],
             ),
             if (selected)
-              Positioned(
+              const Positioned(
                 top: 6,
                 right: 6,
-                child: Icon(
-                  AppIcons.checkCircle,
-                  color: AppColors.accent,
-                  size: 22,
-                ),
+                child: FileSelectRadio(selected: true),
               ),
           ],
         ),

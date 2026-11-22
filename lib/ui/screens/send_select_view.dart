@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -24,12 +25,10 @@ class SendSelectView extends StatefulWidget {
   const SendSelectView({
     super.key,
     required this.controller,
-    required this.onStart,
     this.browserBack,
   });
 
   final SendController controller;
-  final Future<void> Function() onStart;
 
   /// Shared with the send screen so system back can walk up directories
   /// inside the embedded browser before leaving the screen.
@@ -67,6 +66,47 @@ class _SendSelectViewState extends State<SendSelectView> {
     if (files.isNotEmpty) widget.controller.addFiles(files);
     for (final directory in directories) {
       await widget.controller.addDirectory(directory);
+    }
+  }
+
+  /// Live-selection probe for the embedded browser: an entity counts as
+  /// selected when the queue already holds it (a directory counts when any
+  /// queued file lives beneath it).
+  bool _browserItemSelected(FileSystemEntity entity) {
+    final separator = Platform.pathSeparator;
+    return widget.controller.items.any((item) {
+      final path = item.path;
+      if (path == null) return false;
+      return entity is Directory
+          ? path.startsWith('${entity.path}$separator')
+          : path == entity.path;
+    });
+  }
+
+  /// Live-selection toggle: picks go straight into the send queue and the
+  /// queue strip / Start button reflect them immediately.
+  void _browserToggle(FileSystemEntity entity, bool selected) {
+    if (entity is Directory) {
+      if (selected) {
+        unawaited(widget.controller.addDirectory(entity));
+      } else {
+        final prefix = '${entity.path}${Platform.pathSeparator}';
+        for (final item in widget.controller.items
+            .where((item) => item.path?.startsWith(prefix) ?? false)
+            .toList(growable: false)) {
+          widget.controller.removeItem(item);
+        }
+      }
+    } else if (entity is File) {
+      if (selected) {
+        widget.controller.addFiles([entity]);
+      } else {
+        for (final item in widget.controller.items
+            .where((item) => item.path == entity.path)
+            .toList(growable: false)) {
+          widget.controller.removeItem(item);
+        }
+      }
     }
   }
 
@@ -151,7 +191,6 @@ class _SendSelectViewState extends State<SendSelectView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final controller = widget.controller;
     final wide = MediaQuery.sizeOf(context).width >= 840;
@@ -220,22 +259,6 @@ class _SendSelectViewState extends State<SendSelectView> {
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${l10n.fileCount(selected.length)} · '
-                '${formatBytes(controller.totalBytes)}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: selected.isEmpty ? null : () => widget.onStart(),
-              icon: Icon(AppIcons.send, size: 17),
-              label: Text(l10n.startSharing),
-            ),
-          ],
-        ),
       ],
     );
   }
@@ -263,6 +286,8 @@ class _SendSelectViewState extends State<SendSelectView> {
               key: ValueKey(_category),
               mode: mode,
               allowedExtensions: allowed,
+              isItemSelected: _browserItemSelected,
+              onItemToggle: _browserToggle,
               onConfirm: _addBrowserItems,
             )
           : _StorageGate(
@@ -272,6 +297,8 @@ class _SendSelectViewState extends State<SendSelectView> {
                 allowedExtensions: allowed,
                 showHeader: false,
                 backHandler: widget.browserBack,
+                isItemSelected: _browserItemSelected,
+                onItemToggle: _browserToggle,
                 onConfirm: _addBrowserItems,
               ),
             ),
