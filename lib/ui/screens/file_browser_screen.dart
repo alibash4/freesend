@@ -8,6 +8,7 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/kit/tokens.dart';
+import 'package:free_send/ui/widgets/common.dart';
 
 /// Extension sets shared by the send screen's category filters.
 const imageFileExtensions = {
@@ -592,14 +593,22 @@ class _FileBrowserViewState extends State<FileBrowserView> {
             padding: const EdgeInsets.only(left: AppSpacing.sm),
             child: _leading(entity),
           ),
-          title: Text(
-            name,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 17,
-              color: scheme.onSurface,
-            ),
-          ),
+          title: entity is Directory
+              ? Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    color: scheme.onSurface,
+                  ),
+                )
+              : MiddleEllipsisText(
+                  name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    color: scheme.onSurface,
+                  ),
+                ),
           subtitle: entity is File
               ? Text(
                   formatBytes(entity.lengthSync()),
@@ -665,14 +674,25 @@ class _FileBrowserViewState extends State<FileBrowserView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
+                      if (entity is Directory)
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        )
+                      else
+                        MiddleEllipsisText(
+                          name,
+                          maxLines: 1,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
                       if (entity is File)
                         Text(
                           formatBytes(entity.lengthSync()),

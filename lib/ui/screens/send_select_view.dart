@@ -670,11 +670,16 @@ class _QueueStrip extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(
-                    item.name,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  child: isFolder
+                      ? Text(
+                          item.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        )
+                      : MiddleEllipsisText(
+                          item.name,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                 ),
                 IconButton(
                   icon: Icon(AppIcons.close, size: 16),

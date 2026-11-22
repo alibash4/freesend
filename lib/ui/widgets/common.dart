@@ -640,3 +640,83 @@ class _SpinnerIconState extends State<SpinnerIcon>
     );
   }
 }
+
+/// Single-line text that truncates in the middle instead of the end, keeping
+/// the trailing extension readable: `quarterly-report-f…nal-v2.pdf`.
+/// Falls back to a regular end ellipsis when the name cannot fit even then.
+class MiddleEllipsisText extends StatelessWidget {
+  const MiddleEllipsisText(
+    this.data, {
+    super.key,
+    this.style,
+    this.textAlign,
+    this.maxLines = 1,
+  });
+
+  final String data;
+  final TextStyle? style;
+  final TextAlign? textAlign;
+  final int maxLines;
+
+  static const _ellipsis = '…';
+
+  @override
+  Widget build(BuildContext context) {
+    final direction = Directionality.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    double widthOf(String value) => (TextPainter(
+          text: TextSpan(text: value, style: style),
+          maxLines: 1,
+          textDirection: direction,
+          textScaler: scaler,
+        )..layout())
+            .width;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        var truncated = false;
+        var result = data;
+        if (maxWidth.isFinite && widthOf(data) > maxWidth) {
+          // The suffix keeps the format readable; names without a dot just
+          // lose their tail like a normal ellipsis.
+          final dot = data.lastIndexOf('.');
+          final suffix =
+              dot > 0 && dot < data.length - 1 ? data.substring(dot) : '';
+          String candidate(int head) =>
+              '${data.substring(0, head)}$_ellipsis$suffix';
+          var lo = 0;
+          var hi = data.length - suffix.length;
+          var best = -1;
+          while (lo <= hi) {
+            final mid = (lo + hi) ~/ 2;
+            if (widthOf(candidate(mid)) <= maxWidth) {
+              best = mid;
+              lo = mid + 1;
+            } else {
+              hi = mid - 1;
+            }
+          }
+          // Never split a surrogate pair at the cut point.
+          while (best > 0 &&
+              data.codeUnitAt(best - 1) >= 0xD800 &&
+              data.codeUnitAt(best - 1) <= 0xDBFF) {
+            best--;
+          }
+          if (best > 0) {
+            result = candidate(best);
+            truncated = true;
+          }
+        }
+        return Text(
+          result,
+          style: style,
+          textAlign: textAlign,
+          maxLines: maxLines,
+          overflow: truncated ? TextOverflow.clip : TextOverflow.ellipsis,
+          softWrap: false,
+        );
+      },
+    );
+  }
+}
