@@ -228,6 +228,13 @@ class FileBrowserView extends StatefulWidget {
     required this.onConfirm,
   });
 
+  /// Widget-test seam: `Directory.list` stream events never fire inside the
+  /// fake-async zone a widget test runs in, so tests substitute a lister
+  /// that resolves immediately.
+  @visibleForTesting
+  static Future<List<FileSystemEntity>> Function(Directory directory)?
+      debugListDirectory;
+
   final FileBrowserMode mode;
   final Set<String>? allowedExtensions;
 
@@ -327,7 +334,10 @@ class _FileBrowserViewState extends State<FileBrowserView> {
       _error = null;
     });
     try {
-      final entries = await dir.list(followLinks: false).toList();
+      final lister = FileBrowserView.debugListDirectory;
+      final entries = lister != null
+          ? await lister(dir)
+          : await dir.list(followLinks: false).toList();
       entries.sort((a, b) {
         final aDir = a is Directory;
         final bDir = b is Directory;
