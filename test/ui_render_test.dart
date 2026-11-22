@@ -33,6 +33,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/screens/settings_screen.dart';
 import 'package:free_send/ui/shell.dart';
+import 'package:free_send/ui/screens/file_browser_screen.dart';
 import 'package:free_send/ui/screens/logs_screen.dart';
 import 'package:free_send/ui/screens/receive_screen.dart';
 import 'package:free_send/ui/screens/send_screen.dart';
@@ -66,6 +67,11 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({'device_name': 'Desk Mini'});
+    // dart:io directory streams never deliver inside the fake-async zone,
+    // so the embedded send browser gets an empty listing instead of the
+    // real filesystem.
+    FileBrowserView.debugListDirectory =
+        (_) async => const <FileSystemEntity>[];
     appState = AppState(LocalStore());
     await appState.init();
   });
@@ -157,11 +163,19 @@ void main() {
     await pumpApp(tester);
 
     // The home tab is a two-button launcher without its own ListView; the
-    // shell keeps the other tabs alive in an IndexedStack.
-    final controllers = tester
-        .widgetList<ListView>(find.byType(ListView, skipOffstage: false))
-        .map((list) => list.controller)
-        .toSet();
+    // PageView builds tabs lazily, so visit each nav destination and collect
+    // the scroll controllers its ListView owns.
+    final controllers = <ScrollController>{};
+    for (final label in ['Transfers', 'History', 'Settings']) {
+      await tester.tap(find.text(label).last);
+      await tester.pumpAndSettle();
+      for (final list in tester.widgetList<ListView>(
+        find.byType(ListView, skipOffstage: false),
+      )) {
+        final controller = list.controller;
+        if (controller != null) controllers.add(controller);
+      }
+    }
 
     expect(controllers.length, 3);
   });
@@ -178,7 +192,7 @@ void main() {
     await tester.pumpAndSettle();
     // The send control asks how to send before anything else.
     expect(find.text('How do you want to send?'), findsOneWidget);
-    await tester.tap(find.text('Share to nearby'));
+    await tester.tap(find.text('Share to a nearby device'));
     await tester.pumpAndSettle();
     expect(find.text('How do you want to send?'), findsNothing);
     expect(find.byType(SendScreen), findsOneWidget);
@@ -275,7 +289,7 @@ void main() {
 
     await tester.tap(find.text('Send File').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Share to nearby'));
+    await tester.tap(find.text('Share to a nearby device'));
     await tester.pumpAndSettle();
     // The radar only exists once the session is really up: a real listener and
     // seeker socket.
@@ -354,9 +368,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('How do you want to send?'), findsOneWidget);
     // A desktop never offers the camera entry.
-    expect(find.text('Share to nearby'), findsOneWidget);
+    expect(find.text('Share to a nearby device'), findsOneWidget);
     expect(find.text('Send to a group'), findsOneWidget);
-    expect(find.text('Scan a QR code'), findsNothing);
+    expect(find.text('Scan a pairing code'), findsNothing);
 
     await tester.tap(find.text('Send to a group'));
     await tester.pumpAndSettle();
@@ -607,7 +621,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Updates'), findsOneWidget);
+    expect(find.text('System'), findsOneWidget);
     expect(find.text('Check automatically'), findsOneWidget);
     expect(find.text('Check for updates'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -644,7 +658,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
-    expect(find.text('System tray'), findsOneWidget);
+    expect(find.text('System'), findsOneWidget);
     final toggle = find.descendant(
       of: find.ancestor(
         of: find.text('Minimize to tray on close'),
@@ -653,7 +667,16 @@ void main() {
       matching: find.byType(Switch),
     );
     expect(tester.widget<Switch>(toggle).value, isFalse);
-    await tester.ensureVisible(toggle);
+    // Center it: the collapsing header overlays the list's top edge, so a
+    // minimally-scrolled row can land underneath it and miss the tap. The
+    // scroll animates, so it is not awaited - pumpAndSettle drives it.
+    unawaited(
+      Scrollable.ensureVisible(
+        tester.element(toggle),
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 300),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(toggle);
     await tester.pumpAndSettle();
@@ -677,16 +700,16 @@ void main() {
                 jsonEncode([
                   {
                     'tag_name': 'v9.9.9',
-                    'description': 'Faster handshakes and a new icon.',
-                    'assets': {
-                      'links': [
-                        {
-                          'name': 'FreeSend for Linux',
-                          'direct_asset_url':
-                              'https://gitlab.com/a/freesend.AppImage',
-                        },
-                      ],
-                    },
+                    'body': 'Faster handshakes and a new icon.',
+                    'published_at': '2026-01-02T03:04:05.000Z',
+                    'assets': [
+                      {
+                        'name': 'FreeSend for Linux',
+                        'browser_download_url':
+                            'https://github.com/a/freesend.AppImage',
+                        'size': 2048,
+                      },
+                    ],
                   },
                 ]),
                 200);
