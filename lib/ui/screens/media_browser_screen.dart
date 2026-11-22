@@ -10,6 +10,218 @@ import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/kit/tokens.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
+/// Paged device library for one media type. Used inside the send tabs so
+/// audio and video never scan the filesystem.
+class DeviceMediaPicker extends StatefulWidget {
+  const DeviceMediaPicker({
+    super.key,
+    required this.type,
+    required this.isSelected,
+    required this.onToggle,
+  });
+
+  final RequestType type;
+  final bool Function(String path) isSelected;
+  final void Function(String path, bool selected) onToggle;
+
+  @override
+  State<DeviceMediaPicker> createState() => _DeviceMediaPickerState();
+}
+
+class _DeviceMediaPickerState extends State<DeviceMediaPicker> {
+  final ScrollController _scroll = ScrollController();
+  final List<AssetEntity> _assets = [];
+  final Map<String, String> _paths = {};
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  bool _denied = false;
+  int _page = 0;
+  AssetPathEntity? _album;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+    _open();
+  }
+
+  @override
+  void didUpdateWidget(DeviceMediaPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.type != widget.type) {
+      _assets.clear();
+      _paths.clear();
+      _page = 0;
+      _hasMore = true;
+      _open();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients || _loading || _loadingMore || !_hasMore) return;
+    final position = _scroll.position;
+    if (position.pixels > position.maxScrollExtent - 480) _loadMore();
+  }
+
+  Future<void> _open() async {
+    setState(() {
+      _loading = true;
+      _denied = false;
+    });
+    final permission = await PhotoManager.requestPermissionExtend();
+    if (!mounted) return;
+    if (!permission.isAuth && !permission.hasAccess) {
+      setState(() {
+        _loading = false;
+        _denied = true;
+      });
+      return;
+    }
+    final paths = await PhotoManager.getAssetPathList(
+      type: widget.type,
+      hasAll: true,
+      onlyAll: true,
+    );
+    if (!mounted) return;
+    _album = paths.isEmpty ? null : paths.first;
+    _page = 0;
+    _assets.clear();
+    if (_album == null) {
+      setState(() {
+        _loading = false;
+        _hasMore = false;
+      });
+      return;
+    }
+    await _loadMore(initial: true);
+  }
+
+  Future<void> _loadMore({bool initial = false}) async {
+    final album = _album;
+    if (album == null || _loadingMore) return;
+    _loadingMore = true;
+    try {
+      final page = await album.getAssetListPaged(page: _page, size: _pageSize);
+      if (!mounted) return;
+      setState(() {
+        _assets.addAll(page);
+        _page += 1;
+        _hasMore = page.length == _pageSize;
+        _loading = false;
+        _loadingMore = false;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadingMore = false;
+        _hasMore = false;
+      });
+    }
+  }
+
+  Future<void> _toggle(AssetEntity asset) async {
+    var path = _paths[asset.id];
+    if (path == null) {
+      final file = await asset.file;
+      if (file == null || !mounted) return;
+      path = file.path;
+      _paths[asset.id] = path;
+    }
+    widget.onToggle(path, !widget.isSelected(path));
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_denied) {
+      return EmptyState(
+        icon: AppIcons.image,
+        title: l10n.mediaUnavailable,
+        message: l10n.mediaPermissionOff,
+        action: OutlinedButton(
+          onPressed: PhotoManager.openSetting,
+          child: Text(l10n.tryAgain),
+        ),
+      );
+    }
+    if (_assets.isEmpty) {
+      return EmptyState(
+        icon: widget.type == RequestType.audio ? AppIcons.music : AppIcons.video,
+        title: l10n.noMediaHere,
+        message: l10n.noMediaHint,
+      );
+    }
+    if (widget.type == RequestType.audio) {
+      return ListView.builder(
+        controller: _scroll,
+        itemCount: _assets.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= _assets.length) {
+            return const Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final asset = _assets[index];
+          final path = _paths[asset.id];
+          final selected = path != null && widget.isSelected(path);
+          return ListTile(
+            leading: Icon(AppIcons.music),
+            title: MiddleEllipsisText(asset.title ?? l10n.audioLabel),
+            trailing: Icon(
+              selected ? AppIcons.checkCircle : AppIcons.circle,
+              color: selected ? Theme.of(context).colorScheme.primary : null,
+            ),
+            onTap: () => _toggle(asset),
+          );
+        },
+      );
+    }
+    return GridView.builder(
+      controller: _scroll,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 140,
+        childAspectRatio: 1,
+        crossAxisSpacing: 3,
+        mainAxisSpacing: 3,
+      ),
+      itemCount: _assets.length + (_hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= _assets.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        final asset = _assets[index];
+        final path = _paths[asset.id];
+        return RepaintBoundary(
+          child: _AssetTile(
+            asset: asset,
+            selected: path != null && widget.isSelected(path),
+            onTap: () => _toggle(asset),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// In-app media browser: albums, photos, videos, and audio with thumbnails.
 /// Returns the selected files as absolute paths to the send screen.
 class MediaBrowserScreen extends StatefulWidget {
@@ -19,7 +231,9 @@ class MediaBrowserScreen extends StatefulWidget {
   State<MediaBrowserScreen> createState() => _MediaBrowserScreenState();
 }
 
-enum _MediaKind { all, image, video, audio }
+enum _MediaKind { image, video, audio }
+
+const _pageSize = 60;
 
 class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
   bool _loading = true;
@@ -32,16 +246,35 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
   final Set<String> _selected = {};
   final Map<String, AssetEntity> _byId = {};
   String _query = '';
-  _MediaKind _kind = _MediaKind.all;
+  _MediaKind _kind = _MediaKind.image;
+  int _nextPage = 0;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+  final ScrollController _scroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     _load();
   }
 
+  @override
+  void dispose() {
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients || _loading || _loadingMore || !_hasMore) return;
+    final position = _scroll.position;
+    if (position.pixels > position.maxScrollExtent - 480) {
+      _loadMore();
+    }
+  }
+
   RequestType get _requestType => switch (_kind) {
-        _MediaKind.all => RequestType.common,
         _MediaKind.image => RequestType.image,
         _MediaKind.video => RequestType.video,
         _MediaKind.audio => RequestType.audio,
@@ -108,10 +341,12 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       _album = album;
     });
     try {
-      final assets = await album.getAssetListPaged(page: 0, size: 240);
+      final assets = await album.getAssetListPaged(page: 0, size: _pageSize);
       if (!mounted) return;
       setState(() {
         _assets = assets;
+        _nextPage = 1;
+        _hasMore = assets.length == _pageSize;
         _byId
           ..clear()
           ..addEntries(assets.map((asset) => MapEntry(asset.id, asset)));
@@ -127,6 +362,31 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
     }
   }
 
+  Future<void> _loadMore() async {
+    final album = _album;
+    if (album == null || _loadingMore || !_hasMore) return;
+    _loadingMore = true;
+    try {
+      final page = await album.getAssetListPaged(
+        page: _nextPage,
+        size: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _assets = [..._assets, ...page];
+        _nextPage += 1;
+        _hasMore = page.length == _pageSize;
+        for (final asset in page) {
+          _byId[asset.id] = asset;
+        }
+        _loadingMore = false;
+      });
+    } on Object {
+      if (!mounted) return;
+      setState(() => _loadingMore = false);
+    }
+  }
+
   Future<void> _changeKind(_MediaKind kind) async {
     if (kind == _kind) return;
     setState(() {
@@ -136,6 +396,8 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       _album = null;
       _assets = const [];
       _byId.clear();
+      _nextPage = 0;
+      _hasMore = true;
     });
     await _load();
   }
@@ -227,7 +489,6 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
                       padding: const EdgeInsets.only(right: AppSpacing.xs),
                       child: ChoiceChip(
                         label: Text(switch (kind) {
-                          _MediaKind.all => l10n.allFilter,
                           _MediaKind.image => l10n.photosFilter,
                           _MediaKind.video => l10n.videos,
                           _MediaKind.audio => l10n.audioLabel,
@@ -324,6 +585,7 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
       );
     }
     return GridView.builder(
+      controller: _scroll,
       padding: const EdgeInsets.all(AppSpacing.xs),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 140,
@@ -331,19 +593,25 @@ class _MediaBrowserScreenState extends State<MediaBrowserScreen> {
         crossAxisSpacing: 3,
         mainAxisSpacing: 3,
       ),
-      itemCount: assets.length,
+      itemCount: assets.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index >= assets.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
         final asset = assets[index];
-        return _AssetTile(
-          asset: asset,
-          selected: _selected.contains(asset.id),
-          onTap: () => setState(() {
-            if (_selected.remove(asset.id)) {
-              // removed
-            } else {
-              _selected.add(asset.id);
-            }
-          }),
+        return RepaintBoundary(
+          child: _AssetTile(
+            asset: asset,
+            selected: _selected.contains(asset.id),
+            onTap: () => setState(() {
+              if (!_selected.remove(asset.id)) _selected.add(asset.id);
+            }),
+          ),
         );
       },
     );
@@ -389,7 +657,7 @@ class _AssetTile extends StatelessWidget {
               AssetEntityImage(
                 asset,
                 isOriginal: false,
-                thumbnailSize: const ThumbnailSize.square(240),
+                thumbnailSize: const ThumbnailSize.square(160),
                 errorBuilder: (_, __, ___) => Icon(
                   asset.type == AssetType.video
                       ? AppIcons.video

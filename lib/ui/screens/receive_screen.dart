@@ -228,7 +228,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                           controller: controller,
                           onDone: () async {
                             await controller.reset();
-                            if (context.mounted) Navigator.of(context).pop();
+                            if (context.mounted) _leave();
                           },
                         ),
                       ReceivePhase.failed ||

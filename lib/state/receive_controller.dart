@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/services/app_logger.dart';
@@ -39,10 +39,11 @@ enum _HotspotRole { none, hosted, joined }
 
 /// Drives the receiving side: find a session on the hotspot, review the offer,
 /// then pull the selected files to disk.
-class ReceiveController extends ChangeNotifier {
+class ReceiveController extends ChangeNotifier with WidgetsBindingObserver {
   ReceiveController({required this.appState, HotspotService? hotspotService})
       : _hotspotService = hotspotService ?? createHotspotService() {
     _serviceEvents = _foreground.events.listen(_onServiceEvent);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   _HotspotRole _hotspotRole = _HotspotRole.none;
@@ -202,8 +203,11 @@ class ReceiveController extends ChangeNotifier {
   Future<void> startWaiting({bool host = false}) async {
     if (isWaiting) {
       // The link never went down (e.g. "receive more" after a transfer), so
-      // just make sure the background notification reflects it.
+      // just make sure the background notification reflects it. The doorbell
+      // alone can keep isWaiting true while the presence socket is dead, so
+      // revive the responder whenever it is not actually listening.
       unawaited(_showWaitingNotification());
+      if (!_responder.isListening) unawaited(_restartPresence());
       return;
     }
     errorMessage = null;
@@ -215,18 +219,50 @@ class ReceiveController extends ChangeNotifier {
         : PlatformEnv.isDesktop
             ? ReceiverPresence.joinPrompt
             : ReceiverPresence.noCamera;
-    await _responder.start(
+    final responderUp = await _responder.start(
       ownInstanceId: appState.instanceId,
       deviceName: appState.deviceName,
       platform: PlatformEnv.label,
       consentPort: _doorbell.port ?? 0,
     );
+    if (!responderUp) {
+      // Without presence answers no seeker will ever find this device; the
+      // doorbell and QR still work, so surface the degraded state.
+      AppLog.error('receive', 'presence responder failed to bind');
+      errorMessage = _l10n.discoveryFailedBody;
+    }
     AppLog.info(
         'receive',
         'waiting (presence: ${presence.name}, '
             'doorbell :${_doorbell.port})');
     unawaited(_showWaitingNotification());
     notifyListeners();
+  }
+
+  /// Rebinds the presence socket. Used when the OS drops it while the app is
+  /// backgrounded, and as a retry after a failed bind.
+  Future<void> _restartPresence() async {
+    if (!isWaiting) return;
+    await _responder.stop();
+    final ok = await _responder.start(
+      ownInstanceId: appState.instanceId,
+      deviceName: appState.deviceName,
+      platform: PlatformEnv.label,
+      consentPort: _doorbell.port ?? 0,
+    );
+    if (!ok) {
+      AppLog.error('receive', 'presence responder restart failed');
+      errorMessage = _l10n.discoveryFailedBody;
+      notifyListeners();
+    }
+  }
+
+  /// Sockets can go stale while the process sits in the background; a fresh
+  /// responder on resume guarantees seekers find this device again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !isWaiting) return;
+    unawaited(_restartPresence());
   }
 
   /// The persistent notification that keeps the process (and therefore the
@@ -388,6 +424,10 @@ class ReceiveController extends ChangeNotifier {
     activeKnock = null;
     await _doorbell.stop();
     await _responder.stop();
+    // The beacon scanner shares the discovery port; leaving it bound would
+    // make the next presence bind fail or split the traffic.
+    await _scanner.stop();
+    sessions = const [];
     await _releaseHotspot();
     unawaited(_foreground.stop());
     waitingQrPayload = null;
@@ -1052,6 +1092,7 @@ class ReceiveController extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_serviceEvents?.cancel());
     unawaited(_scanSubscription?.cancel());
     unawaited(_scanner.stop());

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import 'package:free_send/core/format.dart';
 import 'package:free_send/core/platform_env.dart';
@@ -11,13 +13,14 @@ import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/app_packages.dart';
 import 'package:free_send/ui/screens/file_browser_screen.dart';
+import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/services/storage_access.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/common.dart';
 
-enum _SendCategory { files, folders, music, docs, videos, apk, large }
+enum _SendCategory { files, folders, audio, docs, videos, apk, large }
 
 /// MVP source browser for the send screen: a category strip, a selectable
 /// content grid/list, and the current send queue.
@@ -119,30 +122,30 @@ class _SendSelectViewState extends State<SendSelectView> {
   Future<void> _addFiles(FileType type, {List<String>? extensions}) async {
     final effectiveExtensions = extensions ??
         (type == FileType.custom
-            ? const [
-                'pdf',
-                'doc',
-                'docx',
-                'txt',
-                'md',
-                'rtf',
-                'xls',
-                'xlsx',
-                'csv',
-                'ppt',
-                'pptx',
-              ]
+            ? documentFileExtensions.toList(growable: false)
             : null);
     final picked = await FilePicker.pickFiles(
       type: type,
       allowedExtensions: effectiveExtensions,
     );
     if (picked.isEmpty || !mounted) return;
-    final files = picked
-        .map((picked) => picked.path)
-        .whereType<String>()
-        .map(File.new)
-        .toList(growable: false);
+    final files = <File>[];
+    for (final item in picked) {
+      final path = item.path;
+      if (path == null) continue;
+      final file = File(path);
+      // The picker is an explicit choice, so nothing is filtered by
+      // category - only the Large tab keeps its size requirement.
+      if (_category == _SendCategory.large) {
+        try {
+          if (await file.length() < largeFileThresholdBytes) continue;
+        } on Object {
+          continue;
+        }
+      }
+      files.add(file);
+    }
+    if (files.isEmpty || !mounted) return;
     widget.controller.addFiles(files);
   }
 
@@ -178,20 +181,18 @@ class _SendSelectViewState extends State<SendSelectView> {
     final all = widget.controller.recents
         .where((recent) => File(recent.path).existsSync())
         .toList(growable: false);
+    return all.where(_recentMatches).toList(growable: false);
+  }
+
+  bool _recentMatches(RecentFile recent) {
+    final ext = _extension(recent.name);
     return switch (_category) {
-      _SendCategory.music =>
-        all.where((recent) => _isMusic(recent.name)).toList(growable: false),
-      _SendCategory.docs =>
-        all.where((recent) => _isDocument(recent.name)).toList(growable: false),
-      _SendCategory.videos =>
-        all.where((recent) => _isVideo(recent.name)).toList(growable: false),
-      _SendCategory.large => all
-          .where((recent) => recent.size >= 100 * 1024 * 1024)
-          .toList(growable: false),
-      _SendCategory.files ||
-      _SendCategory.folders ||
-      _SendCategory.apk =>
-        const [],
+      _SendCategory.audio => audioFileExtensions.contains(ext),
+      _SendCategory.docs => documentFileExtensions.contains(ext),
+      _SendCategory.videos => videoFileExtensions.contains(ext),
+      _SendCategory.large => recent.size >= largeFileThresholdBytes,
+      _SendCategory.files => !plainFileBlockedExtensions.contains(ext),
+      _SendCategory.folders || _SendCategory.apk => false,
     };
   }
 
@@ -217,10 +218,11 @@ class _SendSelectViewState extends State<SendSelectView> {
     // only the APK list (Android-only anyway) keeps the old content views.
     final selected = controller.items;
     // APK bundles only exist on Android; other platforms never show the tab.
-    final categories = _SendCategory.values
-        .where(
-            (category) => category != _SendCategory.apk || Platform.isAndroid)
-        .toList(growable: false);
+    final categories = _SendCategory.values.where((category) {
+      if (category == _SendCategory.apk) return Platform.isAndroid;
+      if (category == _SendCategory.large) return !PlatformEnv.isDesktop;
+      return true;
+    }).toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -233,11 +235,24 @@ class _SendSelectViewState extends State<SendSelectView> {
           labelBuilder: (category) => _categoryLabel(l10n, category),
         ),
         const SizedBox(height: AppSpacing.lg),
-        if (browserMode) ...[
+        if (PlatformEnv.isDesktop && _category != _SendCategory.apk) ...[
           if (selected.isNotEmpty) ...[
-            _QueueStrip(
+            _QueuePanel(
               items: selected,
+              totalBytes: controller.totalBytes,
               onRemove: widget.controller.removeItem,
+              onClear: widget.controller.clearFiles,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          _desktopDropZone(l10n),
+        ] else if (browserMode) ...[
+          if (selected.isNotEmpty) ...[
+            _QueuePanel(
+              items: selected,
+              totalBytes: controller.totalBytes,
+              onRemove: widget.controller.removeItem,
+              onClear: widget.controller.clearFiles,
             ),
             const SizedBox(height: AppSpacing.sm),
           ],
@@ -271,51 +286,114 @@ class _SendSelectViewState extends State<SendSelectView> {
 
   /// The embedded filesystem browser for the current category. Keyed by
   /// category so each tab keeps its own navigation state.
-  Widget _browserContent() {
-    final mode = _category == _SendCategory.folders
-        ? FileBrowserMode.foldersOnly
-        : FileBrowserMode.filesAndFolders;
-    final allowed = switch (_category) {
-      _SendCategory.music => audioFileExtensions,
-      _SendCategory.docs => documentFileExtensions,
-      _SendCategory.videos => videoFileExtensions,
-      _ => null,
-    };
-    // The send screen scrolls as a whole, so the browser gets a bounded
-    // height: everything the scroll viewport has left after the fixed
-    // chrome around it (tabs, queue strip, link picker, trailing space).
-    // Chrome heights: top spacer + tabs + gap = 16+40+24, queue strip
-    // = 44+8 when items are queued, desktop link picker block = 16+~40,
-    // trailing spacer = 24.
+  Widget _desktopDropZone(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final folder = _category == _SendCategory.folders;
+    return _CategoryDropZone(
+      draggingLabel: l10n.dropFilesToSend,
+      onDrop: _onZoneDrop,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            folder ? AppIcons.folderOpen : AppIcons.inbox,
+            size: 28,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.dropFilesToSend,
+            style: theme.textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          FilledButton.icon(
+            onPressed:
+                folder ? _addFolder : () => _addFiles(_typeFor(_category)),
+            icon: Icon(AppIcons.add, size: 17),
+            label: Text(folder ? l10n.addFolder : l10n.addFiles),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onZoneDrop(DropDoneDetails details) async {
+    final files = <File>[];
+    final directories = <Directory>[];
+    for (final item in details.files) {
+      final path = item.path;
+      if (path.isEmpty) continue;
+      // A drop is explicit intent: whatever lands on the zone joins the
+      // queue, whatever tab happens to be selected.
+      if (item is DropItemDirectory ||
+          FileSystemEntity.typeSync(path) == FileSystemEntityType.directory) {
+        directories.add(Directory(path));
+      } else {
+        files.add(File(path));
+      }
+    }
+    if (!mounted) return;
+    if (files.isNotEmpty) widget.controller.addFiles(files);
+    for (final directory in directories) {
+      await widget.controller.addDirectory(directory);
+    }
+  }
+
+  double _panelHeight() {
     const chrome = AppSpacing.md + 40 + AppSpacing.lg + AppSpacing.lg;
     final queueChrome =
         widget.controller.items.isEmpty ? 0.0 : 44 + AppSpacing.sm;
     final linkChrome = PlatformEnv.isDesktop ? AppSpacing.md + 40 : 0.0;
     final raw = widget.contentHeight - chrome - queueChrome - linkChrome;
-    final height = raw < 320 ? 320.0 : raw;
+    return raw < 320 ? 320.0 : raw;
+  }
+
+  Widget _browserContent() {
+    if (_category == _SendCategory.audio || _category == _SendCategory.videos) {
+      return SizedBox(
+        height: _panelHeight(),
+        child: DeviceMediaPicker(
+          key: ValueKey(_category),
+          type: _category == _SendCategory.audio
+              ? RequestType.audio
+              : RequestType.video,
+          isSelected: _isSelected,
+          onToggle: (path, selected) {
+            if (selected) {
+              widget.controller.addFiles([File(path)]);
+            } else {
+              _togglePath(path);
+            }
+          },
+        ),
+      );
+    }
+    final allowed = switch (_category) {
+      _SendCategory.docs => documentFileExtensions,
+      _ => null,
+    };
+    final blocked =
+        _category == _SendCategory.files ? plainFileBlockedExtensions : null;
+    final hideDirectories = _category == _SendCategory.files;
     return SizedBox(
-      height: height,
-      child: PlatformEnv.isDesktop
-          ? FileBrowserView(
-              key: ValueKey(_category),
-              mode: mode,
-              allowedExtensions: allowed,
-              isItemSelected: _browserItemSelected,
-              onItemToggle: _browserToggle,
-              onConfirm: _addBrowserItems,
-            )
-          : _StorageGate(
-              key: ValueKey(_category),
-              child: FileBrowserView(
-                mode: mode,
-                allowedExtensions: allowed,
-                showHeader: false,
-                backHandler: widget.browserBack,
-                isItemSelected: _browserItemSelected,
-                onItemToggle: _browserToggle,
-                onConfirm: _addBrowserItems,
-              ),
-            ),
+      height: _panelHeight(),
+      child: _StorageGate(
+        key: ValueKey(_category),
+        child: FileBrowserView(
+          mode: FileBrowserMode.filesAndFolders,
+          allowedExtensions: allowed,
+          blockedExtensions: blocked,
+          hideDirectories: hideDirectories,
+          minBytes:
+              _category == _SendCategory.large ? largeFileThresholdBytes : null,
+          showHeader: hideDirectories,
+          backHandler: widget.browserBack,
+          isItemSelected: _browserItemSelected,
+          onItemToggle: _browserToggle,
+          onConfirm: _addBrowserItems,
+        ),
+      ),
     );
   }
 
@@ -467,37 +545,6 @@ class _SendSelectViewState extends State<SendSelectView> {
     );
   }
 
-  bool _isMusic(String name) => const {
-        'mp3',
-        'wav',
-        'flac',
-        'm4a',
-        'ogg',
-        'aac',
-      }.contains(_extension(name));
-
-  bool _isDocument(String name) => const {
-        'pdf',
-        'doc',
-        'docx',
-        'txt',
-        'md',
-        'rtf',
-        'xls',
-        'xlsx',
-        'csv',
-        'ppt',
-        'pptx',
-      }.contains(_extension(name));
-
-  bool _isVideo(String name) => const {
-        'mp4',
-        'mkv',
-        'mov',
-        'avi',
-        'webm',
-      }.contains(_extension(name));
-
   String _extension(String name) {
     final dot = name.lastIndexOf('.');
     return dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
@@ -505,7 +552,7 @@ class _SendSelectViewState extends State<SendSelectView> {
 
   FileType _typeFor(_SendCategory category) {
     return switch (category) {
-      _SendCategory.music => FileType.audio,
+      _SendCategory.audio => FileType.audio,
       _SendCategory.videos => FileType.video,
       _SendCategory.docs => FileType.custom,
       _SendCategory.large ||
@@ -520,7 +567,7 @@ class _SendSelectViewState extends State<SendSelectView> {
     return switch (category) {
       _SendCategory.files => l10n.files,
       _SendCategory.folders => l10n.folders,
-      _SendCategory.music => l10n.music,
+      _SendCategory.audio => l10n.audioLabel,
       _SendCategory.docs => l10n.documents,
       _SendCategory.videos => l10n.videos,
       _SendCategory.apk => l10n.apk,
@@ -532,13 +579,97 @@ class _SendSelectViewState extends State<SendSelectView> {
     return switch (category) {
       _SendCategory.files => AppIcons.file,
       _SendCategory.folders => AppIcons.folderOpen,
-      _SendCategory.music => AppIcons.music,
+      _SendCategory.audio => AppIcons.music,
       _SendCategory.docs => AppIcons.pdf,
       _SendCategory.videos => AppIcons.video,
       _SendCategory.apk => AppIcons.android,
       _SendCategory.large => AppIcons.info,
     };
   }
+}
+
+/// Centered dashed target. The button opens the system picker; a drop on
+/// the zone adds only what the current tab allows.
+class _CategoryDropZone extends StatefulWidget {
+  const _CategoryDropZone({
+    required this.child,
+    required this.onDrop,
+    required this.draggingLabel,
+  });
+
+  final Widget child;
+  final Future<void> Function(DropDoneDetails details) onDrop;
+  final String draggingLabel;
+
+  @override
+  State<_CategoryDropZone> createState() => _CategoryDropZoneState();
+}
+
+class _CategoryDropZoneState extends State<_CategoryDropZone> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = _hovering ? AppColors.accent : scheme.outline;
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _hovering = true),
+      onDragExited: (_) => setState(() => _hovering = false),
+      onDragDone: (details) {
+        setState(() => _hovering = false);
+        widget.onDrop(details);
+      },
+      child: Center(
+        child: CustomPaint(
+          painter: _DashedRRectPainter(color: color),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640, minHeight: 190),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.lg,
+              ),
+              child: Center(child: widget.child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  _DashedRRectPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(AppRadii.card),
+    );
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()..addRRect(rect);
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + 8;
+        canvas.drawPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          paint,
+        );
+        distance += 14;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRRectPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 /// Gates the Android file browser behind the "All files access" grant.
@@ -632,60 +763,141 @@ class _StorageGateState extends State<_StorageGate>
   }
 }
 
-/// Compact horizontal strip of everything already in the send queue,
-/// shown above the embedded browser on desktop.
-class _QueueStrip extends StatelessWidget {
-  const _QueueStrip({required this.items, required this.onRemove});
+/// Send-queue preview above the content area: a header with the item count,
+/// total size, and a clear-all action, then the files themselves as wrapped
+/// chips that show name, size, and a remove button.
+class _QueuePanel extends StatelessWidget {
+  const _QueuePanel({
+    required this.items,
+    required this.totalBytes,
+    required this.onRemove,
+    required this.onClear,
+  });
 
   final List<TransferItem> items;
+  final int totalBytes;
+  final void Function(TransferItem item) onRemove;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                AppIcons.send,
+                size: 17,
+                color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  l10n.sendItems(items.length),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+              Text(
+                formatBytes(totalBytes),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              if (items.length > 1)
+                TextButton(
+                  onPressed: onClear,
+                  child: Text(l10n.clearAll),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              for (final item in items)
+                _QueueChip(item: item, onRemove: onRemove),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QueueChip extends StatelessWidget {
+  const _QueueChip({required this.item, required this.onRemove});
+
+  final TransferItem item;
   final void Function(TransferItem item) onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        separatorBuilder: (context, index) =>
-            const SizedBox(width: AppSpacing.sm),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          final isFolder = item.relativePath?.contains('/') ?? false;
-          return Container(
-            padding: const EdgeInsets.only(left: AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isFolder ? AppIcons.folderOpen : AppIcons.file,
-                  size: 16,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 160),
-                  child: Text(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isFolder = item.relativePath?.contains('/') ?? false;
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 280),
+      padding: const EdgeInsets.only(
+        left: AppSpacing.sm,
+        right: AppSpacing.xs,
+        top: AppSpacing.xs,
+        bottom: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isFolder ? AppIcons.folderOpen : AppIcons.file,
+            size: 16,
+            color: scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: isFolder
+                ? Text(
                     item.name,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall,
+                  )
+                : MiddleEllipsisText(
+                    item.name,
+                    style: theme.textTheme.bodySmall,
                   ),
-                ),
-                IconButton(
-                  icon: Icon(AppIcons.close, size: 16),
-                  visualDensity: VisualDensity.compact,
-                  tooltip: AppLocalizations.of(context).remove,
-                  onPressed: () => onRemove(item),
-                ),
-              ],
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            formatBytes(item.size),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
             ),
-          );
-        },
+          ),
+          IconButton(
+            icon: Icon(AppIcons.close, size: 15),
+            visualDensity: VisualDensity.compact,
+            tooltip: AppLocalizations.of(context).remove,
+            onPressed: () => onRemove(item),
+          ),
+        ],
       ),
     );
   }

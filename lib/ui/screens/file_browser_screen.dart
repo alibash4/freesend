@@ -8,6 +8,7 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/kit/tokens.dart';
+import 'package:free_send/ui/widgets/common.dart';
 
 /// Extension sets shared by the send screen's category filters.
 const imageFileExtensions = {
@@ -58,7 +59,27 @@ const documentFileExtensions = {
   'ods',
   'odp',
   'epub',
+  'mobi',
+  'azw',
+  'azw3',
 };
+
+/// Photos, audio, and video. Documents are their own category.
+const mediaFileExtensions = {
+  ...imageFileExtensions,
+  ...audioFileExtensions,
+  ...videoFileExtensions,
+};
+
+/// Files that are neither media nor documents: archives, installers, and
+/// everything else a "Files" tab should keep.
+const plainFileBlockedExtensions = {
+  ...mediaFileExtensions,
+  ...documentFileExtensions,
+};
+
+/// A file counts as large once it reaches this size.
+const largeFileThresholdBytes = 100 * 1024 * 1024;
 
 Directory _homeDirectory() {
   // Android's shared storage root; the all-files grant makes it readable.
@@ -221,6 +242,9 @@ class FileBrowserView extends StatefulWidget {
     super.key,
     this.mode = FileBrowserMode.filesAndFolders,
     this.allowedExtensions,
+    this.blockedExtensions,
+    this.hideDirectories = false,
+    this.minBytes,
     this.showHeader = true,
     this.backHandler,
     this.isItemSelected,
@@ -237,6 +261,16 @@ class FileBrowserView extends StatefulWidget {
 
   final FileBrowserMode mode;
   final Set<String>? allowedExtensions;
+
+  /// Extensions (no dot, lowercase) left out of the list. Directories are
+  /// unaffected unless [hideDirectories] is set.
+  final Set<String>? blockedExtensions;
+
+  /// Files tab: directory rows are navigation for other tabs, not content.
+  final bool hideDirectories;
+
+  /// When set, only files at least this many bytes are listed.
+  final int? minBytes;
 
   /// Desktop shows the breadcrumb strip; embedded mobile use hides it and
   /// relies on [backHandler] for up-navigation instead.
@@ -266,6 +300,7 @@ class FileBrowserView extends StatefulWidget {
 class _FileBrowserViewState extends State<FileBrowserView> {
   Directory _dir = _homeDirectory();
   List<FileSystemEntity> _entries = const [];
+  final Map<String, int> _sizes = {};
   bool _loading = true;
   bool _grid = false;
   String? _error;
@@ -344,10 +379,26 @@ class _FileBrowserViewState extends State<FileBrowserView> {
         if (aDir != bDir) return aDir ? -1 : 1;
         return _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase());
       });
+      final minBytes = widget.minBytes;
+      final sizes = <String, int>{};
+      if (minBytes != null) {
+        for (final entity in entries) {
+          if (entity is! File) continue;
+          try {
+            final length = await entity.length();
+            if (length >= minBytes) sizes[entity.path] = length;
+          } on Object {
+            // Unreadable files stay out of the large-file list.
+          }
+        }
+      }
       if (!mounted) return;
       setState(() {
         _dir = dir;
         _entries = entries;
+        _sizes
+          ..clear()
+          ..addAll(sizes);
         _loading = false;
       });
     } on Object catch (error) {
@@ -537,6 +588,26 @@ class _FileBrowserViewState extends State<FileBrowserView> {
     );
   }
 
+  List<FileSystemEntity> _visibleEntries() {
+    final allowed = widget.allowedExtensions;
+    final blocked = widget.blockedExtensions;
+    final minBytes = widget.minBytes;
+    final visible = <FileSystemEntity>[];
+    for (final entity in _entries) {
+      if (entity is Directory) {
+        if (_foldersOnly || !widget.hideDirectories) visible.add(entity);
+        continue;
+      }
+      if (_foldersOnly || entity is! File) continue;
+      final ext = _extensionOf(_nameOf(entity));
+      if (allowed != null && !allowed.contains(ext)) continue;
+      if (blocked != null && blocked.contains(ext)) continue;
+      if (minBytes != null && !_sizes.containsKey(entity.path)) continue;
+      visible.add(entity);
+    }
+    return visible;
+  }
+
   Widget _body(AppLocalizations l10n) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -554,16 +625,7 @@ class _FileBrowserViewState extends State<FileBrowserView> {
         ),
       );
     }
-    var entries = _foldersOnly
-        ? _entries.whereType<Directory>().toList(growable: false)
-        : _entries;
-    final allowed = widget.allowedExtensions;
-    if (allowed != null) {
-      entries = entries.where((entity) {
-        if (entity is Directory) return true;
-        return allowed.contains(_extensionOf(_nameOf(entity)));
-      }).toList(growable: false);
-    }
+    final entries = _visibleEntries();
     if (entries.isEmpty) {
       return Center(child: Text(l10n.folderEmpty));
     }
@@ -592,14 +654,22 @@ class _FileBrowserViewState extends State<FileBrowserView> {
             padding: const EdgeInsets.only(left: AppSpacing.sm),
             child: _leading(entity),
           ),
-          title: Text(
-            name,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 17,
-              color: scheme.onSurface,
-            ),
-          ),
+          title: entity is Directory
+              ? Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    color: scheme.onSurface,
+                  ),
+                )
+              : MiddleEllipsisText(
+                  name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    color: scheme.onSurface,
+                  ),
+                ),
           subtitle: entity is File
               ? Text(
                   formatBytes(entity.lengthSync()),
@@ -665,14 +735,25 @@ class _FileBrowserViewState extends State<FileBrowserView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
+                      if (entity is Directory)
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        )
+                      else
+                        MiddleEllipsisText(
+                          name,
+                          maxLines: 1,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
                       if (entity is File)
                         Text(
                           formatBytes(entity.lengthSync()),

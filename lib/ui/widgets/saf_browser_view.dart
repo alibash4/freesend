@@ -13,6 +13,7 @@ import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/kit/tokens.dart';
 import 'package:free_send/ui/screens/file_browser_screen.dart';
+import 'package:free_send/ui/widgets/common.dart';
 
 /// Android counterpart of [FileBrowserView]: browses the Storage Access
 /// Framework tree the user granted instead of the raw filesystem.
@@ -417,14 +418,22 @@ class _SafBrowserViewState extends State<SafBrowserView> {
                     color: AppColors.accent,
                   ),
           ),
-          title: Text(
-            entry.name,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 17,
-              color: scheme.onSurface,
-            ),
-          ),
+          title: entry.isDir
+              ? Text(
+                  entry.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    color: scheme.onSurface,
+                  ),
+                )
+              : MiddleEllipsisText(
+                  entry.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    color: scheme.onSurface,
+                  ),
+                ),
           subtitle: entry.isDir
               ? null
               : Text(
@@ -485,14 +494,25 @@ class _SafBrowserViewState extends State<SafBrowserView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        entry.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
+                      if (entry.isDir)
+                        Text(
+                          entry.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        )
+                      else
+                        MiddleEllipsisText(
+                          entry.name,
+                          maxLines: 1,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                        ),
                       if (!entry.isDir)
                         Text(
                           formatBytes(entry.size),
