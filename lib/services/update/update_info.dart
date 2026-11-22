@@ -1,4 +1,4 @@
-/// A release published on GitLab, reduced to what the updater needs.
+/// A release published on GitHub, reduced to what the updater needs.
 class UpdateInfo {
   const UpdateInfo({
     required this.version,

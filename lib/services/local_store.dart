@@ -68,7 +68,7 @@ class LocalStore {
     await _prefs.setString(_kDownloadDir, path);
   }
 
-  /// Whether the app asks GitLab for a newer release on every launch.
+  /// Whether the app asks GitHub for a newer release on every launch.
   bool get autoUpdate => _prefs.getBool(_kAutoUpdate) ?? false;
 
   Future<void> setAutoUpdate(bool value) async {

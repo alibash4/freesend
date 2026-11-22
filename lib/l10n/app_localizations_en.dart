@@ -1220,7 +1220,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get askingGitLab => 'Asking GitLab what is new.';
+  String get askingForUpdates => 'Asking GitHub what is new.';
 
   @override
   String get whatsNew => 'What is new';

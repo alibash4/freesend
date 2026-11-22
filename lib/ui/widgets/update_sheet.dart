@@ -64,7 +64,7 @@ class UpdateSheet extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   update == null
-                      ? 'Asking GitLab what is new.'
+                      ? l10n.askingForUpdates
                       : _subtitle(controller, update),
                   style: theme.textTheme.bodySmall,
                 ),

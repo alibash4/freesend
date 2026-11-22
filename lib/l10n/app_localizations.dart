@@ -2156,11 +2156,11 @@ abstract class AppLocalizations {
   /// **'FreeSend {version} is available'**
   String updateAvailableTitle(Object version);
 
-  /// No description provided for @askingGitLab.
+  /// No description provided for @askingForUpdates.
   ///
   /// In en, this message translates to:
-  /// **'Asking GitLab what is new.'**
-  String get askingGitLab;
+  /// **'Asking GitHub what is new.'**
+  String get askingForUpdates;
 
   /// No description provided for @whatsNew.
   ///

@@ -104,7 +104,7 @@ external files directory on Android (changeable in Settings).
 
 ## Updating
 
-The app checks GitLab Releases for a newer build and can download and
+The app checks GitHub Releases for a newer build and can download and
 install it — see **Settings → Updates**. Release and CI setup for
 maintainers is in [CONTRIBUTING.md](CONTRIBUTING.md).
 

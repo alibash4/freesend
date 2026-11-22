@@ -344,7 +344,7 @@
   "openLogs": "Open logs",
   "checkingForUpdates": "Checking for updates",
   "updateAvailableTitle": "FreeSend {version} is available",
-  "askingGitLab": "Asking GitLab what is new.",
+  "askingForUpdates": "Asking GitHub what is new.",
   "whatsNew": "What is new",
   "youAreOn": "You are on {version}",
   "sizeYouAreOn": "{size} · you are on {version}",

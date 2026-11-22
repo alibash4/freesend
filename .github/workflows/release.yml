@@ -1,13 +1,15 @@
 # Release builds for every platform on version tags. Each job builds its
-# packages and attaches them to the GitLab release, which stays the release
-# host because the in-app updater reads GitLab Releases.
+# packages and attaches them to the GitHub release, which is also the
+# release host the in-app updater reads.
 #
 # Secrets needed on the repository:
-#   RELEASE_TOKEN                GitLab project access token, api scope
 #   SIGNING_KEYSTORE_BASE64      Android release keystore, base64
 #   SIGNING_STORE_PASSWORD
 #   SIGNING_KEY_ALIAS
 #   SIGNING_KEY_PASSWORD
+#
+# No token secret is needed for publishing: the attach script uses the
+# job's GITHUB_TOKEN (contents: write below).
 name: release
 
 on:
@@ -15,10 +17,12 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 env:
   RELEASE_TAG: ${{ github.ref_name }}
-  RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-  GITLAB_PROJECT_ID: "88767048"
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   apk:

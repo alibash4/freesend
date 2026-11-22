@@ -1236,7 +1236,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get askingGitLab => 'نسأل GitLab عمّا هو جديد.';
+  String get askingForUpdates => 'نسأل GitHub عمّا هو جديد.';
 
   @override
   String get whatsNew => 'ما الجديد';

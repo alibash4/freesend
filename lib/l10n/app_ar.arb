@@ -344,7 +344,7 @@
   "openLogs": "فتح السجلات",
   "checkingForUpdates": "جارٍ البحث عن التحديثات",
   "updateAvailableTitle": "الإصدار {version} من FreeSend متاح",
-  "askingGitLab": "نسأل GitLab عمّا هو جديد.",
+  "askingForUpdates": "نسأل GitHub عمّا هو جديد.",
   "whatsNew": "ما الجديد",
   "youAreOn": "أنت تستخدم الإصدار {version}",
   "sizeYouAreOn": "{size} · أنت تستخدم الإصدار {version}",
