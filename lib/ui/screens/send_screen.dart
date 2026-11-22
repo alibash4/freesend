@@ -179,6 +179,17 @@ class _SendScreenState extends State<SendScreen> {
     );
   }
 
+  /// Leaves the send flow. As a shell overlay the exit is [widget.onBack];
+  /// pushed as a plain route (no callback) it is a normal pop.
+  void _dismiss() {
+    final onBack = widget.onBack;
+    if (onBack != null) {
+      onBack();
+    } else if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _start(SendController controller) async {
     final ready = await SetupScreen.ensure(
       context,
@@ -290,9 +301,7 @@ class _SendScreenState extends State<SendScreen> {
                                   controller: controller,
                                   onDone: () async {
                                     await controller.reset();
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop();
-                                    }
+                                    if (context.mounted) _dismiss();
                                   },
                                   onAgain: () async {
                                     await controller.reset();
@@ -312,9 +321,7 @@ class _SendScreenState extends State<SendScreen> {
                                   },
                                   onBack: () async {
                                     await controller.reset();
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop();
-                                    }
+                                    if (context.mounted) _dismiss();
                                   },
                                 ),
                             },
