@@ -199,10 +199,9 @@ class _SendScreenState extends State<SendScreen> {
               style: theme.textTheme.bodySmall,
             ),
           ),
-          FilledButton.icon(
+          FilledButton(
             onPressed: selected.isEmpty ? null : () => _start(controller),
-            icon: Icon(AppIcons.send, size: 17),
-            label: Text(l10n.startSharing),
+            child: Text(l10n.startSharing),
           ),
         ],
       ),
