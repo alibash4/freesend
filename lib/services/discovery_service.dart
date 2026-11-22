@@ -171,12 +171,21 @@ class SessionScanner {
     final socket = _socket!;
     socket.listen(
       (event) {
+        // A closed socket must not keep reporting isScanning: null it so
+        // callers can restart instead of trusting a dead listener.
+        if (event == RawSocketEvent.readClosed) {
+          if (identical(_socket, socket)) _socket = null;
+          return;
+        }
         if (event != RawSocketEvent.read) return;
         final datagram = socket.receive();
         if (datagram == null) return;
         _handle(datagram, ownInstanceId);
       },
       onError: (_) {},
+      onDone: () {
+        if (identical(_socket, socket)) _socket = null;
+      },
     );
     _pruneTimer = Timer.periodic(const Duration(seconds: 3), (_) => _prune());
     return true;
@@ -323,12 +332,19 @@ class SessionSeeker {
     socket.broadcastEnabled = true;
     socket.listen(
       (event) {
+        if (event == RawSocketEvent.readClosed) {
+          if (identical(_socket, socket)) _socket = null;
+          return;
+        }
         if (event != RawSocketEvent.read) return;
         final datagram = socket.receive();
         if (datagram == null) return;
         _handle(datagram, ownInstanceId);
       },
       onError: (_) {},
+      onDone: () {
+        if (identical(_socket, socket)) _socket = null;
+      },
     );
     _payload = {
       'app': 'free-send',
@@ -388,12 +404,11 @@ class SessionSeeker {
         lastSeen: DateTime.now(),
       );
       final existing = _candidates[candidate.id];
-      if (existing != null) {
-        // Keep the first address we saw rather than flapping between
-        // interfaces.
-        existing.lastSeen = candidate.lastSeen;
-      } else {
-        _candidates[candidate.id] = candidate;
+      // Refresh the whole entry: a receiver that rejoined a network answers
+      // from a new address, and its doorbell listens on every interface, so
+      // the freshest source is always the right knock target.
+      _candidates[candidate.id] = candidate;
+      if (existing == null) {
         AppLog.info(
           'seeker',
           'found ${candidate.deviceName} (${candidate.platform}) at '
@@ -495,14 +510,22 @@ class PresenceResponder {
       'pf': platform,
       'port': consentPort,
     };
-    _socket!.listen(
+    final responderSocket = _socket!;
+    responderSocket.listen(
       (event) {
+        if (event == RawSocketEvent.readClosed) {
+          if (identical(_socket, responderSocket)) _socket = null;
+          return;
+        }
         if (event != RawSocketEvent.read) return;
-        final datagram = _socket!.receive();
+        final datagram = responderSocket.receive();
         if (datagram == null) return;
         _handle(datagram, ownInstanceId);
       },
       onError: (_) {},
+      onDone: () {
+        if (identical(_socket, responderSocket)) _socket = null;
+      },
     );
     AppLog.info(
         'responder',
