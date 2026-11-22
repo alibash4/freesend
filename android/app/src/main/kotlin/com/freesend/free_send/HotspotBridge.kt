@@ -111,7 +111,14 @@ class HotspotBridge(
         try {
             wifi.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
                 override fun onStarted(res: WifiManager.LocalOnlyHotspotReservation) {
-                    Log.i(TAG, "LocalOnlyHotspot started: ssid=${ssidOf(res)}")
+                    val ssid = ssidOf(res)
+                    val password = passwordOf(res)
+                    Log.i(
+                        TAG,
+                        "LocalOnlyHotspot started: ssid=$ssid " +
+                            "hasPassword=${password.isNotEmpty()} " +
+                            "sdk=${Build.VERSION.SDK_INT}",
+                    )
                     reservation = res
                     handler.post {
                         if (replied) {
@@ -121,8 +128,8 @@ class HotspotBridge(
                         replied = true
                         result.success(
                             mapOf(
-                                "ssid" to ssidOf(res),
-                                "password" to passwordOf(res),
+                                "ssid" to ssid,
+                                "password" to password.ifEmpty { null },
                                 "ip" to hotspotAddress(),
                                 "note" to null,
                             ),
