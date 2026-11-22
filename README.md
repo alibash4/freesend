@@ -1,4 +1,6 @@
-# FreeSend
+<p align="center">
+  <img src="docs/alpha-banner.svg" alt="FreeSend" width="100%">
+</p>
 
 FreeSend is under construction.
 
