@@ -332,9 +332,9 @@ abstract final class AppTheme {
       ),
       titleLarge: base.titleLarge?.copyWith(
         fontFamily: 'Public Sans',
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         letterSpacing: -0.2,
-        fontSize: 19,
+        fontSize: 22,
         color: scheme.onSurface,
       ),
       titleMedium: base.titleMedium?.copyWith(

@@ -69,28 +69,26 @@ void main() {
             jsonEncode([
               {
                 'tag_name': 'v1.2.0',
-                'description': 'Faster handshakes.',
-                'released_at': '2026-01-02T03:04:05.000Z',
-                'assets': {
-                  'links': [
-                    {
-                      'name': 'FreeSend for Android',
-                      'direct_asset_url': 'https://gitlab.com/a/freesend.apk',
-                      'size': 1024,
-                    },
-                    {
-                      'name': 'FreeSend for Linux',
-                      'direct_asset_url':
-                          'https://gitlab.com/a/freesend.AppImage',
-                      'size': 2048,
-                    },
-                    {
-                      'name': 'FreeSend for Windows',
-                      'direct_asset_url': 'https://gitlab.com/a/freesend.exe',
-                      'size': 4096,
-                    },
-                  ],
-                },
+                'body': 'Faster handshakes.',
+                'published_at': '2026-01-02T03:04:05.000Z',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Android',
+                    'browser_download_url': 'https://github.com/a/freesend.apk',
+                    'size': 1024,
+                  },
+                  {
+                    'name': 'FreeSend for Linux',
+                    'browser_download_url':
+                        'https://github.com/a/freesend.AppImage',
+                    'size': 2048,
+                  },
+                  {
+                    'name': 'FreeSend for Windows',
+                    'browser_download_url': 'https://github.com/a/freesend.exe',
+                    'size': 4096,
+                  },
+                ],
               },
             ]),
             200)),
@@ -104,7 +102,7 @@ void main() {
       expect(latest.publishedAt, isNotNull);
       expect(
         latest.downloadUrl,
-        'https://gitlab.com/a/freesend.AppImage',
+        'https://github.com/a/freesend.AppImage',
       );
       expect(latest.fileName, 'freesend.AppImage');
       expect(latest.sizeBytes, 2048);
@@ -116,28 +114,24 @@ void main() {
             jsonEncode([
               {
                 'tag_name': 'v1.2.0',
-                'description': '',
-                'assets': {
-                  'links': [
-                    {
-                      'name': 'FreeSend for Windows',
-                      'direct_asset_url': 'https://gitlab.com/a/freesend.exe',
-                    },
-                  ],
-                },
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Windows',
+                    'browser_download_url': 'https://github.com/a/freesend.exe',
+                  },
+                ],
               },
               {
                 'tag_name': 'v1.1.0',
-                'description': 'Older.',
-                'assets': {
-                  'links': [
-                    {
-                      'name': 'FreeSend for Linux',
-                      'direct_asset_url':
-                          'https://gitlab.com/a/freesend.AppImage',
-                    },
-                  ],
-                },
+                'body': 'Older.',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Linux',
+                    'browser_download_url':
+                        'https://github.com/a/freesend.AppImage',
+                  },
+                ],
               },
             ]),
             200)),
@@ -149,7 +143,7 @@ void main() {
       expect(latest!.version, '1.1.0');
     });
 
-    test('returns null when GitLab has no releases', () async {
+    test('returns null when GitHub has no releases', () async {
       final service = UpdateService(
         client: MockClient((_) async => http.Response('[]', 200)),
       );
@@ -176,16 +170,14 @@ void main() {
             jsonEncode([
               {
                 'tag_name': 'v1.0.0',
-                'description': '',
-                'assets': {
-                  'links': [
-                    {
-                      'name': 'FreeSend for Linux',
-                      'direct_asset_url':
-                          'https://gitlab.com/a/freesend.AppImage',
-                    },
-                  ],
-                },
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Linux',
+                    'browser_download_url':
+                        'https://github.com/a/freesend.AppImage',
+                  },
+                ],
               },
             ]),
             200)),
@@ -199,31 +191,29 @@ void main() {
   group('UpdateService asset selection by architecture', () {
     final release = {
       'tag_name': 'v1.2.0',
-      'description': 'Notes.',
-      'assets': {
-        'links': [
-          {
-            'name': 'FreeSend for Android (32-bit)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-32.apk',
-            'size': 22,
-          },
-          {
-            'name': 'FreeSend for Android (64-bit)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-64.apk',
-            'size': 26,
-          },
-          {
-            'name': 'FreeSend for Android',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-universal.apk',
-            'size': 69,
-          },
-          {
-            // Another platform's asset must never be considered.
-            'name': 'FreeSend for Linux',
-            'direct_asset_url': 'https://gitlab.com/a/freesend.AppImage',
-          },
-        ],
-      },
+      'body': 'Notes.',
+      'assets': [
+        {
+          'name': 'FreeSend for Android (32-bit)',
+          'browser_download_url': 'https://github.com/a/freesend-32.apk',
+          'size': 22,
+        },
+        {
+          'name': 'FreeSend for Android (64-bit)',
+          'browser_download_url': 'https://github.com/a/freesend-64.apk',
+          'size': 26,
+        },
+        {
+          'name': 'FreeSend for Android',
+          'browser_download_url': 'https://github.com/a/freesend-universal.apk',
+          'size': 69,
+        },
+        {
+          // Another platform's asset must never be considered.
+          'name': 'FreeSend for Linux',
+          'browser_download_url': 'https://github.com/a/freesend.AppImage',
+        },
+      ],
     };
 
     Future<UpdateInfo?> fetchWith(String? arch) async {
@@ -262,65 +252,63 @@ void main() {
     test('a release with only a universal build works', () async {
       final service = UpdateService(
         platform: PlatformKind.android,
-        client: MockClient((_) async => http.Response(jsonEncode([
-          {
-            'tag_name': 'v1.2.0',
-            'description': '',
-            'assets': {
-              'links': [
-                {
-                  'name': 'FreeSend for Android',
-                  'direct_asset_url': 'https://gitlab.com/a/freesend.apk',
-                },
-              ],
-            },
-          },
-        ]), 200)),
+        client: MockClient((_) async => http.Response(
+            jsonEncode([
+              {
+                'tag_name': 'v1.2.0',
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Android',
+                    'browser_download_url': 'https://github.com/a/freesend.apk',
+                  },
+                ],
+              },
+            ]),
+            200)),
       );
       addTearDown(service.dispose);
 
       final info = await service.fetchLatest(arch: 'arm64-v8a');
       expect(info, isNotNull);
-      expect(info!.downloadUrl, 'https://gitlab.com/a/freesend.apk');
+      expect(info!.downloadUrl, 'https://github.com/a/freesend.apk');
     });
   });
 
   group('UpdateService linux and windows packages', () {
     final release = {
       'tag_name': 'v1.4.0',
-      'description': 'Packages.',
-      'assets': {
-        'links': [
-          {
-            'name': 'FreeSend for Linux (AppImage)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend.AppImage',
-          },
-          {
-            'name': 'FreeSend for Linux (deb)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend.deb',
-          },
-          {
-            'name': 'FreeSend for Linux (rpm)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend.rpm',
-          },
-          {
-            'name': 'FreeSend for Linux (bundle)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend.tar.gz',
-          },
-          {
-            'name': 'FreeSend for Windows (exe)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-windows.zip',
-          },
-          {
-            'name': 'FreeSend for macOS (dmg)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-macos.dmg',
-          },
-          {
-            'name': 'FreeSend for Android (64-bit)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-64.apk',
-          },
-        ],
-      },
+      'body': 'Packages.',
+      'assets': [
+        {
+          'name': 'FreeSend for Linux (AppImage)',
+          'browser_download_url': 'https://github.com/a/freesend.AppImage',
+        },
+        {
+          'name': 'FreeSend for Linux (deb)',
+          'browser_download_url': 'https://github.com/a/freesend.deb',
+        },
+        {
+          'name': 'FreeSend for Linux (rpm)',
+          'browser_download_url': 'https://github.com/a/freesend.rpm',
+        },
+        {
+          'name': 'FreeSend for Linux (bundle)',
+          'browser_download_url': 'https://github.com/a/freesend.tar.gz',
+        },
+        {
+          'name': 'FreeSend for Windows (exe)',
+          'browser_download_url': 'https://github.com/a/freesend-windows.zip',
+        },
+        {
+          'name': 'FreeSend for macOS (dmg)',
+          'browser_download_url': 'https://github.com/a/freesend-macos.dmg',
+        },
+        {
+          'name': 'FreeSend for Android (64-bit)',
+          'browser_download_url': 'https://github.com/a/freesend-64.apk',
+        },
+      ],
     };
 
     Future<UpdateInfo?> fetch(PlatformKind platform, PackageFormat format) {
@@ -365,20 +353,21 @@ void main() {
       final service = UpdateService(
         platform: PlatformKind.linux,
         packageFormat: PackageFormat.deb,
-        client: MockClient((_) async => http.Response(jsonEncode([
-          {
-            'tag_name': 'v1.4.0',
-            'description': '',
-            'assets': {
-              'links': [
-                {
-                  'name': 'FreeSend for Linux (bundle)',
-                  'direct_asset_url': 'https://gitlab.com/a/freesend.tar.gz',
-                },
-              ],
-            },
-          },
-        ]), 200)),
+        client: MockClient((_) async => http.Response(
+            jsonEncode([
+              {
+                'tag_name': 'v1.4.0',
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Linux (bundle)',
+                    'browser_download_url':
+                        'https://github.com/a/freesend.tar.gz',
+                  },
+                ],
+              },
+            ]),
+            200)),
       );
       addTearDown(service.dispose);
       final info = await service.fetchLatest();
@@ -395,24 +384,26 @@ void main() {
       final service = UpdateService(
         platform: PlatformKind.macOS,
         packageFormat: PackageFormat.macOS,
-        client: MockClient((_) async => http.Response(jsonEncode([
-          {
-            'tag_name': 'v1.4.0',
-            'description': '',
-            'assets': {
-              'links': [
-                {
-                  'name': 'FreeSend for macOS (zip)',
-                  'direct_asset_url': 'https://gitlab.com/a/freesend-macos.zip',
-                },
-                {
-                  'name': 'FreeSend for macOS (dmg)',
-                  'direct_asset_url': 'https://gitlab.com/a/freesend-macos.dmg',
-                },
-              ],
-            },
-          },
-        ]), 200)),
+        client: MockClient((_) async => http.Response(
+            jsonEncode([
+              {
+                'tag_name': 'v1.4.0',
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for macOS (zip)',
+                    'browser_download_url':
+                        'https://github.com/a/freesend-macos.zip',
+                  },
+                  {
+                    'name': 'FreeSend for macOS (dmg)',
+                    'browser_download_url':
+                        'https://github.com/a/freesend-macos.dmg',
+                  },
+                ],
+              },
+            ]),
+            200)),
       );
       addTearDown(service.dispose);
       final info = await service.fetchLatest();
@@ -423,27 +414,27 @@ void main() {
   group('UpdateService linux architecture', () {
     final release = {
       'tag_name': 'v1.5.0',
-      'description': 'Both architectures.',
-      'assets': {
-        'links': [
-          {
-            'name': 'FreeSend for Linux x86_64 (AppImage)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-x86_64.AppImage',
-          },
-          {
-            'name': 'FreeSend for Linux aarch64 (AppImage)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-aarch64.AppImage',
-          },
-          {
-            'name': 'FreeSend for Linux x86_64 (deb)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-x86_64.deb',
-          },
-          {
-            'name': 'FreeSend for Linux aarch64 (deb)',
-            'direct_asset_url': 'https://gitlab.com/a/freesend-aarch64.deb',
-          },
-        ],
-      },
+      'body': 'Both architectures.',
+      'assets': [
+        {
+          'name': 'FreeSend for Linux x86_64 (AppImage)',
+          'browser_download_url':
+              'https://github.com/a/freesend-x86_64.AppImage',
+        },
+        {
+          'name': 'FreeSend for Linux aarch64 (AppImage)',
+          'browser_download_url':
+              'https://github.com/a/freesend-aarch64.AppImage',
+        },
+        {
+          'name': 'FreeSend for Linux x86_64 (deb)',
+          'browser_download_url': 'https://github.com/a/freesend-x86_64.deb',
+        },
+        {
+          'name': 'FreeSend for Linux aarch64 (deb)',
+          'browser_download_url': 'https://github.com/a/freesend-aarch64.deb',
+        },
+      ],
     };
 
     Future<UpdateInfo?> fetch(String? arch, PackageFormat format) {
@@ -483,21 +474,21 @@ void main() {
       final service = UpdateService(
         platform: PlatformKind.linux,
         packageFormat: PackageFormat.appImage,
-        client: MockClient((_) async => http.Response(jsonEncode([
-          {
-            'tag_name': 'v1.4.0',
-            'description': '',
-            'assets': {
-              'links': [
-                {
-                  'name': 'FreeSend for Linux (AppImage)',
-                  'direct_asset_url':
-                      'https://gitlab.com/a/freesend.AppImage',
-                },
-              ],
-            },
-          },
-        ]), 200)),
+        client: MockClient((_) async => http.Response(
+            jsonEncode([
+              {
+                'tag_name': 'v1.4.0',
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Linux (AppImage)',
+                    'browser_download_url':
+                        'https://github.com/a/freesend.AppImage',
+                  },
+                ],
+              },
+            ]),
+            200)),
       );
       addTearDown(service.dispose);
       final info = await service.fetchLatest(arch: 'x86_64');
@@ -508,21 +499,21 @@ void main() {
       final service = UpdateService(
         platform: PlatformKind.linux,
         packageFormat: PackageFormat.appImage,
-        client: MockClient((_) async => http.Response(jsonEncode([
-          {
-            'tag_name': 'v1.4.0',
-            'description': '',
-            'assets': {
-              'links': [
-                {
-                  'name': 'FreeSend for Linux x86_64 (AppImage)',
-                  'direct_asset_url':
-                      'https://gitlab.com/a/freesend-x86_64.AppImage',
-                },
-              ],
-            },
-          },
-        ]), 200)),
+        client: MockClient((_) async => http.Response(
+            jsonEncode([
+              {
+                'tag_name': 'v1.4.0',
+                'body': '',
+                'assets': [
+                  {
+                    'name': 'FreeSend for Linux x86_64 (AppImage)',
+                    'browser_download_url':
+                        'https://github.com/a/freesend-x86_64.AppImage',
+                  },
+                ],
+              },
+            ]),
+            200)),
       );
       addTearDown(service.dispose);
       expect(await service.fetchLatest(arch: 'aarch64'), isNull);
@@ -574,7 +565,7 @@ void main() {
       const payload = 'fake apk bytes';
       final service = UpdateService(
         client: MockClient((request) async {
-          expect(request.url.toString(), 'https://gitlab.com/a/freesend.apk');
+          expect(request.url.toString(), 'https://github.com/a/freesend.apk');
           return http.Response(payload, 200);
         }),
       );
@@ -590,7 +581,7 @@ void main() {
           version: '1.2.0',
           changelog: '',
           publishedAt: null,
-          downloadUrl: 'https://gitlab.com/a/freesend.apk',
+          downloadUrl: 'https://github.com/a/freesend.apk',
           fileName: 'freesend.apk',
           sizeBytes: payload.length,
         ),
@@ -621,7 +612,7 @@ void main() {
             version: '1.2.0',
             changelog: '',
             publishedAt: null,
-            downloadUrl: 'https://gitlab.com/a/freesend.apk',
+            downloadUrl: 'https://github.com/a/freesend.apk',
             fileName: 'freesend.apk',
             sizeBytes: 0,
           ),

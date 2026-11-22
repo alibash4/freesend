@@ -43,7 +43,15 @@ class AppPackagesBridge(
         return packageManager.getInstalledApplications(0)
             .asSequence()
             .filter { info: ApplicationInfo ->
-                !info.sourceDir.isNullOrEmpty() && File(info.sourceDir).exists()
+                // Only apps the user installed (or updated over a system
+                // image) are shareable - skip the OS packages before paying
+                // for label lookups and disk stats.
+                val userInstalled =
+                    (info.flags and ApplicationInfo.FLAG_SYSTEM == 0) ||
+                        (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0)
+                userInstalled &&
+                    !info.sourceDir.isNullOrEmpty() &&
+                    File(info.sourceDir).exists()
             }
             .flatMap { info: ApplicationInfo ->
                 val label = packageManager.getApplicationLabel(info).toString()

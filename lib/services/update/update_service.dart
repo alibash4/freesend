@@ -17,9 +17,9 @@ class UpdateNotAvailableException implements Exception {
   String toString() => message;
 }
 
-/// Reads GitLab Releases and pulls the asset for this install.
+/// Reads GitHub Releases and pulls the asset for this install.
 ///
-/// Asset link names carry a platform word (`android`, `linux`, `windows`,
+/// Asset names carry a platform word (`android`, `linux`, `windows`,
 /// `macos`), a format marker (`(32-bit)`, `(64-bit)`, `(universal)`,
 /// `(AppImage)`, `(deb)`, `(rpm)`, `(bundle)`, `(exe)`, `(dmg)`) and, where a
 /// platform ships more than one architecture, the architecture word (`x86_64`,
@@ -27,7 +27,7 @@ class UpdateNotAvailableException implements Exception {
 class UpdateService {
   UpdateService({
     http.Client? client,
-    this.projectId = '88767048',
+    this.repo = 'alibash4/freesend',
     PlatformKind? platform,
     PackageFormat? packageFormat,
   })  : _client = client ?? http.Client(),
@@ -36,8 +36,8 @@ class UpdateService {
 
   final http.Client _client;
 
-  /// GitLab project id for `kaon2004a/freesend`.
-  final String projectId;
+  /// `owner/name` of the GitHub repository that hosts releases.
+  final String repo;
 
   /// Platform whose assets to look for; injectable so tests can exercise the
   /// Android bitness rules from any host.
@@ -46,10 +46,15 @@ class UpdateService {
   /// Package this copy was installed from. Null means detect at call time.
   final PackageFormat? _packageFormat;
 
-  PackageFormat get _format =>
-      _packageFormat ?? detectPackageFormat();
+  PackageFormat get _format => _packageFormat ?? detectPackageFormat();
 
-  static const _apiBase = 'https://gitlab.com/api/v4/projects';
+  static const _apiBase = 'https://api.github.com/repos';
+
+  /// GitHub rejects API calls without a User-Agent.
+  static const _headers = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'FreeSend-updater',
+  };
 
   /// Timeout for the metadata call. Downloads use their own, longer budget.
   static const _metadataTimeout = Duration(seconds: 15);
@@ -71,9 +76,9 @@ class UpdateService {
   /// so an arm64 machine does not download the x86_64 build and a 64-bit
   /// Android device does not download the universal APK.
   Future<UpdateInfo?> fetchLatest({String? arch}) async {
-    final uri = Uri.parse('$_apiBase/$projectId/releases');
-    final response = await _client.get(uri,
-        headers: {'Accept': 'application/json'}).timeout(_metadataTimeout);
+    final uri = Uri.parse('$_apiBase/$repo/releases');
+    final response =
+        await _client.get(uri, headers: _headers).timeout(_metadataTimeout);
 
     if (response.statusCode != 200) {
       throw HttpException(
@@ -110,17 +115,16 @@ class UpdateService {
     if (tag is! String || tag.isEmpty) return null;
 
     final assets = release['assets'];
-    final links = assets is Map<String, Object?> ? assets['links'] : null;
-    if (links is! List || links.isEmpty) return null;
+    if (assets is! List || assets.isEmpty) return null;
 
     final candidates = <Map<String, Object?>>[];
-    for (final link in links) {
-      if (link is! Map<String, Object?>) continue;
-      final name = link['name'];
-      final url = link['direct_asset_url'] ?? link['url'];
+    for (final asset in assets) {
+      if (asset is! Map<String, Object?>) continue;
+      final name = asset['name'];
+      final url = asset['browser_download_url'];
       if (name is! String || url is! String) continue;
       if (!_matchesPlatform(name)) continue;
-      candidates.add(link);
+      candidates.add(asset);
     }
     if (candidates.isEmpty) return null;
 
@@ -132,19 +136,18 @@ class UpdateService {
     final match = _platform == PlatformKind.android
         ? _pickForAbi(scoped, arch)
         : _pickForFormat(scoped);
-    final url = (match['direct_asset_url'] ?? match['url'])! as String;
+    final url = match['browser_download_url']! as String;
     final size = match['size'];
-    final releasedAt = release['released_at'] ?? release['created_at'];
+    final releasedAt = release['published_at'] ?? release['created_at'];
+    final assetName = match['name']! as String;
 
     return UpdateInfo(
       version: tag.startsWith('v') ? tag.substring(1) : tag,
-      changelog: (release['description'] as String?)?.trim() ?? '',
+      changelog: (release['body'] as String?)?.trim() ?? '',
       publishedAt: releasedAt is String ? DateTime.tryParse(releasedAt) : null,
       downloadUrl: url,
-      fileName: _fileNameFor(
-        match['name']! as String,
-        url,
-      ),
+      fileName:
+          assetName.contains('.') ? assetName : _fileNameFor(assetName, url),
       sizeBytes: size is num ? size.toInt() : 0,
     );
   }
@@ -217,11 +220,17 @@ class UpdateService {
     return lower.contains(_platformSuffix);
   }
 
-  /// Asset link names are the user-facing label; the file name comes from the
-  /// URL, which GitLab keeps stable.
+  /// Falls back to the file name in the download URL when the asset name
+  /// carries no extension. GitHub percent-encodes the path, so decode it.
   String _fileNameFor(String name, String url) {
     final path = Uri.tryParse(url)?.pathSegments.lastOrNull;
-    if (path != null && path.isNotEmpty && path.contains('.')) return path;
+    if (path != null && path.isNotEmpty && path.contains('.')) {
+      try {
+        return Uri.decodeComponent(path);
+      } on FormatException {
+        return path;
+      }
+    }
     return name;
   }
 

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,7 @@ import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
 import 'package:free_send/ui/widgets/vpn_warning.dart';
+import 'package:free_send/ui/screens/file_browser_screen.dart';
 import 'package:free_send/ui/screens/media_browser_screen.dart';
 import 'package:free_send/ui/screens/send_select_view.dart';
 import 'package:free_send/ui/screens/scan_screen.dart';
@@ -65,6 +67,11 @@ class _SendScreenState extends State<SendScreen> {
   bool _picking = false;
   String _query = '';
   bool _chooserShown = false;
+  bool _draggingFiles = false;
+
+  /// Lets the embedded file browser consume back presses for
+  /// directory-up navigation before the screen's own back handling runs.
+  final _browserBack = BrowserBackHandler();
 
   @override
   void initState() {
@@ -166,10 +173,39 @@ class _SendScreenState extends State<SendScreen> {
     await _pick(controller, kind);
   }
 
+  /// Desktop picks go through the in-app filesystem browser; mobile keeps
+  /// the native picker (and SAF for folders) until the SAF browser lands.
+  Future<void> _pickViaBrowser(
+    SendController controller,
+    _SourceKind kind,
+  ) async {
+    final allowed = switch (kind) {
+      _SourceKind.photos => imageFileExtensions,
+      _SourceKind.videos => videoFileExtensions,
+      _SourceKind.audio => audioFileExtensions,
+      _SourceKind.docs => documentFileExtensions,
+      _ => null,
+    };
+    final result = await Navigator.of(context).push<FileBrowserResult>(
+      MaterialPageRoute(
+        builder: (_) => FileBrowserScreen(allowedExtensions: allowed),
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (result.files.isNotEmpty) controller.addFiles(result.files);
+    for (final directory in result.directories) {
+      await controller.addDirectory(directory);
+    }
+  }
+
   Future<void> _pick(SendController controller, _SourceKind kind) async {
     if (_picking) return;
     setState(() => _picking = true);
     try {
+      if (PlatformEnv.isDesktop) {
+        await _pickViaBrowser(controller, kind);
+        return;
+      }
       final picked = await FilePicker.pickFiles(
         type: switch (kind) {
           _SourceKind.any => FileType.any,
@@ -213,6 +249,11 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   Future<void> _pickMedia(SendController controller) async {
+    // photo_manager has no Linux backend, so the media library falls back
+    // to the filesystem browser there.
+    if (PlatformEnv.kind == PlatformKind.linux) {
+      return _pickViaBrowser(controller, _SourceKind.any);
+    }
     final files = await Navigator.of(context).push<List<File>>(
       MaterialPageRoute(builder: (_) => const MediaBrowserScreen()),
     );
@@ -245,6 +286,20 @@ class _SendScreenState extends State<SendScreen> {
 
   Future<void> _pickFolder(SendController controller) async {
     final l10n = AppLocalizations.of(context);
+    if (PlatformEnv.isDesktop) {
+      final result = await Navigator.of(context).push<FileBrowserResult>(
+        MaterialPageRoute(
+          builder: (_) => const FileBrowserScreen(
+            mode: FileBrowserMode.foldersOnly,
+          ),
+        ),
+      );
+      if (result == null || !mounted) return;
+      for (final directory in result.directories) {
+        await controller.addDirectory(directory);
+      }
+      return;
+    }
     var path = await FilePicker.getDirectoryPath(
       dialogTitle: AppLocalizations.of(context).chooseFolderToSend,
     );
@@ -269,6 +324,31 @@ class _SendScreenState extends State<SendScreen> {
     }
   }
 
+  /// Desktop drag-and-drop: files join the queue directly, directories go
+  /// through the same recursive add as the folder picker.
+  Future<void> _onDropDone(DropDoneDetails details) async {
+    if (!mounted) return;
+    setState(() => _draggingFiles = false);
+    final controller = context.read<SendController>();
+    if (controller.isBusy) return;
+    final files = <File>[];
+    final directories = <Directory>[];
+    for (final item in details.files) {
+      final path = item.path;
+      if (path.isEmpty) continue;
+      if (item is DropItemDirectory ||
+          FileSystemEntity.typeSync(path) == FileSystemEntityType.directory) {
+        directories.add(Directory(path));
+      } else {
+        files.add(File(path));
+      }
+    }
+    if (files.isNotEmpty) controller.addFiles(files);
+    for (final directory in directories) {
+      await controller.addDirectory(directory);
+    }
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -279,6 +359,41 @@ class _SendScreenState extends State<SendScreen> {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
     _toast(AppLocalizations.of(context).labelCopied(label));
+  }
+
+  /// Docked action bar under the scrollable send content: queue summary on
+  /// the start edge, Start sharing on the end edge. Sits above the floating
+  /// bottom nav on mobile and flush with the bottom edge on desktop.
+  Widget _startBar(
+    BuildContext context,
+    SendController controller,
+    AppLocalizations l10n,
+    bool floatingNav,
+  ) {
+    final theme = Theme.of(context);
+    final selected = controller.items;
+    return Container(
+      color: theme.scaffoldBackgroundColor,
+      padding: kPagePadding.copyWith(
+        bottom: floatingNav ? floatingNavClearance(context) : AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${l10n.fileCount(selected.length)} · '
+              '${formatBytes(controller.totalBytes)}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: selected.isEmpty ? null : () => _start(controller),
+            icon: Icon(AppIcons.send, size: 17),
+            label: Text(l10n.startSharing),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _start(SendController controller) async {
@@ -324,10 +439,11 @@ class _SendScreenState extends State<SendScreen> {
     final floatingNav = context.select<AppState, bool>(
       (state) => state.floatingNav,
     );
-    return PopScope(
+    final screen = PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (_browserBack.onBack?.call() ?? false) return;
         final leave = await _confirmLeave(controller);
         if (leave && context.mounted) widget.onBack?.call();
       },
@@ -339,71 +455,148 @@ class _SendScreenState extends State<SendScreen> {
             mouseCursor: SystemMouseCursors.click,
             onPressed: () async {
               context.read<AppState>().tick();
+              if (_browserBack.onBack?.call() ?? false) return;
               final leave = await _confirmLeave(controller);
               if (leave && context.mounted) widget.onBack?.call();
             },
           ),
         ),
-        body: SafeArea(
-          child: ListView(
-            controller: _scrollController,
-            padding: EdgeInsets.only(
-              bottom: AppSpacing.xl +
-                  (floatingNav ? floatingNavClearance(context) : 0),
-            ),
-            children: [
-              Padding(
-                padding: kPagePadding,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: switch (controller.phase) {
-                    SendPhase.idle => SendSelectView(
-                        key: const ValueKey('select'),
-                        controller: controller,
-                        onStart: () => _start(controller),
-                      ),
-                    SendPhase.preparing => _BusyView(
-                        key: const ValueKey('preparing'),
-                        label: l10n.openingHotspot,
-                      ),
-                    SendPhase.waitingForPeer ||
-                    SendPhase.transferring =>
-                      _SessionView(
-                        key: const ValueKey('session'),
-                        controller: controller,
-                        onCopy: _copy,
-                        onScanReceiver: () => _scanReceiver(controller),
-                      ),
-                    SendPhase.completed => _CompletedView(
-                        key: const ValueKey('done'),
-                        controller: controller,
-                        onDone: () async {
-                          await controller.reset();
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                        onAgain: () async {
-                          await controller.reset();
-                          if (!context.mounted) return;
-                          await _start(controller);
-                        },
-                      ),
-                    SendPhase.failed || SendPhase.cancelled => _FailedView(
-                        key: const ValueKey('failed'),
-                        controller: controller,
-                        onRetry: () async {
-                          await controller.reset();
-                          if (!context.mounted) return;
-                          await _start(controller);
-                        },
-                        onBack: () async {
-                          await controller.reset();
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                      ),
+        body: Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                bottom: false,
+                child: LayoutBuilder(
+                  builder: (context, viewport) {
+                    // Height available to the scroll content after the
+                    // ListView's own bottom padding is accounted for; the
+                    // embedded browser uses it to fill the leftover space.
+                    final listBottomPad = AppSpacing.xl +
+                        (floatingNav ? floatingNavClearance(context) : 0);
+                    return ListView(
+                      controller: _scrollController,
+                      padding: EdgeInsets.only(bottom: listBottomPad),
+                      children: [
+                        Padding(
+                          padding: kPagePadding,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: switch (controller.phase) {
+                              SendPhase.idle => SendSelectView(
+                                  key: const ValueKey('select'),
+                                  controller: controller,
+                                  browserBack: _browserBack,
+                                  contentHeight:
+                                      viewport.maxHeight - listBottomPad,
+                                ),
+                              SendPhase.preparing => _BusyView(
+                                  key: const ValueKey('preparing'),
+                                  label: l10n.openingHotspot,
+                                ),
+                              SendPhase.waitingForPeer ||
+                              SendPhase.transferring =>
+                                _SessionView(
+                                  key: const ValueKey('session'),
+                                  controller: controller,
+                                  onCopy: _copy,
+                                  onScanReceiver: () =>
+                                      _scanReceiver(controller),
+                                ),
+                              SendPhase.completed => _CompletedView(
+                                  key: const ValueKey('done'),
+                                  controller: controller,
+                                  onDone: () async {
+                                    await controller.reset();
+                                    if (context.mounted)
+                                      Navigator.of(context).pop();
+                                  },
+                                  onAgain: () async {
+                                    await controller.reset();
+                                    if (!context.mounted) return;
+                                    await _start(controller);
+                                  },
+                                ),
+                              SendPhase.failed ||
+                              SendPhase.cancelled =>
+                                _FailedView(
+                                  key: const ValueKey('failed'),
+                                  controller: controller,
+                                  onRetry: () async {
+                                    await controller.reset();
+                                    if (!context.mounted) return;
+                                    await _start(controller);
+                                  },
+                                  onBack: () async {
+                                    await controller.reset();
+                                    if (context.mounted)
+                                      Navigator.of(context).pop();
+                                  },
+                                ),
+                            },
+                          ),
+                        ),
+                      ],
+                    );
                   },
                 ),
               ),
-            ],
+            ),
+            if (controller.phase == SendPhase.idle)
+              _startBar(context, controller, l10n, floatingNav),
+          ],
+        ),
+      ),
+    );
+    if (!PlatformEnv.isDesktop) return screen;
+    return DropTarget(
+      onDragEntered: (_) {
+        if (!controller.isBusy) setState(() => _draggingFiles = true);
+      },
+      onDragExited: (_) => setState(() => _draggingFiles = false),
+      onDragDone: _onDropDone,
+      child: Stack(
+        children: [
+          screen,
+          if (_draggingFiles && !controller.isBusy)
+            const Positioned.fill(child: _DropFilesOverlay()),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-screen affordance shown while files are dragged over the send view.
+class _DropFilesOverlay extends StatelessWidget {
+  const _DropFilesOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IgnorePointer(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.45),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.lg,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: AppColors.accent, width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(AppIcons.inbox, color: AppColors.accent, size: 22),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  AppLocalizations.of(context).dropFilesToSend,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -596,6 +596,60 @@ abstract class AppLocalizations {
   /// **'Add folder'**
   String get addFolder;
 
+  /// No description provided for @up.
+  ///
+  /// In en, this message translates to:
+  /// **'Up'**
+  String get up;
+
+  /// No description provided for @folderEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty'**
+  String get folderEmpty;
+
+  /// No description provided for @folderReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read this folder: {error}'**
+  String folderReadFailed(Object error);
+
+  /// No description provided for @thisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get thisDevice;
+
+  /// No description provided for @chooseFolderToBrowse.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder to browse'**
+  String get chooseFolderToBrowse;
+
+  /// No description provided for @storageAccessNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage access needed'**
+  String get storageAccessNeeded;
+
+  /// No description provided for @storageAccessBody.
+  ///
+  /// In en, this message translates to:
+  /// **'FreeSend needs permission to view the files on this device so you can pick what to send.'**
+  String get storageAccessBody;
+
+  /// No description provided for @grantStorageAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant access'**
+  String get grantStorageAccess;
+
+  /// No description provided for @dropFilesToSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop files to add them'**
+  String get dropFilesToSend;
+
   /// No description provided for @emptyCategory.
   ///
   /// In en, this message translates to:
@@ -739,12 +793,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{sent} of {total}'**
   String ofTotal(Object sent, Object total);
-
-  /// No description provided for @thisDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'This device'**
-  String get thisDevice;
 
   /// No description provided for @general.
   ///
@@ -2108,11 +2156,11 @@ abstract class AppLocalizations {
   /// **'FreeSend {version} is available'**
   String updateAvailableTitle(Object version);
 
-  /// No description provided for @askingGitLab.
+  /// No description provided for @askingForUpdates.
   ///
   /// In en, this message translates to:
-  /// **'Asking GitLab what is new.'**
-  String get askingGitLab;
+  /// **'Asking GitHub what is new.'**
+  String get askingForUpdates;
 
   /// No description provided for @whatsNew.
   ///

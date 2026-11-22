@@ -46,6 +46,15 @@ abstract final class AppIcons {
   static final IconData file = UIcons.regularRounded.file;
   static final IconData fileText = UIcons.regularRounded.document;
   static final IconData pdf = UIcons.regularRounded.file_invoice;
+  // Filled variants for the file-type glyphs, used where the icon should
+  // read as a solid badge (browser rows, queue items).
+  static final IconData folderFilled = UIcons.solidRounded.folder;
+  static final IconData imageFilled = UIcons.solidRounded.picture;
+  static final IconData videoFilled = UIcons.solidRounded.video_camera;
+  static final IconData musicFilled = UIcons.solidRounded.music;
+  static final IconData fileFilled = UIcons.solidRounded.file;
+  static final IconData fileTextFilled = UIcons.solidRounded.document;
+  static final IconData pdfFilled = UIcons.solidRounded.file_invoice;
   static final IconData grid = UIcons.regularRounded.grid;
   static final IconData list = UIcons.regularRounded.list;
 
@@ -70,7 +79,7 @@ abstract final class AppIcons {
 
   // State.
   static final IconData check = UIcons.regularRounded.check;
-  static final IconData checkCircle = UIcons.regularRounded.checkbox;
+  static final IconData checkCircle = UIcons.solidRounded.check_circle;
   static final IconData circle = UIcons.regularRounded.circle;
   static final IconData package = UIcons.regularRounded.package;
   static final IconData android = UIcons.brands.android;

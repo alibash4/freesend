@@ -2,7 +2,7 @@
 
 ## Self-update mechanics
 
-The app checks GitLab Releases for a newer build and installs it.
+The app checks GitHub Releases for a newer build and installs it.
 
 - **Settings → Updates → Check automatically** turns on a silent check each
   launch. A failure or an up-to-date app stays quiet.
@@ -30,6 +30,7 @@ and the app downloads the package that matches how it was installed:
 | `FreeSend for Linux aarch64 (rpm)` | `.rpm` for aarch64 | Fedora/RHEL package on arm64 |
 | `FreeSend for Linux aarch64 (bundle)` | `.tar.gz` of the raw aarch64 build | an unpacked `free_send` bundle on arm64 |
 | `FreeSend for Windows (exe)` | `.zip` containing `free_send.exe` | Windows |
+| `FreeSend for macOS (dmg)` | `.dmg` disk image | macOS |
 
 The Android ABI is read from the device, so a 64-bit phone downloads the
 smaller split instead of the universal APK. On Linux the architecture is
@@ -47,71 +48,49 @@ copy, or the installer refuses the update.
 
 ## Releasing
 
-Create the release first, then let the pipeline attach the binary to it.
+Push a `v*` tag (`git tag v1.2.3 && git push origin v1.2.3`) and the
+`release` workflow builds every package — Android splits, Linux x86_64 and
+aarch64, Windows and macOS — then attaches them to the GitHub release
+through `scripts/attach_release_asset.sh`. The script creates the release
+itself when the tag went out bare (with generated release notes), so a
+bare tag still publishes; create the release first (**Releases → Draft a
+new release → choose the tag**) if you want your own notes.
 
-1. **Make the release** in GitLab: Deploy → Releases → New release, pick a
-   tag (or type `v1.2.3` to create it), write the release notes, and save.
-   Creating the tag is what triggers the pipeline.
-2. The `release:publish` job uploads every package the build jobs produced
-   and **attaches them to that release** under the names in the table
-   above. Your release notes are left alone. A missing file (for example
-   the Windows zip, when no Windows runner is available) is skipped; the
-   rest are still attached.
-3. If a tag has no release at all, the job creates one for you, using the
-   commit log since the previous tag as the notes.
+Asset names on the release are the names in the table above plus the real
+file extension (for example `FreeSend for Android (64-bit).apk`); the
+updater matches on those names. A missing package is skipped while the
+rest still attach. Publishing uses the job's `GITHUB_TOKEN`
+(`contents: write`), so no release token secret is needed.
 
-Pushing to `main` runs the `test` job only — analyze plus the test suite,
-no packages. A full build matrix costs roughly 45 runner-minutes against a
-finite monthly compute quota, so packages are built on tags: `build:apk`
-(analyze, test, the two ABI splits and the universal APK), `build:linux`
-(AppImage, deb, rpm and the raw tar.gz), `build:linux:arm64` (the same four
-for aarch64 on a hosted Arm runner) and `build:windows` (a zip of
-`free_send.exe` and its DLLs, allowed to fail when no Windows runner is
-available).
+One thing must be configured once — **a signing keystore**. Android must
+be signed with one stable key, or it refuses to install an update over an
+existing copy. Locally, create `android/key.properties` (gitignored):
 
-Two things must be configured once:
+```
+STORE_FILE=/absolute/path/to/freesend.keystore
+STORE_PASSWORD=...
+KEY_ALIAS=freesend
+KEY_PASSWORD=...
+```
 
-1. **`RELEASE_TOKEN`** — a project access token with the `api` scope, set
-   as a CI/CD variable (Settings → CI/CD → Variables). Creating a release
-   in the UI does not remove the need for this: the job still has to upload
-   the APK and attach it, and `CI_JOB_TOKEN` cannot do that. Mark the
-   variable **masked**.
+Generate the keystore once and keep it somewhere safe; losing it means
+no further updates to installed copies:
 
-   Also check **Protect variable**. A protected variable only reaches
-   pipelines on protected branches or tags. If you leave it off, every
-   pipeline can see it. If you turn it on, you must also protect your
-   release tags (Settings → Repository → Protected tags, rule `v*`) or the
-   tag pipeline will not receive the token and the job will fail with a
-   401.
+```bash
+keytool -genkeypair -v -keystore ~/freesend.keystore \
+  -alias freesend -keyalg RSA -keysize 4096 -validity 10000
+```
 
-2. **A signing keystore** — one stable key, or Android refuses to install
-   an update over an existing copy. Locally, create
-   `android/key.properties` (gitignored):
+For CI, add the same key as four Actions secrets (Settings → Secrets
+and variables → Actions) and the workflow writes `key.properties`
+itself:
 
-   ```
-   STORE_FILE=/absolute/path/to/freesend.keystore
-   STORE_PASSWORD=...
-   KEY_ALIAS=freesend
-   KEY_PASSWORD=...
-   ```
+| Variable | Value |
+| --- | --- |
+| `SIGNING_KEYSTORE_BASE64` | `base64 -w0 ~/freesend.keystore` |
+| `SIGNING_STORE_PASSWORD` | keystore password |
+| `SIGNING_KEY_ALIAS` | `freesend` |
+| `SIGNING_KEY_PASSWORD` | key password |
 
-   Generate the keystore once and keep it somewhere safe; losing it means
-   no further updates to installed copies:
-
-   ```bash
-   keytool -genkeypair -v -keystore ~/freesend.keystore \
-     -alias freesend -keyalg RSA -keysize 4096 -validity 10000
-   ```
-
-   For CI, add the same key as four CI/CD variables and the pipeline
-   writes `key.properties` itself:
-
-   | Variable | Value |
-   | --- | --- |
-   | `SIGNING_KEYSTORE_BASE64` | `base64 -w0 ~/freesend.keystore` |
-   | `SIGNING_STORE_PASSWORD` | keystore password |
-   | `SIGNING_KEY_ALIAS` | `freesend` |
-   | `SIGNING_KEY_PASSWORD` | key password |
-
-   Without these the build falls back to debug signing, which is fine for
-   testing but will not update a properly signed release.
+Without these the build falls back to debug signing, which is fine for
+testing but will not update a properly signed release.

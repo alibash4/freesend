@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -9,6 +10,8 @@ import 'package:free_send/l10n/app_localizations.dart';
 import 'package:free_send/models/recent_file.dart';
 import 'package:free_send/models/transfer_item.dart';
 import 'package:free_send/services/app_packages.dart';
+import 'package:free_send/ui/screens/file_browser_screen.dart';
+import 'package:free_send/services/storage_access.dart';
 import 'package:free_send/state/send_controller.dart';
 import 'package:free_send/theme/app_icons.dart';
 import 'package:free_send/theme/app_theme.dart';
@@ -22,11 +25,20 @@ class SendSelectView extends StatefulWidget {
   const SendSelectView({
     super.key,
     required this.controller,
-    required this.onStart,
+    required this.contentHeight,
+    this.browserBack,
   });
 
   final SendController controller;
-  final Future<void> Function() onStart;
+
+  /// Height the page's scroll viewport can show at once. The embedded
+  /// browser uses it to claim whatever space the rest of the column
+  /// doesn't need, instead of a fixed fraction of the screen.
+  final double contentHeight;
+
+  /// Shared with the send screen so system back can walk up directories
+  /// inside the embedded browser before leaving the screen.
+  final BrowserBackHandler? browserBack;
 
   @override
   State<SendSelectView> createState() => _SendSelectViewState();
@@ -34,7 +46,7 @@ class SendSelectView extends StatefulWidget {
 
 class _SendSelectViewState extends State<SendSelectView> {
   _SendCategory _category = _SendCategory.files;
-  bool _grid = false;
+  final bool _grid = false;
   bool _selectionMode = false;
   bool _loadingApps = false;
   List<InstalledApp> _apps = const [];
@@ -51,6 +63,57 @@ class _SendSelectViewState extends State<SendSelectView> {
       _apps = apps;
       _loadingApps = false;
     });
+  }
+
+  Future<void> _addBrowserItems(
+    List<File> files,
+    List<Directory> directories,
+  ) async {
+    if (files.isNotEmpty) widget.controller.addFiles(files);
+    for (final directory in directories) {
+      await widget.controller.addDirectory(directory);
+    }
+  }
+
+  /// Live-selection probe for the embedded browser: an entity counts as
+  /// selected when the queue already holds it (a directory counts when any
+  /// queued file lives beneath it).
+  bool _browserItemSelected(FileSystemEntity entity) {
+    final separator = Platform.pathSeparator;
+    return widget.controller.items.any((item) {
+      final path = item.path;
+      if (path == null) return false;
+      return entity is Directory
+          ? path.startsWith('${entity.path}$separator')
+          : path == entity.path;
+    });
+  }
+
+  /// Live-selection toggle: picks go straight into the send queue and the
+  /// queue strip / Start button reflect them immediately.
+  void _browserToggle(FileSystemEntity entity, bool selected) {
+    if (entity is Directory) {
+      if (selected) {
+        unawaited(widget.controller.addDirectory(entity));
+      } else {
+        final prefix = '${entity.path}${Platform.pathSeparator}';
+        for (final item in widget.controller.items
+            .where((item) => item.path?.startsWith(prefix) ?? false)
+            .toList(growable: false)) {
+          widget.controller.removeItem(item);
+        }
+      }
+    } else if (entity is File) {
+      if (selected) {
+        widget.controller.addFiles([entity]);
+      } else {
+        for (final item in widget.controller.items
+            .where((item) => item.path == entity.path)
+            .toList(growable: false)) {
+          widget.controller.removeItem(item);
+        }
+      }
+    }
   }
 
   Future<void> _addFiles(FileType type, {List<String>? extensions}) async {
@@ -134,16 +197,24 @@ class _SendSelectViewState extends State<SendSelectView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final controller = widget.controller;
     final wide = MediaQuery.sizeOf(context).width >= 840;
+    // Every browsing category embeds a file browser: the raw filesystem
+    // on desktop, and on Android the same browser once the all-files
+    // grant is in place. iOS keeps the old content views, and the APK
+    // list is Android-only anyway.
+    final browserMode = _category != _SendCategory.apk &&
+        (PlatformEnv.isDesktop || Platform.isAndroid);
     // Recents stat every file synchronously, so only resolve them for the
     // categories that actually render them.
-    final needsRecents = _category != _SendCategory.files &&
+    final needsRecents = !browserMode &&
+        _category != _SendCategory.files &&
         _category != _SendCategory.folders &&
         _category != _SendCategory.apk;
     final recents = needsRecents ? _categoryRecents() : const <RecentFile>[];
+    // On desktop every browsing category embeds the filesystem browser;
+    // only the APK list (Android-only anyway) keeps the old content views.
     final selected = controller.items;
     // APK bundles only exist on Android; other platforms never show the tab.
     final categories = _SendCategory.values
@@ -162,29 +233,16 @@ class _SendSelectViewState extends State<SendSelectView> {
           labelBuilder: (category) => _categoryLabel(l10n, category),
         ),
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                _categoryLabel(l10n, _category),
-                style: theme.textTheme.titleLarge,
-              ),
+        if (browserMode) ...[
+          if (selected.isNotEmpty) ...[
+            _QueueStrip(
+              items: selected,
+              onRemove: widget.controller.removeItem,
             ),
-            if (wide)
-              TextButton(
-                onPressed: () =>
-                    setState(() => _selectionMode = !_selectionMode),
-                child: Text(_selectionMode ? l10n.done : l10n.select),
-              ),
-            IconButton(
-              tooltip: _grid ? l10n.listView : l10n.gridView,
-              onPressed: () => setState(() => _grid = !_grid),
-              icon: Icon(_grid ? AppIcons.list : AppIcons.grid),
-            ),
+            const SizedBox(height: AppSpacing.sm),
           ],
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (_category == _SendCategory.files ||
+          _browserContent(),
+        ] else if (_category == _SendCategory.files ||
             _category == _SendCategory.folders)
           _selectedQueue(
             l10n,
@@ -207,23 +265,57 @@ class _SendSelectViewState extends State<SendSelectView> {
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${l10n.fileCount(selected.length)} · '
-                '${formatBytes(controller.totalBytes)}',
-                style: theme.textTheme.bodySmall,
+      ],
+    );
+  }
+
+  /// The embedded filesystem browser for the current category. Keyed by
+  /// category so each tab keeps its own navigation state.
+  Widget _browserContent() {
+    final mode = _category == _SendCategory.folders
+        ? FileBrowserMode.foldersOnly
+        : FileBrowserMode.filesAndFolders;
+    final allowed = switch (_category) {
+      _SendCategory.music => audioFileExtensions,
+      _SendCategory.docs => documentFileExtensions,
+      _SendCategory.videos => videoFileExtensions,
+      _ => null,
+    };
+    // The send screen scrolls as a whole, so the browser gets a bounded
+    // height: everything the scroll viewport has left after the fixed
+    // chrome around it (tabs, queue strip, link picker, trailing space).
+    // Chrome heights: top spacer + tabs + gap = 16+40+24, queue strip
+    // = 44+8 when items are queued, desktop link picker block = 16+~40,
+    // trailing spacer = 24.
+    const chrome = AppSpacing.md + 40 + AppSpacing.lg + AppSpacing.lg;
+    final queueChrome =
+        widget.controller.items.isEmpty ? 0.0 : 44 + AppSpacing.sm;
+    final linkChrome = PlatformEnv.isDesktop ? AppSpacing.md + 40 : 0.0;
+    final raw = widget.contentHeight - chrome - queueChrome - linkChrome;
+    final height = raw < 320 ? 320.0 : raw;
+    return SizedBox(
+      height: height,
+      child: PlatformEnv.isDesktop
+          ? FileBrowserView(
+              key: ValueKey(_category),
+              mode: mode,
+              allowedExtensions: allowed,
+              isItemSelected: _browserItemSelected,
+              onItemToggle: _browserToggle,
+              onConfirm: _addBrowserItems,
+            )
+          : _StorageGate(
+              key: ValueKey(_category),
+              child: FileBrowserView(
+                mode: mode,
+                allowedExtensions: allowed,
+                showHeader: false,
+                backHandler: widget.browserBack,
+                isItemSelected: _browserItemSelected,
+                onItemToggle: _browserToggle,
+                onConfirm: _addBrowserItems,
               ),
             ),
-            FilledButton.icon(
-              onPressed: selected.isEmpty ? null : () => widget.onStart(),
-              icon: Icon(AppIcons.send, size: 17),
-              label: Text(l10n.startSharing),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -446,6 +538,156 @@ class _SendSelectViewState extends State<SendSelectView> {
       _SendCategory.apk => AppIcons.android,
       _SendCategory.large => AppIcons.info,
     };
+  }
+}
+
+/// Gates the Android file browser behind the "All files access" grant.
+/// Shows a prompt until [StorageAccess.isGranted] reports access, then
+/// reveals the normal filesystem browser. Re-checks whenever the app
+/// resumes so returning from system settings just works.
+class _StorageGate extends StatefulWidget {
+  const _StorageGate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<_StorageGate> createState() => _StorageGateState();
+}
+
+class _StorageGateState extends State<_StorageGate>
+    with WidgetsBindingObserver {
+  bool _checking = true;
+  bool _granted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final granted = await StorageAccess.isGranted();
+    if (!mounted) return;
+    setState(() {
+      _granted = granted;
+      _checking = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    if (_checking) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_granted) return widget.child;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              AppIcons.folderOpen,
+              size: 40,
+              color: scheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              l10n.storageAccessNeeded,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              l10n.storageAccessBody,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton.icon(
+              onPressed: () async {
+                await StorageAccess.request();
+                await _refresh();
+              },
+              icon: Icon(AppIcons.settings, size: 17),
+              label: Text(l10n.grantStorageAccess),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact horizontal strip of everything already in the send queue,
+/// shown above the embedded browser on desktop.
+class _QueueStrip extends StatelessWidget {
+  const _QueueStrip({required this.items, required this.onRemove});
+
+  final List<TransferItem> items;
+  final void Function(TransferItem item) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (context, index) =>
+            const SizedBox(width: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final isFolder = item.relativePath?.contains('/') ?? false;
+          return Container(
+            padding: const EdgeInsets.only(left: AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isFolder ? AppIcons.folderOpen : AppIcons.file,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 160),
+                  child: Text(
+                    item.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(AppIcons.close, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: AppLocalizations.of(context).remove,
+                  onPressed: () => onRemove(item),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 

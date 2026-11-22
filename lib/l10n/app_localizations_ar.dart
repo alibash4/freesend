@@ -295,6 +295,36 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addFolder => 'إضافة مجلد';
 
   @override
+  String get up => 'أعلى';
+
+  @override
+  String get folderEmpty => 'هذا المجلد فارغ';
+
+  @override
+  String folderReadFailed(Object error) {
+    return 'تعذّرت قراءة هذا المجلد: $error';
+  }
+
+  @override
+  String get thisDevice => 'هذا الجهاز';
+
+  @override
+  String get chooseFolderToBrowse => 'اختر مجلدًا للتصفح';
+
+  @override
+  String get storageAccessNeeded => 'يلزم الوصول إلى التخزين';
+
+  @override
+  String get storageAccessBody =>
+      'يحتاج FreeSend إلى إذن لعرض الملفات على هذا الجهاز لتتمكن من اختيار ما تريد إرساله.';
+
+  @override
+  String get grantStorageAccess => 'منح الإذن';
+
+  @override
+  String get dropFilesToSend => 'أفلت الملفات لإضافتها';
+
+  @override
   String get emptyCategory => 'لا يوجد شيء هنا بعد';
 
   @override
@@ -411,9 +441,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String ofTotal(Object sent, Object total) {
     return '$sent من $total';
   }
-
-  @override
-  String get thisDevice => 'هذا الجهاز';
 
   @override
   String get general => 'عام';
@@ -1209,7 +1236,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get askingGitLab => 'نسأل GitLab عمّا هو جديد.';
+  String get askingForUpdates => 'نسأل GitHub عمّا هو جديد.';
 
   @override
   String get whatsNew => 'ما الجديد';

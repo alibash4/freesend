@@ -14,7 +14,7 @@ enum UpdatePhase {
   /// Nothing happening.
   idle,
 
-  /// Asking GitLab what the latest release is.
+  /// Asking GitHub what the latest release is.
   checking,
 
   /// A newer release is available and waiting for the user's decision.

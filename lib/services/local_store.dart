@@ -28,6 +28,7 @@ class LocalStore {
   static const _kHapticIntensity = 'haptic_intensity';
   static const _kBlackTheme = 'black_theme';
   static const _kFloatingNav = 'floating_nav';
+  static const _kSafRootUri = 'saf_root_uri';
 
   late SharedPreferences _prefs;
 
@@ -67,7 +68,7 @@ class LocalStore {
     await _prefs.setString(_kDownloadDir, path);
   }
 
-  /// Whether the app asks GitLab for a newer release on every launch.
+  /// Whether the app asks GitHub for a newer release on every launch.
   bool get autoUpdate => _prefs.getBool(_kAutoUpdate) ?? false;
 
   Future<void> setAutoUpdate(bool value) async {
@@ -108,6 +109,17 @@ class LocalStore {
 
   Future<void> setFloatingNav(bool value) async {
     await _prefs.setBool(_kFloatingNav, value);
+  }
+
+  /// The SAF tree URI the file browser last browsed on Android, if any.
+  String? get safRootUri => _prefs.getString(_kSafRootUri);
+
+  Future<void> setSafRootUri(String? uri) async {
+    if (uri == null || uri.isEmpty) {
+      await _prefs.remove(_kSafRootUri);
+    } else {
+      await _prefs.setString(_kSafRootUri, uri);
+    }
   }
 
   /// Whether the mobile permission gate has been shown at least once.
